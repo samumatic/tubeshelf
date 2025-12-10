@@ -1,7 +1,7 @@
 # TubeShelf
 
 > [!WARNING]
-> TubeShelf is still in early development and is subject to major changes from version to version. I am developing the core features and collecting feedbacks. Expect bugs! Contributions and feedback are welcome.
+> TubeShelf is still in early development and is subject to major changes from version to version. Expect bugs! Contributions and feedback are welcome.
 
 **TubeShelf** is a self-hosted YouTube subscription feed that gives you a clean, chronological video inbox — no algorithm, no tracking, no noise.
 
