@@ -20,7 +20,7 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper process handling
+# Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
 # Copy built application from builder
@@ -28,16 +28,17 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
-# Create data directory for persistent storage
-RUN mkdir -p /app/data && \
-    mkdir -p /app/.next/cache && \
-    chown -R node:node /app
+# Create required dirs and ensure non-root can write
+RUN mkdir -p /app/data /app/.next/cache && \
+    chown -R 1000:1000 /app
 
 # Expose port
 EXPOSE 3000
 
-# Switch to non-root user
-USER node
+# Do not set a fixed USER here; compose will run with PUID/PGID
+
+# Run as non-root user (uid:gid 1000:1000)
+USER 1000:1000
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

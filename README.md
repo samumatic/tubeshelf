@@ -19,6 +19,9 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./data:/app/data
 ```
