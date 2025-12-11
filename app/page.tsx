@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Menu, Search, Settings, Bookmark } from "lucide-react";
+import { Play, Menu, Search, Settings, Bookmark, Sliders } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { WatchLater } from "@/components/WatchLater";
 import { ThemeToggle } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,15 @@ import {
   removeSubscription,
   importSubscriptions,
   exportSubscriptions,
+  getSettings,
+  updateSettings,
+  deleteAllSubscriptions,
+  clearWatchHistory,
+  resetAllSettings,
   Video,
   Subscription,
 } from "@/lib/mockData";
+import type { AppSettings } from "@/lib/settingsStore";
 
 type Page = "home" | "watch-later";
 type FeedTab = "videos" | "reels";
@@ -41,6 +48,7 @@ export default function Home() {
   const [watchLater, setWatchLater] = useState<WatchLaterItem[]>([]);
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredVideos, setFilteredVideos] = useState<Video[]>([]);
@@ -48,6 +56,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hideWatched, setHideWatched] = useState(false);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   const refreshData = async () => {
     setLoading(true);
@@ -98,8 +107,24 @@ export default function Home() {
 
   // Initialize data
   useEffect(() => {
+    const init = async () => {
+      try {
+        const appSettings = await getSettings();
+        setSettings(appSettings);
+      } catch (e) {
+        console.error("Failed to load settings:", e);
+      }
+    };
+
     refreshData();
     loadUserState();
+    init();
+
+    // Load hideWatched preference from localStorage
+    const savedHideWatched = localStorage.getItem("hideWatched");
+    if (savedHideWatched !== null) {
+      setHideWatched(JSON.parse(savedHideWatched));
+    }
 
     // Load watch later from localStorage (keep this client-side)
     const saved = localStorage.getItem("watchLater");
@@ -129,6 +154,11 @@ export default function Home() {
       saveUserState();
     }
   }, [watchedVideos, hideWatched]);
+
+  // Save hideWatched preference to localStorage
+  useEffect(() => {
+    localStorage.setItem("hideWatched", JSON.stringify(hideWatched));
+  }, [hideWatched]);
 
   // Handle search and filter
   useEffect(() => {
@@ -186,6 +216,36 @@ export default function Home() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveSettings = async (updates: Partial<typeof settings>) => {
+    try {
+      await updateSettings(updates);
+      const freshSettings = await getSettings();
+      setSettings(freshSettings);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
+  };
+
+  const handleDeleteAllSubscriptions = async () => {
+    await deleteAllSubscriptions();
+    await refreshData();
+  };
+
+  const handleClearWatchHistory = async () => {
+    await clearWatchHistory();
+    setWatchedVideos(new Set());
+  };
+
+  const handleResetAllSettings = async () => {
+    try {
+      await resetAllSettings();
+      const freshSettings = await getSettings();
+      setSettings(freshSettings);
+    } catch (err) {
+      console.error("Failed to reset settings:", err);
+    }
   };
 
   const handleRemoveSubscription = async (id: string) => {
@@ -279,6 +339,14 @@ export default function Home() {
             {/* Right Actions */}
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button
+                onClick={() => setShowSettings(true)}
+                variant="ghost"
+                size="icon"
+                title="Settings"
+              >
+                <Sliders className="w-5 h-5" />
+              </Button>
               <Button
                 onClick={() => setShowSubscriptions(true)}
                 variant="secondary"
@@ -507,6 +575,29 @@ export default function Home() {
         isOpen={showSubscriptions}
         onClose={() => setShowSubscriptions(false)}
       />
+
+      {/* Modals */}
+      <SubscriptionManager
+        subscriptions={subscriptions}
+        onAdd={handleAddSubscription}
+        onRemove={handleRemoveSubscription}
+        onImport={handleImportSubscriptions}
+        onExport={handleExportSubscriptions}
+        isOpen={showSubscriptions}
+        onClose={() => setShowSubscriptions(false)}
+      />
+
+      {settings && (
+        <SettingsPanel
+          settings={settings}
+          onSave={handleSaveSettings}
+          onDeleteSubscriptions={handleDeleteAllSubscriptions}
+          onClearWatchHistory={handleClearWatchHistory}
+          onResetSettings={handleResetAllSettings}
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
 
       {/* Footer */}
       <footer className="border-t border-border mt-16 bg-card/50">

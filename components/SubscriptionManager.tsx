@@ -107,7 +107,7 @@ export function SubscriptionManager({
               variant="secondary"
               size="icon"
               disabled={importing}
-              title="Import OPML"
+              title="Import OPML or TubeShelf export"
             >
               <Upload className="w-4 h-4" />
             </Button>
@@ -147,6 +147,12 @@ export function SubscriptionManager({
               </Button>
             </div>
             {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+          </div>
+
+          {/* Import Info */}
+          <div className="mb-4 p-3 bg-secondary/50 rounded text-xs text-muted-foreground">
+            Import OPML files from other services or export files from TubeShelf
+            using the upload button above.
           </div>
 
           <input

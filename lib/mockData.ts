@@ -105,3 +105,60 @@ export async function exportSubscriptions(): Promise<string> {
   }
   return res.text();
 }
+
+export async function getSettings() {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Failed to fetch settings");
+  }
+  return res.json();
+}
+
+export async function updateSettings(updates: Record<string, any>) {
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update settings");
+  }
+  return res.json();
+}
+
+export async function deleteAllSubscriptions() {
+  const res = await fetch("/api/danger/delete-subscriptions", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to delete subscriptions");
+  }
+  return res.json();
+}
+
+export async function clearWatchHistory() {
+  const res = await fetch("/api/danger/clear-watch-history", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to clear watch history");
+  }
+  return res.json();
+}
+
+export async function resetAllSettings() {
+  const res = await fetch("/api/danger/reset-settings", {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to reset settings");
+  }
+  return res.json();
+}
