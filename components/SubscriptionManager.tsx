@@ -201,7 +201,12 @@ export function SubscriptionManager({
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{sub.title}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      Added {new Date(sub.addedAt).toLocaleDateString()}
+                      Added{" "}
+                      {new Date(sub.addedAt).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
                     </p>
                   </div>
                   <Button

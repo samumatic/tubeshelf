@@ -51,7 +51,12 @@ export function WatchLater({ items, onRemove, onPlay }: WatchLaterProps) {
             </h4>
             <p className="text-xs text-muted-foreground mt-1">{item.channel}</p>
             <p className="text-xs text-muted-foreground">
-              Saved {item.addedAt.toLocaleDateString()}
+              Saved{" "}
+              {item.addedAt.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
             </p>
           </div>
 

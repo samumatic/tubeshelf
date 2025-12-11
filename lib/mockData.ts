@@ -27,7 +27,11 @@ const headers: HeadersInit = {
 function formatDate(dateStr: string) {
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString();
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export async function getVideos(): Promise<Video[]> {

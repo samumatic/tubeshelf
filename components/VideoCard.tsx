@@ -129,15 +129,15 @@ export function VideoCard({
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col h-48">
-        <h3 className="font-semibold text-sm leading-tight mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+      <div className="p-3 flex flex-col h-44">
+        <h3 className="font-semibold text-sm leading-tight mb-1 line-clamp-2 group-hover:text-primary transition-colors">
           {title}
         </h3>
-        <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
+        <p className="text-xs text-muted-foreground mb-0.5 line-clamp-1">
           {channel}
         </p>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3 line-clamp-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2 line-clamp-1">
           {views && <span>{views.toLocaleString()} views</span>}
           {uploadedAt && <span>•</span>}
           {uploadedAt && <span>{uploadedAt}</span>}
@@ -149,7 +149,7 @@ export function VideoCard({
             onClick={handleWatch}
             variant="default"
             size="sm"
-            className="flex-1 text-xs"
+            className="flex-1 text-xs h-8"
           >
             Watch
           </Button>
@@ -157,7 +157,7 @@ export function VideoCard({
             onClick={onWatchLater}
             variant="outline"
             size="sm"
-            className="flex-1 text-xs"
+            className="flex-1 text-xs h-8"
           >
             <Clock className="w-3 h-3 mr-1" />
             Later

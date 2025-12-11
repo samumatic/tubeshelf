@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Menu, Search, Settings, Bookmark, Sliders } from "lucide-react";
+import { Play, Menu, Search, Settings, Bookmark, Sliders, Plus } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
@@ -351,27 +351,21 @@ export default function Home() {
             {/* Right Actions */}
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => setShowSettings(true)}
-                variant="ghost"
-                size="icon"
-                title="Settings"
-              >
-                <Sliders className="w-5 h-5" />
-              </Button>
-              <Button
                 onClick={() => setShowSubscriptions(true)}
                 variant="secondary"
                 size="sm"
-                className="hidden sm:flex"
+                className="hidden sm:flex gap-1"
+                title="Manage subscriptions"
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Subscriptions
+                <Plus className="w-4 h-4" />
+                Add
               </Button>
               <Button
                 onClick={() => setCurrentPage("watch-later")}
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 className="relative"
+                title="Watch later list"
               >
                 <Bookmark className="w-5 h-5" />
                 {watchLater.length > 0 && (
@@ -379,6 +373,14 @@ export default function Home() {
                     {watchLater.length}
                   </span>
                 )}
+              </Button>
+              <Button
+                onClick={() => setShowSettings(true)}
+                variant="ghost"
+                size="icon"
+                title="Settings"
+              >
+                <Settings className="w-5 h-5" />
               </Button>
             </div>
           </div>
