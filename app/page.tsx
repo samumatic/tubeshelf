@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Menu, Search, Settings, Bookmark, Sliders, Plus } from "lucide-react";
+import {
+  Play,
+  Menu,
+  Search,
+  Settings,
+  Bookmark,
+  Sliders,
+  Plus,
+} from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
