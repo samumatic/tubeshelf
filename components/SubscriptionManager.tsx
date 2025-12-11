@@ -33,6 +33,7 @@ export function SubscriptionManager({
   onClose,
 }: SubscriptionManagerProps) {
   const [input, setInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -152,7 +153,7 @@ export function SubscriptionManager({
           {/* Import Info */}
           <div className="mb-4 p-3 bg-secondary/50 rounded text-xs text-muted-foreground">
             Import OPML files from other services or export files from TubeShelf
-            using the upload button above.
+            using the download button above.
           </div>
 
           <input
@@ -163,38 +164,56 @@ export function SubscriptionManager({
             onChange={handleFileChange}
           />
 
+          {/* Search Subscriptions */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Search</label>
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title or URL..."
+              className="text-sm"
+            />
+          </div>
+
           {/* Subscriptions List */}
           <div className="space-y-3">
-            {subscriptions.map((sub) => (
-              <div
-                key={sub.id}
-                className="flex items-center gap-3 p-3 rounded border border-border hover:bg-secondary transition-colors"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={
-                    sub.thumbnail ||
-                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
-                  }
-                  alt={sub.title}
-                  className="w-10 h-10 rounded-full object-cover bg-secondary"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{sub.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    Added {new Date(sub.addedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <Button
-                  onClick={() => onRemove?.(sub.id)}
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+            {subscriptions
+              .filter(
+                (sub) =>
+                  sub.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  sub.url.toLowerCase().includes(searchQuery.toLowerCase())
+              )
+              .map((sub) => (
+                <div
+                  key={sub.id}
+                  className="flex items-center gap-3 p-3 rounded border border-border hover:bg-secondary transition-colors"
                 >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={
+                      sub.thumbnail ||
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
+                    }
+                    alt={sub.title}
+                    className="w-10 h-10 rounded-full object-cover bg-secondary"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{sub.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      Added {new Date(sub.addedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => onRemove?.(sub.id)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
           </div>
 
           {subscriptions.length === 0 && (

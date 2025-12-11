@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { X, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
+import { ThemeContext } from "./ThemeProvider";
 import type { AppSettings } from "@/lib/settingsStore";
 
 interface SettingsPanelProps {
@@ -26,6 +27,7 @@ export function SettingsPanel({
   isOpen,
   onClose,
 }: SettingsPanelProps) {
+  const { setTheme } = useContext(ThemeContext);
   const [local, setLocal] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +163,11 @@ export function SettingsPanel({
                   {(["light", "dark", "system"] as const).map((theme) => (
                     <button
                       key={theme}
-                      onClick={() => setLocal({ ...local, theme })}
+                      onClick={() => {
+                        const updated = { ...local, theme };
+                        setLocal(updated);
+                        setTheme(theme);
+                      }}
                       className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
                         local.theme === theme
                           ? "bg-primary text-primary-foreground"
@@ -226,13 +232,15 @@ export function SettingsPanel({
 
         {/* Footer */}
         <div className="border-t border-border p-4 flex justify-end gap-2">
-          <Button onClick={onClose} variant="outline" size="sm">
-            Cancel
-          </Button>
           {!confirmAction && (
-            <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? "Saving..." : "Save"}
-            </Button>
+            <>
+              <Button onClick={onClose} variant="outline" size="sm">
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving} size="sm">
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </>
           )}
         </div>
       </div>

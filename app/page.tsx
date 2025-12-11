@@ -6,7 +6,6 @@ import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { WatchLater } from "@/components/WatchLater";
-import { ThemeToggle } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -186,9 +185,22 @@ export default function Home() {
       shts = shts.filter((v) => !watchedVideos.has(v.id));
     }
 
+    // Sort by defaultSortOrder
+    if (settings?.defaultSortOrder === "oldest") {
+      vids = [...vids].reverse();
+      shts = [...shts].reverse();
+    }
+
     setFilteredVideos(vids);
     setFilteredShorts(shts);
-  }, [searchQuery, videos, shorts, hideWatched, watchedVideos]);
+  }, [
+    searchQuery,
+    videos,
+    shorts,
+    hideWatched,
+    watchedVideos,
+    settings?.defaultSortOrder,
+  ]);
 
   const handleAddSubscription = async (url: string) => {
     try {
@@ -338,7 +350,6 @@ export default function Home() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               <Button
                 onClick={() => setShowSettings(true)}
                 variant="ghost"
@@ -566,17 +577,6 @@ export default function Home() {
       </main>
 
       {/* Subscription Manager Modal */}
-      <SubscriptionManager
-        subscriptions={subscriptions}
-        onAdd={handleAddSubscription}
-        onRemove={handleRemoveSubscription}
-        onImport={handleImportSubscriptions}
-        onExport={handleExportSubscriptions}
-        isOpen={showSubscriptions}
-        onClose={() => setShowSubscriptions(false)}
-      />
-
-      {/* Modals */}
       <SubscriptionManager
         subscriptions={subscriptions}
         onAdd={handleAddSubscription}

@@ -129,19 +129,22 @@ export function VideoCard({
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4 flex flex-col h-48">
         <h3 className="font-semibold text-sm leading-tight mb-2 line-clamp-2 group-hover:text-primary transition-colors">
           {title}
         </h3>
-        <p className="text-xs text-muted-foreground mb-2">{channel}</p>
+        <p className="text-xs text-muted-foreground mb-1 line-clamp-1">
+          {channel}
+        </p>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3 line-clamp-1">
           {views && <span>{views.toLocaleString()} views</span>}
+          {uploadedAt && <span>•</span>}
           {uploadedAt && <span>{uploadedAt}</span>}
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto">
           <Button
             onClick={handleWatch}
             variant="default"
