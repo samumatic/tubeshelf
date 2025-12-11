@@ -28,8 +28,16 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
+# Create data directory for persistent storage
+RUN mkdir -p /app/data && \
+    mkdir -p /app/.next/cache && \
+    chown -R node:node /app
+
 # Expose port
 EXPOSE 3000
+
+# Switch to non-root user
+USER node
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

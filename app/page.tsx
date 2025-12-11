@@ -64,11 +64,42 @@ export default function Home() {
     }
   };
 
+  // Load user state from server
+  const loadUserState = async () => {
+    try {
+      const res = await fetch("/api/user-state");
+      if (res.ok) {
+        const data = await res.json();
+        setWatchedVideos(new Set(data.watchedVideos || []));
+        setHideWatched(data.hideWatched || false);
+      }
+    } catch (e) {
+      console.error("Failed to load user state:", e);
+    }
+  };
+
+  // Save user state to server
+  const saveUserState = async () => {
+    try {
+      await fetch("/api/user-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          watchedVideos: Array.from(watchedVideos),
+          hideWatched,
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to save user state:", e);
+    }
+  };
+
   // Initialize data
   useEffect(() => {
     refreshData();
+    loadUserState();
 
-    // Load watch later from localStorage
+    // Load watch later from localStorage (keep this client-side)
     const saved = localStorage.getItem("watchLater");
     if (saved) {
       try {
@@ -83,16 +114,6 @@ export default function Home() {
         console.error("Failed to load watch later:", e);
       }
     }
-
-    // Load watched videos from localStorage
-    const watchedSaved = localStorage.getItem("watchedVideos");
-    if (watchedSaved) {
-      try {
-        setWatchedVideos(new Set(JSON.parse(watchedSaved)));
-      } catch (e) {
-        console.error("Failed to load watched videos:", e);
-      }
-    }
   }, []);
 
   // Save watch later to localStorage
@@ -100,13 +121,12 @@ export default function Home() {
     localStorage.setItem("watchLater", JSON.stringify(watchLater));
   }, [watchLater]);
 
-  // Save watched videos to localStorage
+  // Save user state when it changes
   useEffect(() => {
-    localStorage.setItem(
-      "watchedVideos",
-      JSON.stringify(Array.from(watchedVideos))
-    );
-  }, [watchedVideos]);
+    if (watchedVideos.size > 0 || hideWatched) {
+      saveUserState();
+    }
+  }, [watchedVideos, hideWatched]);
 
   // Handle search and filter
   useEffect(() => {
