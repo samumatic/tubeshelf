@@ -15,18 +15,19 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Runtime stage
+# Runtime stage - minimal Node.js Alpine
 FROM node:24-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install only dumb-init
+RUN apk add --no-cache dumb-init && \
+    rm -rf /var/cache/apk/*
 
-# Copy built application from builder
+# Copy only necessary built files from builder (standalone includes everything needed)
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 # Create required dirs and ensure non-root can write
 RUN mkdir -p /app/data /app/.next/cache && \
@@ -35,9 +36,7 @@ RUN mkdir -p /app/data /app/.next/cache && \
 # Expose port
 EXPOSE 3000
 
-# Do not set a fixed USER here; compose will run with PUID/PGID
-
-# Run as non-root user (uid:gid 1000:1000)
+# Run as non-root user
 USER 1000:1000
 
 # Use dumb-init to handle signals properly

@@ -1,5 +1,6 @@
 services:
   tubeshelf:
+    image: tubeshelf
     build: .
     container_name: tubeshelf
     restart: unless-stopped
