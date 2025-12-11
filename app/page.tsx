@@ -14,6 +14,8 @@ import {
   getSubscriptions,
   addSubscription,
   removeSubscription,
+  importSubscriptions,
+  exportSubscriptions,
   Video,
   Subscription,
 } from "@/lib/mockData";
@@ -166,6 +168,24 @@ export default function Home() {
       console.error(err);
       throw err;
     }
+  };
+
+  const handleImportSubscriptions = async (opmlText: string) => {
+    await importSubscriptions(opmlText);
+    await refreshData();
+  };
+
+  const handleExportSubscriptions = async () => {
+    const xml = await exportSubscriptions();
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "tubeshelf-subscriptions.opml";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   const handleRemoveSubscription = async (id: string) => {
@@ -482,6 +502,8 @@ export default function Home() {
         subscriptions={subscriptions}
         onAdd={handleAddSubscription}
         onRemove={handleRemoveSubscription}
+        onImport={handleImportSubscriptions}
+        onExport={handleExportSubscriptions}
         isOpen={showSubscriptions}
         onClose={() => setShowSubscriptions(false)}
       />

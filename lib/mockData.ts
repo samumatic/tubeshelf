@@ -84,3 +84,24 @@ export async function removeSubscription(channelId: string): Promise<void> {
     throw new Error("Failed to remove subscription");
   }
 }
+
+export async function importSubscriptions(opmlText: string) {
+  const res = await fetch("/api/subscriptions/import", {
+    method: "POST",
+    headers: { "Content-Type": "text/xml" },
+    body: opmlText,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to import subscriptions");
+  }
+  return res.json();
+}
+
+export async function exportSubscriptions(): Promise<string> {
+  const res = await fetch("/api/subscriptions/export", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Failed to export subscriptions");
+  }
+  return res.text();
+}

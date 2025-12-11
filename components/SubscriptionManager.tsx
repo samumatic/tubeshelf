@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, Plus } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { X, Plus, Upload, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -17,6 +17,8 @@ interface SubscriptionManagerProps {
   subscriptions: Subscription[];
   onAdd?: (url: string) => void;
   onRemove?: (id: string) => void;
+  onImport?: (opmlText: string) => Promise<void> | void;
+  onExport?: () => Promise<void> | void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -25,12 +27,17 @@ export function SubscriptionManager({
   subscriptions,
   onAdd,
   onRemove,
+  onImport,
+  onExport,
   isOpen,
   onClose,
 }: SubscriptionManagerProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = async () => {
     if (!input.trim()) return;
@@ -46,6 +53,37 @@ export function SubscriptionManager({
     }
   };
 
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const text = await file.text();
+      await onImport?.(text);
+    } catch (err: any) {
+      setError(err?.message || "Failed to import");
+    } finally {
+      setImporting(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleExport = async () => {
+    if (!onExport) return;
+    setExporting(true);
+    setError(null);
+    try {
+      await onExport();
+    } catch (err: any) {
+      setError(err?.message || "Failed to export");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -54,14 +92,34 @@ export function SubscriptionManager({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-bold">Manage Subscriptions</h2>
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-          >
-            <X className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              size="icon"
+              disabled={exporting}
+              title="Export subscriptions"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              variant="secondary"
+              size="icon"
+              disabled={importing}
+              title="Import OPML"
+            >
+              <Upload className="w-4 h-4" />
+            </Button>
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Content */}
@@ -88,10 +146,16 @@ export function SubscriptionManager({
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
-            {error && (
-              <p className="text-xs text-destructive mt-2">{error}</p>
-            )}
+            {error && <p className="text-xs text-destructive mt-2">{error}</p>}
           </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".opml,.xml,text/xml,application/xml"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
           {/* Subscriptions List */}
           <div className="space-y-3">
@@ -104,7 +168,7 @@ export function SubscriptionManager({
                 <img
                   src={
                     sub.thumbnail ||
-                    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop"
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
                   }
                   alt={sub.title}
                   className="w-10 h-10 rounded-full object-cover bg-secondary"
