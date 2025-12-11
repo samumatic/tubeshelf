@@ -11,6 +11,7 @@ interface VideoCardProps {
   uploadedAt?: string;
   views?: number;
   watched?: boolean;
+  videoUrl?: string;
   onWatch?: () => void;
   onWatchLater?: () => void;
 }
@@ -24,9 +25,16 @@ export function VideoCard({
   uploadedAt,
   views,
   watched,
+  videoUrl,
   onWatch,
   onWatchLater,
 }: VideoCardProps) {
+  const handleWatch = () => {
+    if (videoUrl) {
+      window.open(videoUrl, "_blank");
+    }
+    onWatch?.();
+  };
   return (
     <div className="group overflow-hidden rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border">
       {/* Thumbnail */}
@@ -62,7 +70,7 @@ export function VideoCard({
         {/* Actions */}
         <div className="flex gap-2">
           <Button
-            onClick={onWatch}
+            onClick={handleWatch}
             variant="default"
             size="sm"
             className="flex-1 text-xs"

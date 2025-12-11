@@ -18,6 +18,7 @@ import {
 } from "@/lib/mockData";
 
 type Page = "home" | "watch-later";
+type FeedTab = "videos" | "reels";
 
 interface WatchLaterItem {
   id: string;
@@ -30,6 +31,7 @@ interface WatchLaterItem {
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [feedTab, setFeedTab] = useState<FeedTab>("videos");
   const [videos, setVideos] = useState<Video[]>([]);
   const [shorts, setShorts] = useState<Video[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -298,67 +300,105 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {/* Videos Grid */}
-                {filteredVideos.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-semibold mb-2">No videos found</h3>
-                    <p className="text-muted-foreground">
-                      {searchQuery
-                        ? "Try adjusting your search"
-                        : "Subscribe to channels to get started"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredVideos.map((video) => (
-                      <VideoCard
-                        key={video.id}
-                        id={video.id}
-                        title={video.title}
-                        channel={video.channel}
-                        thumbnail={video.thumbnail}
-                        duration={video.duration}
-                        uploadedAt={video.uploadedAt}
-                        views={video.views}
-                        watched={watchedVideos.has(video.id)}
-                        onWatch={() => handleWatchVideo(video.id)}
-                        onWatchLater={() => handleAddToWatchLater(video)}
-                      />
-                    ))}
-                  </div>
+                {/* Tabs */}
+                <div className="flex gap-4 mb-6 border-b border-border">
+                  <button
+                    onClick={() => setFeedTab("videos")}
+                    className={`px-4 py-2 font-medium transition-colors ${
+                      feedTab === "videos"
+                        ? "border-b-2 border-primary text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Videos ({filteredVideos.length})
+                  </button>
+                  <button
+                    onClick={() => setFeedTab("reels")}
+                    className={`px-4 py-2 font-medium transition-colors ${
+                      feedTab === "reels"
+                        ? "border-b-2 border-primary text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Reels ({filteredShorts.length})
+                  </button>
+                </div>
+
+                {/* Videos Tab */}
+                {feedTab === "videos" && (
+                  <>
+                    {filteredVideos.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                        <h3 className="text-lg font-semibold mb-2">
+                          No videos found
+                        </h3>
+                        <p className="text-muted-foreground">
+                          {searchQuery
+                            ? "Try adjusting your search"
+                            : "Subscribe to channels to get started"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {filteredVideos.map((video) => (
+                          <VideoCard
+                            key={video.id}
+                            id={video.id}
+                            title={video.title}
+                            channel={video.channel}
+                            thumbnail={video.thumbnail}
+                            duration={video.duration}
+                            uploadedAt={video.uploadedAt}
+                            views={video.views}
+                            watched={watchedVideos.has(video.id)}
+                            videoUrl={video.url}
+                            onWatch={() => handleWatchVideo(video.id)}
+                            onWatchLater={() => handleAddToWatchLater(video)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* Reels */}
-                <div className="mt-10">
-                  <div className="flex items-center gap-2 mb-4">
-                    <h3 className="text-xl font-semibold">Reels</h3>
-                    <span className="text-sm text-muted-foreground">
-                      {filteredShorts.length} item{filteredShorts.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  {filteredShorts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No reels found.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {filteredShorts.map((video) => (
-                        <VideoCard
-                          key={video.id}
-                          id={video.id}
-                          title={video.title}
-                          channel={video.channel}
-                          thumbnail={video.thumbnail}
-                          duration={video.duration}
-                          uploadedAt={video.uploadedAt}
-                          views={video.views}
-                          watched={watchedVideos.has(video.id)}
-                          onWatch={() => handleWatchVideo(video.id)}
-                          onWatchLater={() => handleAddToWatchLater(video)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Reels Tab */}
+                {feedTab === "reels" && (
+                  <>
+                    {filteredShorts.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                        <h3 className="text-lg font-semibold mb-2">
+                          No reels found
+                        </h3>
+                        <p className="text-muted-foreground">
+                          {searchQuery
+                            ? "Try adjusting your search"
+                            : "Subscribe to channels to get started"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {filteredShorts.map((video) => (
+                          <VideoCard
+                            key={video.id}
+                            id={video.id}
+                            title={video.title}
+                            channel={video.channel}
+                            thumbnail={video.thumbnail}
+                            duration={video.duration}
+                            uploadedAt={video.uploadedAt}
+                            views={video.views}
+                            watched={watchedVideos.has(video.id)}
+                            videoUrl={video.url}
+                            onWatch={() => handleWatchVideo(video.id)}
+                            onWatchLater={() => handleAddToWatchLater(video)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
           </>
