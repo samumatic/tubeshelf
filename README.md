@@ -28,6 +28,13 @@ services:
 
 The web UI will be available on port `3000` by default.
 
+Before deploying, create the data directory and set ownership to user 1000:
+
+```bash
+mkdir data
+chown 1000:1000 data
+```
+
 ## Features
 
 - Chronological, algorithm-free subscription feed
