@@ -55,6 +55,11 @@ export function VideoCard({
     onWatch?.();
   };
 
+  const handleWatchLater = () => {
+    onWatchLater?.();
+    setShowMenu(false);
+  };
+
   const handleMarkWatched = () => {
     onMarkWatched?.();
     setShowMenu(false);
@@ -89,12 +94,24 @@ export function VideoCard({
   return (
     <div className="group overflow-hidden rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border">
       {/* Thumbnail */}
-      <div className="relative overflow-hidden bg-secondary h-56 sm:h-40">
+      <a
+        href={videoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative overflow-hidden bg-secondary aspect-video cursor-pointer block"
+        onClick={(e) => {
+          // Let middle-click and ctrl/cmd+click pass through naturally
+          if (e.button !== 0) return;
+          e.preventDefault();
+          handleWatch();
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={thumbnail}
           alt={title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          draggable="false"
         />
 
         {/* Duration badge - top right */}
@@ -109,10 +126,10 @@ export function VideoCard({
             <Eye className="w-8 h-8 text-white" />
           </div>
         )}
-      </div>
+      </a>
 
       {/* Content */}
-      <div className="p-3 flex flex-col h-44">
+      <div className="p-3 flex flex-col">
         {/* Title and Menu */}
         <div
           className="flex items-start justify-between gap-2 mb-1"
@@ -138,6 +155,13 @@ export function VideoCard({
                 >
                   <Eye className="w-4 h-4" />
                   {watched ? "Mark as unwatched" : "Mark as watched"}
+                </button>
+                <button
+                  onClick={handleWatchLater}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  Watch later
                 </button>
                 <button
                   onClick={handleShare}
@@ -168,27 +192,6 @@ export function VideoCard({
           {views && <span>{views.toLocaleString()} views</span>}
           {uploadedAt && <span>•</span>}
           {uploadedAt && <span>{formatTimeAgo(uploadedAt)}</span>}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 mt-auto">
-          <Button
-            onClick={handleWatch}
-            variant="default"
-            size="sm"
-            className="flex-1 text-xs h-8"
-          >
-            Watch
-          </Button>
-          <Button
-            onClick={onWatchLater}
-            variant="outline"
-            size="sm"
-            className="flex-1 text-xs h-8"
-          >
-            <Clock className="w-3 h-3 mr-1" />
-            Later
-          </Button>
         </div>
       </div>
     </div>
