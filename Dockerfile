@@ -44,3 +44,6 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
 CMD ["node", "server.js"]
+
+# Set the NODE_ENV environment variable to production
+ENV NODE_ENV=production

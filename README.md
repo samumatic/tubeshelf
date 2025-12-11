@@ -19,8 +19,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
 ```
 
 The web UI will be available on port `3000` by default.
@@ -30,6 +30,7 @@ The web UI will be available on port `3000` by default.
 - Chronological, algorithm-free subscription feed
 - Subscribe via channel URL, ID, or handle
 - Local watch history & “watch later”
+- Server-persisted subscriptions, watched status, and hide-watched preference
 - Lightweight and privacy-focused
 - Docker-ready and easy to self-host
 
