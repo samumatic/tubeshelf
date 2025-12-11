@@ -7,6 +7,24 @@
 
 Follow your favorite creators without missing uploads, distraction, or recommendation manipulation. TubeShelf fetches new videos directly from channels you choose and presents them in a simple, timeline-based feed you control.
 
+## Docker
+
+Quick start using Docker Compose (recommended):
+
+```yaml
+services:
+  tubeshelf:
+    image: ghcr.io/samumatic/tubeshelf:latest
+    container_name: tubeshelf
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+```
+
+The web UI will be available on port `3000` by default.
+
 ## Features
 
 - Chronological, algorithm-free subscription feed
