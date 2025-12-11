@@ -8,6 +8,7 @@ import { WatchLater } from "@/components/WatchLater";
 import { ThemeToggle } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   getVideos,
   getSubscriptions,
@@ -44,6 +45,7 @@ export default function Home() {
   const [filteredShorts, setFilteredShorts] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hideWatched, setHideWatched] = useState(false);
 
   const refreshData = async () => {
     setLoading(true);
@@ -106,29 +108,35 @@ export default function Home() {
     );
   }, [watchedVideos]);
 
-  // Handle search
+  // Handle search and filter
   useEffect(() => {
     const term = searchQuery.trim().toLowerCase();
-    if (!term) {
-      setFilteredVideos(videos);
-      setFilteredShorts(shorts);
-      return;
+    let vids = videos;
+    let shts = shorts;
+
+    // Filter by search term
+    if (term) {
+      vids = vids.filter(
+        (v) =>
+          v.title.toLowerCase().includes(term) ||
+          v.channel.toLowerCase().includes(term)
+      );
+      shts = shts.filter(
+        (v) =>
+          v.title.toLowerCase().includes(term) ||
+          v.channel.toLowerCase().includes(term)
+      );
     }
-    setFilteredVideos(
-      videos.filter(
-        (v) =>
-          v.title.toLowerCase().includes(term) ||
-          v.channel.toLowerCase().includes(term)
-      )
-    );
-    setFilteredShorts(
-      shorts.filter(
-        (v) =>
-          v.title.toLowerCase().includes(term) ||
-          v.channel.toLowerCase().includes(term)
-      )
-    );
-  }, [searchQuery, videos, shorts]);
+
+    // Filter out watched videos if hideWatched is true
+    if (hideWatched) {
+      vids = vids.filter((v) => !watchedVideos.has(v.id));
+      shts = shts.filter((v) => !watchedVideos.has(v.id));
+    }
+
+    setFilteredVideos(vids);
+    setFilteredShorts(shts);
+  }, [searchQuery, videos, shorts, hideWatched, watchedVideos]);
 
   const handleAddSubscription = async (url: string) => {
     try {
@@ -152,6 +160,16 @@ export default function Home() {
   const handleWatchVideo = (videoId: string) => {
     const newWatched = new Set(watchedVideos);
     newWatched.add(videoId);
+    setWatchedVideos(newWatched);
+  };
+
+  const handleToggleWatched = (videoId: string) => {
+    const newWatched = new Set(watchedVideos);
+    if (newWatched.has(videoId)) {
+      newWatched.delete(videoId);
+    } else {
+      newWatched.add(videoId);
+    }
     setWatchedVideos(newWatched);
   };
 
@@ -213,7 +231,7 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search videos..."
-                  className="w-full text-sm"
+                  className="w-full text-sm pl-10"
                 />
               </div>
             </div>
@@ -255,7 +273,7 @@ export default function Home() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search videos..."
-                className="w-full text-sm"
+                className="w-full text-sm pl-10"
               />
             </div>
           </div>
@@ -300,28 +318,39 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {/* Tabs */}
-                <div className="flex gap-4 mb-6 border-b border-border">
-                  <button
-                    onClick={() => setFeedTab("videos")}
-                    className={`px-4 py-2 font-medium transition-colors ${
-                      feedTab === "videos"
-                        ? "border-b-2 border-primary text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Videos ({filteredVideos.length})
-                  </button>
-                  <button
-                    onClick={() => setFeedTab("reels")}
-                    className={`px-4 py-2 font-medium transition-colors ${
-                      feedTab === "reels"
-                        ? "border-b-2 border-primary text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Reels ({filteredShorts.length})
-                  </button>
+                {/* Tabs and Controls */}
+                <div className="flex items-center justify-between mb-6 border-b border-border">
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setFeedTab("videos")}
+                      className={`px-4 py-2 font-medium transition-colors ${
+                        feedTab === "videos"
+                          ? "border-b-2 border-primary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Videos ({filteredVideos.length})
+                    </button>
+                    <button
+                      onClick={() => setFeedTab("reels")}
+                      className={`px-4 py-2 font-medium transition-colors ${
+                        feedTab === "reels"
+                          ? "border-b-2 border-primary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Reels ({filteredShorts.length})
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 pb-2">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                      <Switch
+                        checked={hideWatched}
+                        onCheckedChange={setHideWatched}
+                      />
+                      Hide watched
+                    </label>
+                  </div>
                 </div>
 
                 {/* Videos Tab */}
@@ -355,6 +384,7 @@ export default function Home() {
                             videoUrl={video.url}
                             onWatch={() => handleWatchVideo(video.id)}
                             onWatchLater={() => handleAddToWatchLater(video)}
+                            onMarkWatched={() => handleToggleWatched(video.id)}
                           />
                         ))}
                       </div>
@@ -393,6 +423,7 @@ export default function Home() {
                             videoUrl={video.url}
                             onWatch={() => handleWatchVideo(video.id)}
                             onWatchLater={() => handleAddToWatchLater(video)}
+                            onMarkWatched={() => handleToggleWatched(video.id)}
                           />
                         ))}
                       </div>
