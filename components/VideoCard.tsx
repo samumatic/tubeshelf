@@ -92,7 +92,9 @@ export function VideoCard({
     }
   }, [showMenu]);
   return (
-    <div className="group overflow-hidden rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border">
+    <div className="group overflow-visible rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border"
+      ref={menuRef}
+    >
       {/* Thumbnail */}
       <a
         href={videoUrl}
@@ -133,7 +135,6 @@ export function VideoCard({
         {/* Title and Menu */}
         <div
           className="flex items-start justify-between gap-2 mb-1"
-          ref={menuRef}
         >
           <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors flex-1">
             {title}
