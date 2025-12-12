@@ -100,7 +100,7 @@ export function VideoCard({
         href={videoUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative overflow-hidden bg-secondary aspect-video cursor-pointer block"
+        className="relative overflow-hidden bg-secondary aspect-video cursor-pointer block rounded-t-lg"
         onClick={(e) => {
           // Let middle-click and ctrl/cmd+click pass through naturally
           if (e.button !== 0) return;
