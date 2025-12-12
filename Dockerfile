@@ -3,6 +3,9 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 
+# Update npm to latest version to fix glob vulnerability
+RUN npm install -g npm@latest
+
 # Copy package files
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
 
@@ -19,6 +22,9 @@ RUN npm run build
 FROM node:24-alpine
 
 WORKDIR /app
+
+# Update npm to latest version to fix glob vulnerability
+RUN npm install -g npm@latest
 
 # Install only dumb-init
 RUN apk add --no-cache dumb-init && \
