@@ -99,7 +99,8 @@ function getHandleFromPath(parts: string[]): string | null {
   const cIndex = parts.indexOf("c");
   if (cIndex !== -1 && parts[cIndex + 1]) return `@${parts[cIndex + 1]}`;
   const userIndex = parts.indexOf("user");
-  if (userIndex !== -1 && parts[userIndex + 1]) return `@${parts[userIndex + 1]}`;
+  if (userIndex !== -1 && parts[userIndex + 1])
+    return `@${parts[userIndex + 1]}`;
   return null;
 }
 
@@ -138,13 +139,11 @@ export function extractChannelId(input: string): string | null {
   return null;
 }
 
-async function resolveHandleToChannelId(handle: string): Promise<string | null> {
+async function resolveHandleToChannelId(
+  handle: string
+): Promise<string | null> {
   const cleanHandle = handle.startsWith("@") ? handle : `@${handle}`;
-  const pageUrls = [
-    `https://www.youtube.com/${cleanHandle}`,
-    `https://www.youtube.com/${cleanHandle}/about`,
-    `https://www.youtube.com/${cleanHandle}/featured`,
-  ];
+  const pageUrl = `https://www.youtube.com/${cleanHandle}`;
 
   const headers = {
     "user-agent":
@@ -153,38 +152,76 @@ async function resolveHandleToChannelId(handle: string): Promise<string | null> 
     cookie: "CONSENT=YES+1",
   };
 
-  const regexes = [
-    /"channelId":"(UC[\\w-]{21}[\\w-])"/,
-    /"browseId":"(UC[\\w-]{21}[\\w-])"/,
-    /"externalId":"(UC[\\w-]{21}[\\w-])"/,
-  ];
+  try {
+    const res = await fetch(`${pageUrl}?hl=en&gl=US`, {
+      cache: "no-store",
+      headers,
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
 
-  let lastError: any = null;
-  for (const baseUrl of pageUrls) {
-    const pageUrl = `${baseUrl}?hl=en&gl=US`;
-    try {
-      const res = await fetch(pageUrl, {
-        cache: "no-store",
-        headers,
-      });
-      if (!res.ok) continue;
-      const html = await res.text();
-      for (const r of regexes) {
-        const m = html.match(r);
-        if (m?.[1]) {
-          return m[1];
+    // Look for the canonical URL first, which directly contains the channel handle
+    // This is the most reliable way to get the correct channel ID
+    const canonicalMatch = html.match(
+      /<link\s+rel="canonical"\s+href="https:\/\/www\.youtube\.com\/([^"]+)"/
+    );
+    if (canonicalMatch) {
+      const canonicalPath = canonicalMatch[1];
+      // If it redirects to a channel ID, extract it
+      if (canonicalPath.startsWith("channel/")) {
+        const channelId = canonicalPath.replace("channel/", "");
+        if (/^UC[A-Za-z0-9_-]{22}$/.test(channelId)) {
+          return channelId;
         }
       }
-    } catch (err) {
-      lastError = err;
-      continue;
     }
-  }
 
-  if (lastError) {
-    console.error("Handle resolution failed", { handle: cleanHandle, error: lastError });
+    // Fallback: Look for ytInitialData with the channel's own metadata
+    // This appears early in the page and contains the page's own channel info
+    const initialDataMatch = html.match(/var ytInitialData = ({.*?});/);
+    if (initialDataMatch) {
+      try {
+        const data = JSON.parse(initialDataMatch[1]);
+        // Navigate through the initial data structure to find the channel ID
+        // This is more reliable than regex on the whole page
+        const channelId =
+          data?.metadata?.channelMetadataRenderer?.externalId ||
+          data?.metadata?.playlistMetadataRenderer?.externalId ||
+          data?.microformat?.microformatDataRenderer?.externalId;
+        if (channelId && /^UC[A-Za-z0-9_-]{22}$/.test(channelId)) {
+          return channelId;
+        }
+      } catch (e) {
+        // JSON parse failed, continue with regex fallback
+      }
+    }
+
+    // Fallback: Search for channelId in the initial data, preferring the first occurrence
+    // which is typically the page's own channel
+    const regexes = [
+      /"externalId":"(UC[A-Za-z0-9_-]{22})"/,
+      /"channelId":"(UC[A-Za-z0-9_-]{22})"/,
+      /"browseId":"(UC[A-Za-z0-9_-]{22})"/,
+    ];
+
+    for (const r of regexes) {
+      const m = html.match(r);
+      if (m?.[1]) {
+        const channelId = m[1].replace(/["\s]/g, "");
+        if (/^UC[A-Za-z0-9_-]{22}$/.test(channelId)) {
+          return channelId;
+        }
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Handle resolution failed", {
+      handle: cleanHandle,
+      error: err,
+    });
+    return null;
   }
-  return null;
 }
 
 export async function resolveChannelId(input: string): Promise<string | null> {
@@ -209,4 +246,3 @@ export async function resolveChannelId(input: string): Promise<string | null> {
 
   return null;
 }
-
