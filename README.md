@@ -1,15 +1,40 @@
-# TubeShelf
+<div align="center">
+  <picture>
+    <source srcset="public/icon-dark.svg" media="(prefers-color-scheme: dark)">
+    <source srcset="public/icon-light.svg" media="(prefers-color-scheme: light)">
+    <img alt="TubeShelf icon" src="/public/icon-flat.svg" width="140" height="140">
+  </picture>
+  <h1>TubeShelf</h1>
+  <h3>Self-hosted YouTube subscription feed<br />Chronological, distraction-free, yours.</h3>
+</div>
 
 > [!WARNING]
-> TubeShelf is still in early development and is subject to major changes from version to version. Expect bugs! Contributions and feedback are welcome.
+> TubeShelf is in early development and subject to breaking changes. Expect bugs and missing features. Contributions and feedback are welcome!
 
-**TubeShelf** is a self-hosted YouTube subscription feed that gives you a clean, chronological video inbox — no algorithm, no tracking, no noise.
+**TubeShelf** is a self-hosted YouTube subscription feed that gives you a clean, chronological video inbox — no algorithm, no tracking, no distractions.
 
-Follow your favorite creators without missing uploads, distraction, or recommendation manipulation. TubeShelf fetches new videos directly from channels you choose and presents them in a simple, timeline-based feed you control.
+Follow your favorite creators in a simple timeline-based feed you control. TubeShelf fetches videos directly from YouTube RSS feeds and presents them in order of upload, without recommendations or engagement manipulation.
 
-## Docker
+## Features
 
-Quick start using Docker Compose (recommended):
+- **Chronological feed** - Videos sorted by upload time, newest first
+- **Subscribe easily** - Add channels via URL, ID, or @handle
+- **Import/Export** - OPML support for migrating subscriptions
+- **Mark as watched** - Track what you've seen with persistent state
+- **Hide watched videos** - Filter option to show only unwatched content
+- **Watch later** - Save videos for later viewing
+
+## Limitations
+
+> [!NOTE]
+> TubeShelf uses YouTube RSS feeds, which only provide the **latest ~15 videos** per channel. This is a YouTube limitation, not a bug. TubeShelf focuses on recent uploads rather than complete channel archives.
+
+- No video duration display (RSS feeds don't include this metadata)
+- Limited to RSS feed capabilities (~15 recent videos per channel)
+
+## Quick Start
+
+### Docker Compose (Recommended)
 
 ```yaml
 services:
@@ -26,32 +51,30 @@ services:
       - ./data:/app/data
 ```
 
-The web UI will be available on port `3000` by default.
-
-Before deploying, create the data directory and set ownership to user 1000:
+Start the container:
 
 ```bash
-mkdir data
+# Create data directory with correct permissions
+mkdir -p data
 chown 1000:1000 data
+
+# Start TubeShelf
+docker compose up -d
 ```
 
-## Features
-
-- Chronological, algorithm-free subscription feed
-- Subscribe via channel URL, ID, or handle
-- Local watch history & “watch later”
-- Server-persisted subscriptions, watched status, and hide-watched preference
-- Lightweight and privacy-focused
-- Docker-ready and easy to self-host
+Access the web UI at **http://localhost:3000**
 
 ## Why TubeShelf?
 
-YouTube’s subscription page is optimized for engagement, not completeness. TubeShelf is built for users who want:
+YouTube's subscription page is designed for engagement, not completeness. Videos get buried, sorted by "personalization" rather than time, and mixed with algorithmic recommendations.
 
-- Every upload, in order
-- Full control over their feed
-- A private, self-hosted alternative
+TubeShelf is built for users who want:
+
+- **Every recent upload, in chronological order** - No hidden videos
+- **Full control over their feed** - No algorithm deciding what you see
+- **Privacy** - Self-hosted, no tracking, no data collection
+- **Simplicity** - Just your subscriptions, nothing else
 
 ## License
 
-This project is licensed under [AGPL-3 License](LICENSE).
+This project is licensed under [AGPL-3.0 License](LICENSE).

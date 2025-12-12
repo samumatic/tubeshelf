@@ -1,0 +1,15 @@
+<svg viewBox="18 32 60 38" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded rectangle background -->
+  <rect x="18" y="32" width="60" height="38" rx="8" fill="transparent"/>
+
+  <!-- Shelf -->
+  <rect x="18" y="58" width="64" height="12" fill="#3b3b3b"/>
+  <rect x="18" y="66" width="64" height="4" fill="#2a2a2a"/>
+
+  <!-- Side books -->
+  <rect x="26" y="38" width="12" height="26" fill="#666"/> <!-- smaller first book -->
+  <rect x="44" y="32" width="12" height="32" fill="#777"/> <!-- middle book -->
+
+  <!-- Perfect isosceles triangle/play-book -->
+  <polygon points="62,32 78,50 62,64" fill="#ff5252"/>
+</svg>

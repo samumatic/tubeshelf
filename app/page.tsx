@@ -332,12 +332,21 @@ export default function Home() {
                   setSearchQuery("");
                 }}
               >
-                <div className="bg-primary rounded p-1">
-                  <Play
-                    className="w-5 h-5 text-primary-foreground"
-                    fill="currentColor"
+                <picture className="h-11 w-11 shrink-0">
+                  <source
+                    srcSet="/icon-dark.svg"
+                    media="(prefers-color-scheme: dark)"
                   />
-                </div>
+                  <source
+                    srcSet="/icon-light.svg"
+                    media="(prefers-color-scheme: light)"
+                  />
+                  <img
+                    src="/icon-flat.svg"
+                    alt="TubeShelf"
+                    className="h-11 w-11"
+                  />
+                </picture>
                 <h1 className="text-xl font-bold hidden sm:block">TubeShelf</h1>
               </div>
             </div>

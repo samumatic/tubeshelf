@@ -1,0 +1,28 @@
+{
+  "name": "TubeShelf",
+  "short_name": "TubeShelf",
+  "description": "Self-hosted YouTube subscription feed",
+  "icons": [
+    {
+      "src": "/icon-light.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-flat.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    }
+  ],
+  "theme_color": "#1e1e1e",
+  "background_color": "#111827",
+  "display": "standalone"
+}
