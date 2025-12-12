@@ -154,9 +154,11 @@ async function resolveHandleToChannelId(handle: string): Promise<string | null> 
   };
 
   const regexes = [
-    /"channelId":"(UC[\\w-]{21}[\\w-])"/,
-    /"browseId":"(UC[\\w-]{21}[\\w-])"/,
-    /"externalId":"(UC[\\w-]{21}[\\w-])"/,
+    /"channelId":"(UC[A-Za-z0-9_-]{22})"/,
+    /"browseId":"(UC[A-Za-z0-9_-]{22})"/,
+    /"externalId":"(UC[A-Za-z0-9_-]{22})"/,
+    /"channelId":"(UC[A-Za-z0-9_\-]{22})"/,
+    /channelId["\s:]+(["\s]?)(UC[A-Za-z0-9_-]{22})/,
   ];
 
   let lastError: any = null;
@@ -172,7 +174,10 @@ async function resolveHandleToChannelId(handle: string): Promise<string | null> 
       for (const r of regexes) {
         const m = html.match(r);
         if (m?.[1]) {
-          return m[1];
+          const channelId = m[1].replace(/["\s]/g, "");
+          if (/^UC[A-Za-z0-9_-]{22}$/.test(channelId)) {
+            return channelId;
+          }
         }
       }
     } catch (err) {
