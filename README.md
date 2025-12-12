@@ -8,6 +8,10 @@
   <h3>Self-hosted YouTube subscription feed<br />Chronological, distraction-free, yours.</h3>
 </div>
 
+<p align="center">
+  <img src="public/readme-hero.png" alt="TubeShelf feed screenshot" width="100%" />
+</p>
+
 > [!WARNING]
 > TubeShelf is in early development and subject to breaking changes. Expect bugs and missing features. Contributions and feedback are welcome!
 
