@@ -228,18 +228,20 @@ export default function Home() {
     }
   };
 
-  const handleImportSubscriptions = async (opmlText: string) => {
-    await importSubscriptions(opmlText);
+  const handleImportSubscriptions = async (data: string, format?: string) => {
+    await importSubscriptions(data, format);
     await refreshData();
   };
 
-  const handleExportSubscriptions = async () => {
-    const xml = await exportSubscriptions();
-    const blob = new Blob([xml], { type: "application/xml" });
+  const handleExportSubscriptions = async (format: "opml" | "json") => {
+    const data = await exportSubscriptions(format);
+    const mimeType = format === "json" ? "application/json" : "application/xml";
+    const extension = format === "json" ? "json" : "opml";
+    const blob = new Blob([data], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "tubeshelf-subscriptions.opml";
+    link.download = `tubeshelf-subscriptions.${extension}`;
     document.body.appendChild(link);
     link.click();
     link.remove();

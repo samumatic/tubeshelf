@@ -38,39 +38,57 @@ function extractChannelId(xmlUrl: string): string | null {
 }
 
 export async function POST(req: Request) {
-  const xml = await req.text().catch(() => "");
-  if (!xml.trim()) {
-    return NextResponse.json(
-      { error: "No OPML/XML content provided" },
-      { status: 400 }
-    );
+  const contentType = req.headers.get("content-type") || "";
+  const body = await req.text().catch(() => "");
+
+  if (!body.trim()) {
+    return NextResponse.json({ error: "No content provided" }, { status: 400 });
   }
 
-  try {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "",
-    });
-    const parsed = parser.parse(xml);
-    const outlines = collectOutlines(parsed?.opml?.body) as any[];
-    const entries = outlines
-      .map((o) => ({
-        xmlUrl: o.xmlUrl as string | undefined,
-        title: (o.title || o.text) as string | undefined,
-      }))
-      .filter((o) => o.xmlUrl);
+  let channelItems: { channelId: string; title: string }[] = [];
 
-    const channelItems = entries
-      .map((e) => {
-        const channelId = extractChannelId(e.xmlUrl!);
-        if (!channelId) return null;
-        return { channelId, title: e.title || channelId };
-      })
-      .filter((x): x is { channelId: string; title: string } => !!x);
+  try {
+    // Handle JSON format (Invidious)
+    if (contentType.includes("application/json")) {
+      const json = JSON.parse(body);
+      if (!json.subscriptions || !Array.isArray(json.subscriptions)) {
+        return NextResponse.json(
+          { error: "Invalid JSON format: missing subscriptions array" },
+          { status: 400 }
+        );
+      }
+
+      channelItems = json.subscriptions
+        .filter((id: any) => typeof id === "string" && id.startsWith("UC"))
+        .map((id: string) => ({ channelId: id, title: id }));
+    }
+    // Handle OPML/XML format
+    else {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "",
+      });
+      const parsed = parser.parse(body);
+      const outlines = collectOutlines(parsed?.opml?.body) as any[];
+      const entries = outlines
+        .map((o) => ({
+          xmlUrl: o.xmlUrl as string | undefined,
+          title: (o.title || o.text) as string | undefined,
+        }))
+        .filter((o) => o.xmlUrl);
+
+      channelItems = entries
+        .map((e) => {
+          const channelId = extractChannelId(e.xmlUrl!);
+          if (!channelId) return null;
+          return { channelId, title: e.title || channelId };
+        })
+        .filter((x): x is { channelId: string; title: string } => !!x);
+    }
 
     if (channelItems.length === 0) {
       return NextResponse.json(
-        { error: "No channel_id feeds found in OPML" },
+        { error: "No valid channel IDs found" },
         { status: 400 }
       );
     }
