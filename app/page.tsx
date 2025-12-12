@@ -340,22 +340,24 @@ export default function Home() {
                 }}
               >
                 <img
-                    src={
-                      !mounted
-                        ? "/icon-flat.svg"
-                        : (() => {
-                            if (theme === "dark") return "/icon-dark.svg";
-                            if (theme === "light") return "/icon-light.svg";
-                            // system theme
-                            const prefersDark = window.matchMedia(
-                              "(prefers-color-scheme: dark)"
-                            ).matches;
-                            return prefersDark ? "/icon-dark.svg" : "/icon-light.svg";
-                          })()
-                    }
-                    alt="TubeShelf"
-                    className="h-11 w-11"
-                  />
+                  src={
+                    !mounted
+                      ? "/icon-flat.svg"
+                      : (() => {
+                          if (theme === "dark") return "/icon-dark.svg";
+                          if (theme === "light") return "/icon-light.svg";
+                          // system theme
+                          const prefersDark = window.matchMedia(
+                            "(prefers-color-scheme: dark)"
+                          ).matches;
+                          return prefersDark
+                            ? "/icon-dark.svg"
+                            : "/icon-light.svg";
+                        })()
+                  }
+                  alt="TubeShelf"
+                  className="h-11 w-11"
+                />
                 <h1 className="text-xl font-bold hidden sm:block">TubeShelf</h1>
               </div>
             </div>
