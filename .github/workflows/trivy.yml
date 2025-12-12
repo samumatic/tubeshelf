@@ -29,7 +29,7 @@ jobs:
           docker build -t ghcr.io/samumatic/tubeshelf:${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac
         with:
           image-ref: 'ghcr.io/samumatic/tubeshelf:${{ github.sha }}'
           format: 'template'
