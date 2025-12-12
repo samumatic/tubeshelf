@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
-import {
-  readSubscriptions,
-  writeSubscriptions,
-  StoredSubscription,
-} from "@/lib/subscriptionStore";
+import { readLists, addSubscriptionToList } from "@/lib/subscriptionListStore";
 import { fetchChannelFeed } from "@/lib/rss";
 
 function collectOutlines(node: any, out: any[] = []) {
@@ -93,12 +89,32 @@ export async function POST(req: Request) {
       );
     }
 
-    const existing = await readSubscriptions();
-    const existingIds = new Set(existing.map((s) => s.channelId));
+    // Get listId from query params or use default
+    const url = new URL(req.url);
+    const listId = url.searchParams.get("listId") || "default";
 
-    const toAdd: StoredSubscription[] = [];
+    const listsData = await readLists();
+    const targetList = listsData.lists.find((l) => l.id === listId);
+
+    if (!targetList) {
+      return NextResponse.json(
+        { error: "Target list not found" },
+        { status: 404 }
+      );
+    }
+
+    const existingIds = new Set(
+      targetList.subscriptions.map((s) => s.channelId)
+    );
+
+    let added = 0;
+    let skipped = 0;
+
     for (const item of channelItems) {
-      if (existingIds.has(item.channelId)) continue;
+      if (existingIds.has(item.channelId)) {
+        skipped++;
+        continue;
+      }
       existingIds.add(item.channelId);
 
       // Fetch real channel metadata
@@ -112,31 +128,26 @@ export async function POST(req: Request) {
         // Fall back to extracted title if feed fetch fails
       }
 
-      toAdd.push({
+      const subscription = {
         id: item.channelId,
         channelId: item.channelId,
         title,
         url: `https://www.youtube.com/channel/${item.channelId}`,
         thumbnail,
         addedAt: new Date().toISOString(),
-      });
+      };
+
+      await addSubscriptionToList(listId, subscription);
+      added++;
     }
 
-    if (toAdd.length === 0) {
-      return NextResponse.json({
-        added: 0,
-        skipped: channelItems.length,
-        total: existing.length,
-      });
-    }
-
-    const updated = [...existing, ...toAdd];
-    await writeSubscriptions(updated);
+    const updatedList = await readLists();
+    const finalList = updatedList.lists.find((l) => l.id === listId);
 
     return NextResponse.json({
-      added: toAdd.length,
-      skipped: channelItems.length - toAdd.length,
-      total: updated.length,
+      added,
+      skipped,
+      total: finalList?.subscriptions.length || 0,
     });
   } catch (err: any) {
     return NextResponse.json(

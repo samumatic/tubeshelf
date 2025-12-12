@@ -1,4 +1,4 @@
-import { readSubscriptions } from "@/lib/subscriptionStore";
+import { readLists } from "@/lib/subscriptionListStore";
 
 function escapeXml(value: string) {
   return value
@@ -12,7 +12,29 @@ function escapeXml(value: string) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const format = searchParams.get("format") || "opml";
-  const subs = await readSubscriptions();
+  const listId = searchParams.get("listId") || "all";
+
+  const listsData = await readLists();
+  let subs: any[] = [];
+
+  // Get subscriptions from specified list or all lists
+  if (listId === "all") {
+    // Aggregate all unique subscriptions from all lists
+    const uniqueSubs = new Map();
+    listsData.lists.forEach((list) => {
+      list.subscriptions.forEach((sub) => {
+        if (!uniqueSubs.has(sub.channelId)) {
+          uniqueSubs.set(sub.channelId, sub);
+        }
+      });
+    });
+    subs = Array.from(uniqueSubs.values());
+  } else {
+    const list = listsData.lists.find((l) => l.id === listId);
+    if (list) {
+      subs = list.subscriptions;
+    }
+  }
 
   // JSON export (Invidious format)
   if (format === "json") {

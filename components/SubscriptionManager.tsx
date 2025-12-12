@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { X, Plus, Upload, Download, ChevronDown } from "lucide-react";
+import { X, Plus, Upload, Download, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -13,8 +13,18 @@ interface Subscription {
   addedAt: string;
 }
 
-interface SubscriptionManagerProps {
+interface SubscriptionList {
+  id: string;
+  name: string;
   subscriptions: Subscription[];
+}
+
+interface SubscriptionManagerProps {
+  lists: SubscriptionList[];
+  currentListId: string;
+  onSelectList?: (listId: string) => void;
+  onCreateList?: (name: string) => Promise<void>;
+  onDeleteList?: (listId: string) => Promise<void>;
   onAdd?: (url: string) => void;
   onRemove?: (id: string) => void;
   onImport?: (data: string, format?: string) => Promise<void> | void;
@@ -24,7 +34,11 @@ interface SubscriptionManagerProps {
 }
 
 export function SubscriptionManager({
-  subscriptions,
+  lists,
+  currentListId,
+  onSelectList,
+  onCreateList,
+  onDeleteList,
   onAdd,
   onRemove,
   onImport,
@@ -32,6 +46,9 @@ export function SubscriptionManager({
   isOpen,
   onClose,
 }: SubscriptionManagerProps) {
+  const currentList = lists.find((l) => l.id === currentListId);
+  const subscriptions = currentList?.subscriptions || [];
+
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +56,8 @@ export function SubscriptionManager({
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showCreateList, setShowCreateList] = useState(false);
+  const [newListName, setNewListName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = async () => {
@@ -75,6 +94,27 @@ export function SubscriptionManager({
     }
   };
 
+  const handleCreateList = async () => {
+    if (!newListName.trim()) return;
+    try {
+      await onCreateList?.(newListName);
+      setNewListName("");
+      setShowCreateList(false);
+    } catch (err: any) {
+      setError(err?.message || "Failed to create list");
+    }
+  };
+
+  const handleDeleteList = async (listId: string) => {
+    if (confirm("Delete this list? This cannot be undone.")) {
+      try {
+        await onDeleteList?.(listId);
+      } catch (err: any) {
+        setError(err?.message || "Failed to delete list");
+      }
+    }
+  };
+
   const handleExport = async (format: "opml" | "json") => {
     if (!onExport) return;
     setExporting(true);
@@ -95,47 +135,14 @@ export function SubscriptionManager({
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-card border border-border rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-bold">Manage Subscriptions</h2>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                variant="outline"
-                size="sm"
-                disabled={exporting}
-                title="Export subscriptions"
-                className="gap-1"
-              >
-                <Download className="w-4 h-4" />
-                <ChevronDown className="w-3 h-3" />
-              </Button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-1 w-40 bg-card border border-border rounded-md shadow-lg z-10">
-                  <button
-                    onClick={() => handleExport("opml")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors rounded-t-md"
-                  >
-                    Export OPML
-                  </button>
-                  <button
-                    onClick={() => handleExport("json")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors rounded-b-md"
-                  >
-                    Export JSON
-                  </button>
-                </div>
-              )}
-            </div>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="secondary"
-              size="icon"
-              disabled={importing}
-              title="Import OPML or TubeShelf export"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
+        <div className="border-b border-border">
+          <div className="flex items-center justify-between p-6 pb-4">
+            <h2 className="text-xl font-bold">
+              Subscriptions
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({subscriptions.length})
+              </span>
+            </h2>
             <Button
               onClick={onClose}
               variant="ghost"
@@ -144,6 +151,137 @@ export function SubscriptionManager({
             >
               <X className="w-5 h-5" />
             </Button>
+          </div>
+
+          {/* List Selector & Actions */}
+          <div className="px-6 pb-4">
+            <div className="flex gap-2 items-start">
+              {/* List Dropdown */}
+              <div className="flex-1 relative">
+                <select
+                  value={currentListId}
+                  onChange={(e) => onSelectList?.(e.target.value)}
+                  className="w-full h-10 px-3 py-2 bg-secondary border border-border rounded-lg text-sm font-medium appearance-none cursor-pointer hover:bg-secondary/80 transition-colors pr-8"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 0.75rem center",
+                  }}
+                >
+                  {[...lists]
+                    .sort((a, b) =>
+                      a.id === "default" ? -1 : b.id === "default" ? 1 : 0
+                    )
+                    .map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <Button
+                onClick={() => setShowCreateList(!showCreateList)}
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="New list"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+
+              <Button
+                onClick={() => handleDeleteList(currentListId)}
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={
+                  currentList?.id === "default"
+                    ? "Cannot delete default list"
+                    : "Delete current list"
+                }
+                disabled={!currentList || currentList.id === "default"}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+
+              <div className="relative">
+                <Button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  variant="outline"
+                  size="icon"
+                  disabled={exporting}
+                  title="Export subscriptions"
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-1 w-40 bg-card border border-border rounded-lg shadow-lg z-10 overflow-hidden">
+                    <button
+                      onClick={() => handleExport("opml")}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                    >
+                      Export OPML
+                    </button>
+                    <button
+                      onClick={() => handleExport("json")}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                    >
+                      Export JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                size="icon"
+                disabled={importing}
+                title="Import OPML or JSON"
+                className="h-10 w-10 shrink-0"
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Create List Form */}
+            {showCreateList && (
+              <div className="mt-3 p-3 bg-secondary/50 rounded-lg border border-border">
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                    placeholder="New list name..."
+                    className="text-sm h-9"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateList();
+                      else if (e.key === "Escape") setShowCreateList(false);
+                    }}
+                    autoFocus
+                  />
+                  <Button
+                    onClick={handleCreateList}
+                    variant="default"
+                    size="sm"
+                    className="h-9"
+                  >
+                    Create
+                  </Button>
+                  <Button
+                    onClick={() => setShowCreateList(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-9"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
