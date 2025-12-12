@@ -11,9 +11,11 @@ import type { AppSettings } from "@/lib/settingsStore";
 interface SettingsPanelProps {
   settings: AppSettings;
   onSave?: (settings: Partial<AppSettings>) => void;
-  onDeleteSubscriptions?: () => Promise<void>;
+  onDeleteSubscriptions?: (listId?: string) => Promise<void>;
   onClearWatchHistory?: () => Promise<void>;
   onResetSettings?: () => Promise<void>;
+  subscriptionLists?: Array<{ id: string; name: string }>;
+  currentListId?: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -24,6 +26,8 @@ export function SettingsPanel({
   onDeleteSubscriptions,
   onClearWatchHistory,
   onResetSettings,
+  subscriptionLists = [],
+  currentListId,
   isOpen,
   onClose,
 }: SettingsPanelProps) {
@@ -32,6 +36,7 @@ export function SettingsPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<"all" | string>("all");
 
   const handleSave = async () => {
     setSaving(true);
@@ -52,8 +57,10 @@ export function SettingsPanel({
     setSaving(true);
     setError(null);
     try {
-      if (action === "subscriptions") await onDeleteSubscriptions?.();
-      else if (action === "history") await onClearWatchHistory?.();
+      if (action === "subscriptions") {
+        const targetListId = deleteTarget === "all" ? undefined : deleteTarget;
+        await onDeleteSubscriptions?.(targetListId);
+      } else if (action === "history") await onClearWatchHistory?.();
       else if (action === "settings") await onResetSettings?.();
       setConfirmAction(null);
       onClose();
@@ -92,23 +99,55 @@ export function SettingsPanel({
                 <div>
                   <p className="font-semibold text-sm">
                     {confirmAction === "subscriptions"
-                      ? "Delete all subscriptions?"
+                      ? "Delete subscriptions?"
                       : confirmAction === "history"
                       ? "Clear all watch history?"
                       : "Reset all settings to defaults?"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {confirmAction === "subscriptions"
-                      ? "This will remove all subscriptions. This action cannot be undone."
+                      ? deleteTarget === "all"
+                        ? "This will remove all subscriptions from all lists. This action cannot be undone."
+                        : "This will remove all subscriptions from the selected list. This action cannot be undone."
                       : confirmAction === "history"
                       ? "This will clear all watched/unwatched states. This action cannot be undone."
                       : "All settings will be reset to their default values. This action cannot be undone."}
                   </p>
                 </div>
               </div>
+
+              {confirmAction === "subscriptions" && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    Delete from:
+                  </label>
+                  <select
+                    value={deleteTarget}
+                    onChange={(e) => setDeleteTarget(e.target.value)}
+                    className="w-full h-10 px-3 py-2 bg-secondary border border-border rounded-lg text-sm appearance-none cursor-pointer hover:bg-secondary/80 transition-colors"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 0.75rem center",
+                      paddingRight: "2rem",
+                    }}
+                  >
+                    <option value="all">All Lists</option>
+                    {subscriptionLists.map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex gap-2 justify-end">
                 <Button
-                  onClick={() => setConfirmAction(null)}
+                  onClick={() => {
+                    setConfirmAction(null);
+                    setDeleteTarget("all");
+                  }}
                   variant="outline"
                   size="sm"
                   disabled={saving}
@@ -207,10 +246,10 @@ export function SettingsPanel({
                     className="w-full px-4 py-2 text-left text-sm rounded border border-destructive/30 hover:bg-destructive/10 transition-colors"
                   >
                     <p className="font-medium text-destructive">
-                      Delete All Subscriptions
+                      Delete Subscriptions
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Remove all channels
+                      Remove channels
                     </p>
                   </button>
                   <button

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchChannelFeed } from "@/lib/rss";
-import { readSubscriptions } from "@/lib/subscriptionStore";
+import { readLists } from "@/lib/subscriptionListStore";
 
 const CONCURRENCY = 4;
 
@@ -15,8 +15,15 @@ export async function GET(req: Request) {
       .map((id) => id.trim())
       .filter(Boolean);
   } else {
-    const subs = await readSubscriptions();
-    channelIds = subs.map((s) => s.channelId);
+    // Get all unique channel IDs from all subscription lists
+    const listsData = await readLists();
+    const uniqueChannelIds = new Set<string>();
+    listsData.lists.forEach((list) => {
+      list.subscriptions.forEach((sub) => {
+        uniqueChannelIds.add(sub.channelId);
+      });
+    });
+    channelIds = Array.from(uniqueChannelIds);
   }
 
   if (channelIds.length === 0) {
@@ -56,4 +63,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ items });
 }
-

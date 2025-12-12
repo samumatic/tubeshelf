@@ -35,6 +35,10 @@ import {
   Subscription,
 } from "@/lib/mockData";
 import type { AppSettings } from "@/lib/settingsStore";
+import type {
+  SubscriptionList,
+  SubscriptionListsData,
+} from "@/lib/subscriptionListStore";
 
 type Page = "home" | "watch-later";
 type FeedTab = "videos" | "reels";
@@ -68,6 +72,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [hideWatched, setHideWatched] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [subscriptionLists, setSubscriptionLists] = useState<
+    SubscriptionList[]
+  >([]);
+  const [currentListId, setCurrentListId] = useState<string>("default");
+  const [filterListId, setFilterListId] = useState<string>("all");
 
   useEffect(() => {
     setMounted(true);
@@ -77,8 +86,18 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const [subs, vids] = await Promise.all([getSubscriptions(), getVideos()]);
-      setSubscriptions(subs);
+      const [listsData, vids] = await Promise.all([
+        fetch("/api/subscription-lists").then((r) => r.json()),
+        getVideos(),
+      ]);
+      setSubscriptionLists(listsData.lists);
+      // Only change currentListId if it's not set or the current list no longer exists
+      setCurrentListId((prevId) => {
+        const listStillExists = listsData.lists.some(
+          (l: any) => l.id === prevId
+        );
+        return prevId && listStillExists ? prevId : listsData.defaultListId;
+      });
       setVideos(vids.filter((v) => !v.isShort));
       setShorts(vids.filter((v) => v.isShort));
       setFilteredVideos(vids.filter((v) => !v.isShort));
@@ -181,6 +200,18 @@ export default function Home() {
     let vids = videos;
     let shts = shorts;
 
+    // Filter by subscription list
+    if (filterListId !== "all") {
+      const selectedList = subscriptionLists.find((l) => l.id === filterListId);
+      if (selectedList) {
+        const channelIds = new Set(
+          selectedList.subscriptions.map((s) => s.channelId)
+        );
+        vids = vids.filter((v) => channelIds.has(v.channelId));
+        shts = shts.filter((v) => channelIds.has(v.channelId));
+      }
+    }
+
     // Filter by search term
     if (term) {
       vids = vids.filter(
@@ -216,11 +247,13 @@ export default function Home() {
     hideWatched,
     watchedVideos,
     settings?.defaultSortOrder,
+    filterListId,
+    subscriptionLists,
   ]);
 
   const handleAddSubscription = async (url: string) => {
     try {
-      await addSubscription(url);
+      await addSubscription(url, currentListId);
       await refreshData();
     } catch (err) {
       console.error(err);
@@ -229,19 +262,22 @@ export default function Home() {
   };
 
   const handleImportSubscriptions = async (data: string, format?: string) => {
-    await importSubscriptions(data, format);
+    await importSubscriptions(data, format, currentListId);
     await refreshData();
   };
 
   const handleExportSubscriptions = async (format: "opml" | "json") => {
-    const data = await exportSubscriptions(format);
+    const data = await exportSubscriptions(format, currentListId);
     const mimeType = format === "json" ? "application/json" : "application/xml";
     const extension = format === "json" ? "json" : "opml";
+    const currentList = subscriptionLists.find((l) => l.id === currentListId);
+    const listName = currentList?.name || "subscriptions";
+    const sanitizedListName = listName.toLowerCase().replace(/\s+/g, "-");
     const blob = new Blob([data], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tubeshelf-subscriptions.${extension}`;
+    link.download = `tubeshelf-${sanitizedListName}.${extension}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -258,8 +294,13 @@ export default function Home() {
     }
   };
 
-  const handleDeleteAllSubscriptions = async () => {
-    await deleteAllSubscriptions();
+  const handleDeleteAllSubscriptions = async (listId?: string) => {
+    const res = await fetch("/api/subscription-lists/subscriptions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear", listId: listId || null }),
+    });
+    if (!res.ok) throw new Error("Failed to delete subscriptions");
     await refreshData();
   };
 
@@ -440,7 +481,25 @@ export default function Home() {
             <div className="mb-8">
               <h2 className="text-2xl sm:text-3xl font-bold mb-2">Your Feed</h2>
               <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                <span>{subscriptions.length} subscriptions</span>
+                <span>
+                  {(() => {
+                    if (filterListId === "all") {
+                      const uniqueChannels = new Set<string>();
+                      subscriptionLists.forEach((list) => {
+                        list.subscriptions.forEach((sub) => {
+                          uniqueChannels.add(sub.channelId);
+                        });
+                      });
+                      return uniqueChannels.size;
+                    } else {
+                      const selectedList = subscriptionLists.find(
+                        (l) => l.id === filterListId
+                      );
+                      return selectedList?.subscriptions.length || 0;
+                    }
+                  })()}{" "}
+                  subscriptions
+                </span>
                 <span>•</span>
                 <span>{filteredVideos.length} videos</span>
                 <span>•</span>
@@ -481,7 +540,7 @@ export default function Home() {
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Videos ({filteredVideos.length})
+                      Videos
                     </button>
                     <button
                       onClick={() => setFeedTab("reels")}
@@ -491,10 +550,11 @@ export default function Home() {
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Reels ({filteredShorts.length})
+                      Reels
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 pb-2">
+                  <div className="flex items-center gap-3 pb-2">
+                    {/* Hide watched first */}
                     <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                       <Switch
                         checked={hideWatched}
@@ -502,6 +562,23 @@ export default function Home() {
                       />
                       Hide watched
                     </label>
+                    {/* List Filter */}
+                    <select
+                      value={filterListId}
+                      onChange={(e) => setFilterListId(e.target.value)}
+                      className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
+                    >
+                      <option value="all">All Lists</option>
+                      {subscriptionLists
+                        .sort((a, b) =>
+                          a.id === "default" ? -1 : b.id === "default" ? 1 : 0
+                        )
+                        .map((list) => (
+                          <option key={list.id} value={list.id}>
+                            {list.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </div>
 
@@ -611,7 +688,27 @@ export default function Home() {
 
       {/* Subscription Manager Modal */}
       <SubscriptionManager
-        subscriptions={subscriptions}
+        lists={subscriptionLists}
+        currentListId={currentListId}
+        onSelectList={setCurrentListId}
+        onCreateList={async (name: string) => {
+          const res = await fetch("/api/subscription-lists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "create", name }),
+          });
+          if (!res.ok) throw new Error("Failed to create list");
+          await refreshData();
+        }}
+        onDeleteList={async (listId: string) => {
+          const res = await fetch("/api/subscription-lists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "delete", listId }),
+          });
+          if (!res.ok) throw new Error("Failed to delete list");
+          await refreshData();
+        }}
         onAdd={handleAddSubscription}
         onRemove={handleRemoveSubscription}
         onImport={handleImportSubscriptions}
@@ -627,6 +724,8 @@ export default function Home() {
           onDeleteSubscriptions={handleDeleteAllSubscriptions}
           onClearWatchHistory={handleClearWatchHistory}
           onResetSettings={handleResetAllSettings}
+          subscriptionLists={subscriptionLists}
+          currentListId={currentListId}
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
         />
