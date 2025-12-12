@@ -70,14 +70,11 @@ Access the web UI at **http://localhost:3000**
 
 ## Why TubeShelf?
 
-YouTube's subscription page is designed for engagement, not completeness. Videos get buried, sorted by "personalization" rather than time, and mixed with algorithmic recommendations.
+Want a YouTube subscription feed without a Google account? Invidious used to be the answer, but YouTube now actively blocks it.
 
-TubeShelf is built for users who want:
+**TubeShelf** takes a different approach: it collects videos from YouTube RSS feeds and displays them as a clean chronological list. Click any video to open it on YouTube.
 
-- **Every recent upload, in chronological order** - No hidden videos
-- **Full control over their feed** - No algorithm deciding what you see
-- **Privacy** - Self-hosted, no tracking, no data collection
-- **Simplicity** - Just your subscriptions, nothing else
+No Google account required. No algorithm. No tracking. Just your subscriptions in order.
 
 ## License
 
