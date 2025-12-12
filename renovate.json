@@ -5,8 +5,8 @@
   "dependencyDashboardTitle": "Renovate Dashboard",
   "packageRules": [
     {
-      "description": "Automerge minor and patch updates for standard packages",
-      "matchUpdateTypes": ["minor", "patch"],
+      "description": "Automerge minor/patch/pin/digest updates directly on branch",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
       "automergeType": "branch"
     },
