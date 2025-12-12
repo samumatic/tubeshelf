@@ -189,26 +189,35 @@ export function SubscriptionManager({
                   key={sub.id}
                   className="flex items-center gap-3 p-3 rounded border border-border hover:bg-secondary transition-colors"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={
-                      sub.thumbnail ||
-                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
-                    }
-                    alt={sub.title}
-                    className="w-10 h-10 rounded-full object-cover bg-secondary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{sub.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      Added{" "}
-                      {new Date(sub.addedAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-                  </div>
+                  <a
+                    href={sub.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 flex-1 min-w-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        sub.thumbnail ||
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
+                      }
+                      alt={sub.title}
+                      className="w-10 h-10 rounded-full object-cover bg-secondary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {sub.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        Added{" "}
+                        {new Date(sub.addedAt).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </a>
                   <Button
                     onClick={() => onRemove?.(sub.id)}
                     variant="ghost"

@@ -10,6 +10,7 @@ import {
   Bookmark,
   Sliders,
   Plus,
+  List,
 } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
@@ -385,8 +386,8 @@ export default function Home() {
                 className="hidden sm:flex gap-1"
                 title="Manage subscriptions"
               >
-                <Plus className="w-4 h-4" />
-                Add
+                <List className="w-5 h-5" />
+                Manage
               </Button>
               <Button
                 onClick={() => setCurrentPage("watch-later")}
@@ -455,7 +456,7 @@ export default function Home() {
                 variant="default"
                 className="w-full"
               >
-                <Settings className="w-4 h-4 mr-2" />
+                <List className="w-5 h-5 mr-2" />
                 Manage Subscriptions
               </Button>
             </div>
