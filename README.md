@@ -2,7 +2,7 @@
   <picture>
     <source srcset="public/icon-dark.svg" media="(prefers-color-scheme: dark)">
     <source srcset="public/icon-light.svg" media="(prefers-color-scheme: light)">
-    <img alt="TubeShelf icon" src="/public/icon-flat.svg" width="140" height="140">
+    <img alt="TubeShelf icon" src="public/icon-flat.svg" width="140" height="140">
   </picture>
   <h1>TubeShelf</h1>
   <h3>Self-hosted YouTube subscription feed<br />Chronological, distraction-free, yours.</h3>

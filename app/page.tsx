@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { ThemeContext } from "@/components/ThemeProvider";
 import {
   Play,
   Menu,
@@ -47,6 +48,8 @@ interface WatchLaterItem {
 }
 
 export default function Home() {
+  const { theme } = useContext(ThemeContext);
+  const [mounted, setMounted] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>("home");
   const [feedTab, setFeedTab] = useState<FeedTab>("videos");
   const [videos, setVideos] = useState<Video[]>([]);
@@ -64,6 +67,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [hideWatched, setHideWatched] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const refreshData = async () => {
     setLoading(true);
@@ -332,21 +339,23 @@ export default function Home() {
                   setSearchQuery("");
                 }}
               >
-                <picture className="h-11 w-11 shrink-0">
-                  <source
-                    srcSet="/icon-dark.svg"
-                    media="(prefers-color-scheme: dark)"
-                  />
-                  <source
-                    srcSet="/icon-light.svg"
-                    media="(prefers-color-scheme: light)"
-                  />
-                  <img
-                    src="/icon-flat.svg"
+                <img
+                    src={
+                      !mounted
+                        ? "/icon-flat.svg"
+                        : (() => {
+                            if (theme === "dark") return "/icon-dark.svg";
+                            if (theme === "light") return "/icon-light.svg";
+                            // system theme
+                            const prefersDark = window.matchMedia(
+                              "(prefers-color-scheme: dark)"
+                            ).matches;
+                            return prefersDark ? "/icon-dark.svg" : "/icon-light.svg";
+                          })()
+                    }
                     alt="TubeShelf"
                     className="h-11 w-11"
                   />
-                </picture>
                 <h1 className="text-xl font-bold hidden sm:block">TubeShelf</h1>
               </div>
             </div>

@@ -11,5 +11,5 @@
   <rect x="44" y="32" width="12" height="32" fill="#777"/>
 
   <!-- Perfect isosceles triangle/play-book -->
-  <polygon points="62,32 78,50 62,64" fill="#ff5252"/>
+  <polygon points="62,32 78,50 62,64" fill="#d32f2f"/>
 </svg>
