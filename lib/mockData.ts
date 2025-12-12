@@ -82,11 +82,16 @@ export async function addSubscription(
   return list.subscriptions[list.subscriptions.length - 1];
 }
 
-export async function removeSubscription(channelId: string): Promise<void> {
+export async function removeSubscription(
+  channelId: string,
+  listId: string = "default"
+): Promise<void> {
   const res = await fetch(
-    `/api/subscriptions?id=${encodeURIComponent(channelId)}`,
+    `/api/subscription-lists/subscriptions`,
     {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channelId, listId }),
     }
   );
   if (!res.ok) {

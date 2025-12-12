@@ -321,7 +321,7 @@ export default function Home() {
 
   const handleRemoveSubscription = async (id: string) => {
     try {
-      await removeSubscription(id);
+      await removeSubscription(id, currentListId);
       await refreshData();
     } catch (err) {
       console.error(err);
