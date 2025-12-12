@@ -92,7 +92,8 @@ export function VideoCard({
     }
   }, [showMenu]);
   return (
-    <div className="group overflow-visible rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border"
+    <div
+      className="group overflow-visible rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border"
       ref={menuRef}
     >
       {/* Thumbnail */}
@@ -100,7 +101,7 @@ export function VideoCard({
         href={videoUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative overflow-hidden bg-secondary aspect-video cursor-pointer block"
+        className="relative overflow-hidden bg-secondary aspect-video cursor-pointer block rounded-t-lg"
         onClick={(e) => {
           // Let middle-click and ctrl/cmd+click pass through naturally
           if (e.button !== 0) return;
@@ -133,9 +134,7 @@ export function VideoCard({
       {/* Content */}
       <div className="p-3 flex flex-col">
         {/* Title and Menu */}
-        <div
-          className="flex items-start justify-between gap-2 mb-1"
-        >
+        <div className="flex items-start justify-between gap-2 mb-1">
           <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors flex-1">
             {title}
           </h3>
