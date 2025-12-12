@@ -89,11 +89,15 @@ export async function removeSubscription(channelId: string): Promise<void> {
   }
 }
 
-export async function importSubscriptions(opmlText: string) {
+export async function importSubscriptions(
+  data: string,
+  format: string = "opml"
+) {
+  const contentType = format === "json" ? "application/json" : "text/xml";
   const res = await fetch("/api/subscriptions/import", {
     method: "POST",
-    headers: { "Content-Type": "text/xml" },
-    body: opmlText,
+    headers: { "Content-Type": contentType },
+    body: data,
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -102,8 +106,12 @@ export async function importSubscriptions(opmlText: string) {
   return res.json();
 }
 
-export async function exportSubscriptions(): Promise<string> {
-  const res = await fetch("/api/subscriptions/export", { cache: "no-store" });
+export async function exportSubscriptions(
+  format: "opml" | "json" = "opml"
+): Promise<string> {
+  const res = await fetch(`/api/subscriptions/export?format=${format}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     throw new Error("Failed to export subscriptions");
   }

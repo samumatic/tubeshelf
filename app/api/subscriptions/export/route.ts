@@ -9,10 +9,32 @@ function escapeXml(value: string) {
     .replace(/'/g, "&apos;");
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const format = searchParams.get("format") || "opml";
   const subs = await readSubscriptions();
-  const now = new Date().toISOString();
 
+  // JSON export (Invidious format)
+  if (format === "json") {
+    const json = {
+      subscriptions: subs.map((sub) => sub.channelId),
+      watch_history: [],
+      preferences: {},
+      playlists: [],
+    };
+
+    return new Response(JSON.stringify(json, null, 2), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition":
+          "attachment; filename=TubeShelf-Subscriptions.json",
+      },
+    });
+  }
+
+  // OPML export (default)
+  const now = new Date().toISOString();
   const outlines = subs
     .map((sub) => {
       const title = escapeXml(sub.title || sub.channelId);

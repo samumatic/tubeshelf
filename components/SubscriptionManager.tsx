@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { X, Plus, Upload, Download } from "lucide-react";
+import { X, Plus, Upload, Download, ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -17,8 +17,8 @@ interface SubscriptionManagerProps {
   subscriptions: Subscription[];
   onAdd?: (url: string) => void;
   onRemove?: (id: string) => void;
-  onImport?: (opmlText: string) => Promise<void> | void;
-  onExport?: () => Promise<void> | void;
+  onImport?: (data: string, format?: string) => Promise<void> | void;
+  onExport?: (format: "opml" | "json") => Promise<void> | void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -38,6 +38,7 @@ export function SubscriptionManager({
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = async () => {
@@ -63,7 +64,9 @@ export function SubscriptionManager({
     setError(null);
     try {
       const text = await file.text();
-      await onImport?.(text);
+      // Detect format based on content
+      const format = text.trim().startsWith("<") ? "opml" : "json";
+      await onImport?.(text, format);
     } catch (err: any) {
       setError(err?.message || "Failed to import");
     } finally {
@@ -72,12 +75,13 @@ export function SubscriptionManager({
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format: "opml" | "json") => {
     if (!onExport) return;
     setExporting(true);
     setError(null);
+    setShowExportMenu(false);
     try {
-      await onExport();
+      await onExport(format);
     } catch (err: any) {
       setError(err?.message || "Failed to export");
     } finally {
@@ -94,15 +98,35 @@ export function SubscriptionManager({
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-bold">Manage Subscriptions</h2>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={handleExport}
-              variant="outline"
-              size="icon"
-              disabled={exporting}
-              title="Export subscriptions"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
+            <div className="relative">
+              <Button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                variant="outline"
+                size="sm"
+                disabled={exporting}
+                title="Export subscriptions"
+                className="gap-1"
+              >
+                <Download className="w-4 h-4" />
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 w-40 bg-card border border-border rounded-md shadow-lg z-10">
+                  <button
+                    onClick={() => handleExport("opml")}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors rounded-t-md"
+                  >
+                    Export OPML
+                  </button>
+                  <button
+                    onClick={() => handleExport("json")}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors rounded-b-md"
+                  >
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <Button
               onClick={() => fileInputRef.current?.click()}
               variant="secondary"
@@ -152,14 +176,14 @@ export function SubscriptionManager({
 
           {/* Import Info */}
           <div className="mb-4 p-3 bg-secondary/50 rounded text-xs text-muted-foreground">
-            Import OPML files from other services or export files from TubeShelf
-            using the download button above.
+            Import OPML files from other services or JSON files (Invidious
+            format) using the upload button above.
           </div>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept=".opml,.xml,text/xml,application/xml"
+            accept=".opml,.xml,.json,text/xml,application/xml,application/json"
             className="hidden"
             onChange={handleFileChange}
           />
