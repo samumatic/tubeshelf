@@ -3,6 +3,7 @@ name: Publish container to GHCR
 on:
   push:
     branches: [main, master]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +12,6 @@ permissions:
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
-  VERSION: 0.1.0
 
 jobs:
   build-and-push:
@@ -19,6 +19,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,14 +45,14 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE }}:v${{ env.VERSION }}
-            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:v${{ steps.version.outputs.version }}
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
             ${{ env.IMAGE }}:latest
           provenance: false
 
       - name: Summary
         run: |
           echo "Published:"
-          echo "  ${{ env.IMAGE }}:v${{ env.VERSION }}"
-          echo "  ${{ env.IMAGE }}:${{ env.VERSION }}"
+          echo "  ${{ env.IMAGE }}:v${{ steps.version.outputs.version }}"
+          echo "  ${{ env.IMAGE }}:${{ steps.version.outputs.version }}"
           echo "  ${{ env.IMAGE }}:latest"
