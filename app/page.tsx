@@ -8,8 +8,6 @@ import {
   Search,
   Settings,
   Bookmark,
-  Sliders,
-  Plus,
   List,
 } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
@@ -21,14 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   getVideos,
-  getSubscriptions,
   addSubscription,
   removeSubscription,
   importSubscriptions,
   exportSubscriptions,
   getSettings,
   updateSettings,
-  deleteAllSubscriptions,
   clearWatchHistory,
   resetAllSettings,
   Video,
@@ -59,7 +55,6 @@ export default function Home() {
   const [feedTab, setFeedTab] = useState<FeedTab>("videos");
   const [videos, setVideos] = useState<Video[]>([]);
   const [shorts, setShorts] = useState<Video[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [watchLater, setWatchLater] = useState<WatchLaterItem[]>([]);
   const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
   const [showSubscriptions, setShowSubscriptions] = useState(false);

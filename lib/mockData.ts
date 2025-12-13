@@ -86,14 +86,11 @@ export async function removeSubscription(
   channelId: string,
   listId: string = "default"
 ): Promise<void> {
-  const res = await fetch(
-    `/api/subscription-lists/subscriptions`,
-    {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelId, listId }),
-    }
-  );
+  const res = await fetch(`/api/subscription-lists/subscriptions`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channelId, listId }),
+  });
   if (!res.ok) {
     throw new Error("Failed to remove subscription");
   }
@@ -169,18 +166,6 @@ export async function updateSettings(updates: Record<string, any>) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Failed to update settings");
-  }
-  return res.json();
-}
-
-export async function deleteAllSubscriptions() {
-  const res = await fetch("/api/danger/delete-subscriptions", {
-    method: "POST",
-    headers,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to delete subscriptions");
   }
   return res.json();
 }
