@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { ThemeContext } from "@/components/ThemeProvider";
 import { Play, Menu, Search, Settings, Bookmark, List, X } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { WatchLater } from "@/components/WatchLater";
+import { LoadingProgress } from "@/components/LoadingProgress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -65,14 +66,20 @@ export default function Home() {
   >([]);
   const [currentListId, setCurrentListId] = useState<string>("default");
   const [filterListId, setFilterListId] = useState<string>("all");
+  const [showLoadingProgress, setShowLoadingProgress] = useState(false);
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const refreshData = async () => {
+    // Prevent concurrent or duplicate refreshes (e.g., React Strict Mode)
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setLoading(true);
     setError(null);
+    setShowLoadingProgress(true);
     try {
       const [listsData, vids] = await Promise.all([
         fetch("/api/subscription-lists").then((r) => r.json()),
@@ -94,6 +101,8 @@ export default function Home() {
       setError(err?.message || "Failed to load data");
     } finally {
       setLoading(false);
+      setShowLoadingProgress(false);
+      refreshingRef.current = false;
     }
   };
 
@@ -151,6 +160,8 @@ export default function Home() {
 
   // Initialize data
   useEffect(() => {
+    // Ref used to suppress duplicate init in dev Strict Mode
+    refreshingRef.current = false;
     const init = async () => {
       try {
         const appSettings = await getSettings();
@@ -396,6 +407,8 @@ export default function Home() {
     const newWatched = new Set(watchedVideos);
     newWatched.add(videoId);
     setWatchedVideos(newWatched);
+    // Open the video in a new tab
+    window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
   };
 
   const handleToggleWatched = (videoId: string) => {
@@ -425,7 +438,10 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Loading Progress Modal */}
+      <LoadingProgress isVisible={showLoadingProgress} />
+
       {/* Navigation */}
       <nav className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -556,7 +572,7 @@ export default function Home() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {currentPage === "home" ? (
           <>
             {/* Page Header */}
@@ -606,8 +622,7 @@ export default function Home() {
 
             {loading ? (
               <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <p className="mt-4 text-muted-foreground">Loading feed...</p>
+                {/* Loading progress shown via LoadingProgress modal */}
               </div>
             ) : (
               <>

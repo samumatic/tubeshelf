@@ -41,12 +41,16 @@ export function WatchLater({ items, onRemove, onPlay }: WatchLaterProps) {
           <img
             src={item.thumbnail}
             alt={item.title}
-            className="w-24 h-16 object-cover rounded flex-shrink-0"
+            className="w-24 h-16 object-cover rounded flex-shrink-0 cursor-pointer"
+            onClick={() => onPlay?.(item.videoId)}
           />
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-sm line-clamp-2 group-hover:text-accent transition-colors">
+            <h4
+              className="font-medium text-sm line-clamp-2 text-foreground group-hover:text-primary transition-colors cursor-pointer"
+              onClick={() => onPlay?.(item.videoId)}
+            >
               {item.title}
             </h4>
             <p className="text-xs text-muted-foreground mt-1">{item.channel}</p>
@@ -62,12 +66,6 @@ export function WatchLater({ items, onRemove, onPlay }: WatchLaterProps) {
 
           {/* Actions */}
           <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => onPlay?.(item.videoId)}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground px-3 py-1 rounded text-xs font-medium transition-colors"
-            >
-              Play
-            </button>
             <button
               onClick={() => onRemove?.(item.id)}
               className="p-2 hover:bg-destructive/10 rounded transition-colors"
