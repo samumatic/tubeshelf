@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { X, Plus, Upload, Download, ChevronDown, Trash2 } from "lucide-react";
+import {
+  X,
+  Plus,
+  Upload,
+  Download,
+  ChevronDown,
+  Trash2,
+  Shuffle,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -27,6 +35,7 @@ interface SubscriptionManagerProps {
   onDeleteList?: (listId: string) => Promise<void>;
   onAdd?: (url: string) => void;
   onRemove?: (id: string) => void;
+  onMove?: (subscriptionId: string, targetListId: string) => Promise<void>;
   onImport?: (data: string, format?: string) => Promise<void> | void;
   onExport?: (format: "opml" | "json") => Promise<void> | void;
   isOpen: boolean;
@@ -41,6 +50,7 @@ export function SubscriptionManager({
   onDeleteList,
   onAdd,
   onRemove,
+  onMove,
   onImport,
   onExport,
   isOpen,
@@ -58,6 +68,7 @@ export function SubscriptionManager({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [movingSubId, setMovingSubId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = async () => {
@@ -126,6 +137,17 @@ export function SubscriptionManager({
       setError(err?.message || "Failed to export");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleMove = async (subscriptionId: string, targetListId: string) => {
+    if (!onMove) return;
+    setError(null);
+    try {
+      await onMove(subscriptionId, targetListId);
+      setMovingSubId(null);
+    } catch (err: any) {
+      setError(err?.message || "Failed to move subscription");
     }
   };
 
@@ -349,7 +371,7 @@ export function SubscriptionManager({
               .map((sub) => (
                 <div
                   key={sub.id}
-                  className="flex items-center gap-3 p-3 rounded border border-border hover:bg-secondary transition-colors"
+                  className="flex items-center gap-2 p-3 rounded border border-border hover:bg-secondary transition-colors"
                 >
                   <a
                     href={sub.url}
@@ -380,6 +402,43 @@ export function SubscriptionManager({
                       </p>
                     </div>
                   </a>
+
+                  {/* Move dropdown - only show if there are other lists */}
+                  {lists.length > 1 && onMove && (
+                    <div className="relative">
+                      <Button
+                        onClick={() =>
+                          setMovingSubId(movingSubId === sub.id ? null : sub.id)
+                        }
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        title="Move to another list"
+                      >
+                        <Shuffle className="w-4 h-4" />
+                      </Button>
+                      {movingSubId === sub.id && (
+                        <div className="absolute right-0 bottom-full mb-1 w-48 bg-card border border-border rounded-lg shadow-lg z-10 overflow-hidden">
+                          <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border bg-secondary/30">
+                            Move to another list
+                          </div>
+                          {lists
+                            .filter((list) => list.id !== currentListId)
+                            .map((list) => (
+                              <button
+                                key={list.id}
+                                onClick={() => handleMove(sub.id, list.id)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2"
+                              >
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                {list.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <Button
                     onClick={() => onRemove?.(sub.id)}
                     variant="ghost"

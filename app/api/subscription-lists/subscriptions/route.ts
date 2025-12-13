@@ -5,6 +5,7 @@ import {
   removeSubscriptionFromList,
   clearListSubscriptions,
   clearAllSubscriptions,
+  moveSubscription,
 } from "@/lib/subscriptionListStore";
 import { fetchChannelFeed } from "@/lib/rss";
 import { resolveChannelId } from "@/lib/rss";
@@ -97,4 +98,31 @@ export async function DELETE(req: Request) {
       { status: 400 }
     );
   }
+}
+
+export async function PATCH(req: Request) {
+  const body = await req.json().catch(() => null);
+  const { action, channelId, fromListId, toListId } = body || {};
+
+  if (action === "move") {
+    if (!channelId || !fromListId || !toListId) {
+      return NextResponse.json(
+        { error: "Channel ID, source list ID, and target list ID required" },
+        { status: 400 }
+      );
+    }
+
+    try {
+      await moveSubscription(fromListId, toListId, channelId);
+      const lists = await readLists();
+      return NextResponse.json(lists);
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: err?.message || "Failed to move subscription" },
+        { status: 400 }
+      );
+    }
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

@@ -356,6 +356,30 @@ export default function Home() {
     }
   };
 
+  const handleMoveSubscription = async (
+    subscriptionId: string,
+    targetListId: string
+  ) => {
+    try {
+      const res = await fetch("/api/subscription-lists/subscriptions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "move",
+          channelId: subscriptionId,
+          fromListId: currentListId,
+          toListId: targetListId,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to move subscription");
+      const data = await res.json();
+      setSubscriptionLists(data.lists);
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  };
+
   const handleWatchVideo = (videoId: string) => {
     const newWatched = new Set(watchedVideos);
     newWatched.add(videoId);
@@ -764,6 +788,7 @@ export default function Home() {
         }}
         onAdd={handleAddSubscription}
         onRemove={handleRemoveSubscription}
+        onMove={handleMoveSubscription}
         onImport={handleImportSubscriptions}
         onExport={handleExportSubscriptions}
         isOpen={showSubscriptions}

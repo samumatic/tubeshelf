@@ -182,3 +182,35 @@ export async function clearAllSubscriptions() {
   });
   await writeLists(data);
 }
+
+export async function moveSubscription(
+  fromListId: string,
+  toListId: string,
+  channelId: string
+) {
+  const data = await readLists();
+  const fromList = data.lists.find((l) => l.id === fromListId);
+  const toList = data.lists.find((l) => l.id === toListId);
+
+  if (!fromList) throw new Error("Source list not found");
+  if (!toList) throw new Error("Target list not found");
+
+  const subscription = fromList.subscriptions.find(
+    (s) => s.channelId === channelId
+  );
+  if (!subscription) throw new Error("Subscription not found");
+
+  // Remove from source list
+  fromList.subscriptions = fromList.subscriptions.filter(
+    (s) => s.channelId !== channelId
+  );
+  fromList.updatedAt = new Date().toISOString();
+
+  // Add to target list if not already there
+  if (!toList.subscriptions.some((s) => s.channelId === channelId)) {
+    toList.subscriptions.push(subscription);
+    toList.updatedAt = new Date().toISOString();
+  }
+
+  await writeLists(data);
+}
