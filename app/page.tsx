@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useContext } from "react";
 import { ThemeContext } from "@/components/ThemeProvider";
-import { Play, Menu, Search, Settings, Bookmark, List } from "lucide-react";
+import { Play, Menu, Search, Settings, Bookmark, List, X } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
@@ -221,6 +221,18 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("filterListId", JSON.stringify(filterListId));
   }, [filterListId]);
+
+  // Handle Escape key to clear search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && searchQuery) {
+        setSearchQuery("");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [searchQuery]);
 
   // Handle search and filter
   useEffect(() => {
@@ -467,8 +479,17 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search videos..."
-                  className="w-full text-sm pl-10"
+                  className="w-full text-sm pl-10 pr-9"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Clear search (or press Escape)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -518,8 +539,17 @@ export default function Home() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search videos..."
-                className="w-full text-sm pl-10"
+                className="w-full text-sm pl-10 pr-9"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Clear search (or press Escape)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -667,7 +697,7 @@ export default function Home() {
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
                             onChannelClick={(channelName) =>
-                              setSearchQuery(channelName)
+                              setSearchQuery(searchQuery === channelName ? "" : channelName)
                             }
                           />
                         ))}
@@ -709,7 +739,7 @@ export default function Home() {
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
                             onChannelClick={(channelName) =>
-                              setSearchQuery(channelName)
+                              setSearchQuery(searchQuery === channelName ? "" : channelName)
                             }
                           />
                         ))}
