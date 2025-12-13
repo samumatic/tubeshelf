@@ -105,6 +105,9 @@ export default function Home() {
         const data = await res.json();
         setWatchedVideos(new Set(data.watchedVideos || []));
         setHideWatched(data.hideWatched || false);
+        if (typeof data.filterListId === "string") {
+          setFilterListId(data.filterListId);
+        }
       }
     } catch (e) {
       console.error("Failed to load user state:", e);
@@ -120,10 +123,29 @@ export default function Home() {
         body: JSON.stringify({
           watchedVideos: Array.from(watchedVideos),
           hideWatched,
+          filterListId,
         }),
       });
     } catch (e) {
       console.error("Failed to save user state:", e);
+    }
+  };
+
+  const handleChangeFilterList = async (newId: string) => {
+    setFilterListId(newId);
+    try {
+      await fetch("/api/user-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          watchedVideos: Array.from(watchedVideos),
+          hideWatched,
+          filterListId: newId,
+        }),
+      });
+      localStorage.setItem("filterListId", JSON.stringify(newId));
+    } catch (e) {
+      console.error("Failed to persist filter list:", e);
     }
   };
 
@@ -146,6 +168,19 @@ export default function Home() {
     const savedHideWatched = localStorage.getItem("hideWatched");
     if (savedHideWatched !== null) {
       setHideWatched(JSON.parse(savedHideWatched));
+    }
+
+    // Load filterListId preference from localStorage
+    const savedFilterListId = localStorage.getItem("filterListId");
+    if (savedFilterListId !== null) {
+      try {
+        const parsed = JSON.parse(savedFilterListId);
+        if (typeof parsed === "string") {
+          // Only apply local value if server hasn't set a different one yet
+          // This avoids overwriting server-persisted selection on reload.
+          setFilterListId((prev) => (prev ? prev : parsed));
+        }
+      } catch {}
     }
 
     // Load watch later from localStorage (keep this client-side)
@@ -175,12 +210,17 @@ export default function Home() {
     if (watchedVideos.size > 0 || hideWatched) {
       saveUserState();
     }
-  }, [watchedVideos, hideWatched]);
+  }, [watchedVideos, hideWatched, filterListId]);
 
   // Save hideWatched preference to localStorage
   useEffect(() => {
     localStorage.setItem("hideWatched", JSON.stringify(hideWatched));
   }, [hideWatched]);
+
+  // Persist filterListId to localStorage
+  useEffect(() => {
+    localStorage.setItem("filterListId", JSON.stringify(filterListId));
+  }, [filterListId]);
 
   // Handle search and filter
   useEffect(() => {
@@ -553,7 +593,7 @@ export default function Home() {
                     {/* List Filter */}
                     <select
                       value={filterListId}
-                      onChange={(e) => setFilterListId(e.target.value)}
+                      onChange={(e) => handleChangeFilterList(e.target.value)}
                       className="px-3 py-1.5 text-sm bg-secondary border border-border rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
                     >
                       <option value="all">All Lists</option>

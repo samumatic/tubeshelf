@@ -4,6 +4,7 @@ import path from "path";
 export interface UserState {
   watchedVideos: string[];
   hideWatched: boolean;
+  filterListId?: string;
 }
 
 const dataDir = path.join(process.cwd(), "data");
@@ -28,7 +29,7 @@ async function ensureConfigFile() {
     await fs.access(configFile);
   } catch {
     await ensureDir();
-    const defaultConfig = { hideWatched: false };
+    const defaultConfig = { hideWatched: false, filterListId: "all" };
     await fs.writeFile(
       configFile,
       JSON.stringify(defaultConfig, null, 2),
@@ -47,6 +48,7 @@ export async function readUserState(): Promise<UserState> {
 
   let watchedVideos: string[] = [];
   let hideWatched = false;
+  let filterListId = "all";
 
   try {
     const parsedWatched = JSON.parse(watchedRaw);
@@ -61,11 +63,16 @@ export async function readUserState(): Promise<UserState> {
       typeof parsedConfig.hideWatched === "boolean"
         ? parsedConfig.hideWatched
         : false;
+    filterListId =
+      typeof parsedConfig.filterListId === "string"
+        ? parsedConfig.filterListId
+        : "all";
   } catch {
     hideWatched = false;
+    filterListId = "all";
   }
 
-  return { watchedVideos, hideWatched };
+  return { watchedVideos, hideWatched, filterListId };
 }
 
 export async function writeUserState(state: UserState) {
@@ -79,7 +86,14 @@ export async function writeUserState(state: UserState) {
 
   const configWrite = fs.writeFile(
     configFile,
-    JSON.stringify({ hideWatched: !!state.hideWatched }, null, 2),
+    JSON.stringify(
+      {
+        hideWatched: !!state.hideWatched,
+        filterListId: state.filterListId ?? "all",
+      },
+      null,
+      2
+    ),
     "utf8"
   );
 
