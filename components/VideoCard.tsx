@@ -33,6 +33,7 @@ interface VideoCardProps {
   onWatch?: () => void;
   onWatchLater?: () => void;
   onMarkWatched?: () => void;
+  onChannelClick?: (channelName: string) => void;
 }
 
 export function VideoCard({
@@ -48,6 +49,7 @@ export function VideoCard({
   onWatch,
   onWatchLater,
   onMarkWatched,
+  onChannelClick,
 }: VideoCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -189,7 +191,10 @@ export function VideoCard({
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground mb-0.5 line-clamp-1">
+        <p
+          className="text-xs text-muted-foreground mb-0.5 line-clamp-1 cursor-pointer hover:text-primary transition-colors"
+          onClick={() => onChannelClick?.(channel)}
+        >
           {channel}
         </p>
 

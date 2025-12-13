@@ -666,6 +666,9 @@ export default function Home() {
                             onWatch={() => handleWatchVideo(video.id)}
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
+                            onChannelClick={(channelName) =>
+                              setSearchQuery(channelName)
+                            }
                           />
                         ))}
                       </div>
@@ -705,6 +708,9 @@ export default function Home() {
                             onWatch={() => handleWatchVideo(video.id)}
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
+                            onChannelClick={(channelName) =>
+                              setSearchQuery(channelName)
+                            }
                           />
                         ))}
                       </div>
