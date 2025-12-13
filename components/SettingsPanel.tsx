@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { X, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -37,6 +37,14 @@ export function SettingsPanel({
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<"all" | string>("all");
+  const [version, setVersion] = useState<string>("...");
+
+  useEffect(() => {
+    fetch("/api/version")
+      .then((res) => res.json())
+      .then((data) => setVersion(data.version))
+      .catch(() => setVersion("unknown"));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -220,6 +228,21 @@ export function SettingsPanel({
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
+
+              {/* Info Section */}
+              <div className="border-t pt-6">
+                <h3 className="font-semibold text-sm mb-3">About</h3>
+                <div className="p-4 bg-secondary/50 rounded-lg space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Version</span>
+                    <span className="font-mono font-medium">v{version}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Application</span>
+                    <span className="font-medium">TubeShelf</span>
+                  </div>
+                </div>
+              </div>
 
               {/* Danger Zone */}
               <div className="border-t pt-6">

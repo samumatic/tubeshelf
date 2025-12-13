@@ -2,14 +2,7 @@
 
 import { useState, useEffect, useContext } from "react";
 import { ThemeContext } from "@/components/ThemeProvider";
-import {
-  Play,
-  Menu,
-  Search,
-  Settings,
-  Bookmark,
-  List,
-} from "lucide-react";
+import { Play, Menu, Search, Settings, Bookmark, List } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
