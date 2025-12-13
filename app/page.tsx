@@ -118,6 +118,14 @@ export default function Home() {
         if (typeof data.filterListId === "string") {
           setFilterListId(data.filterListId);
         }
+        if (Array.isArray(data.watchLater)) {
+          setWatchLater(
+            data.watchLater.map((item: any) => ({
+              ...item,
+              addedAt: new Date(item.addedAt),
+            }))
+          );
+        }
       }
     } catch (e) {
       console.error("Failed to load user state:", e);
@@ -134,6 +142,10 @@ export default function Home() {
           watchedVideos: Array.from(watchedVideos),
           hideWatched,
           filterListId,
+          watchLater: watchLater.map((item) => ({
+            ...item,
+            addedAt: item.addedAt.toISOString(),
+          })),
         }),
       });
     } catch (e) {
@@ -194,35 +206,14 @@ export default function Home() {
         }
       } catch {}
     }
-
-    // Load watch later from localStorage (keep this client-side)
-    const saved = localStorage.getItem("watchLater");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setWatchLater(
-          parsed.map((item: any) => ({
-            ...item,
-            addedAt: new Date(item.addedAt),
-          }))
-        );
-      } catch (e) {
-        console.error("Failed to load watch later:", e);
-      }
-    }
   }, []);
-
-  // Save watch later to localStorage
-  useEffect(() => {
-    localStorage.setItem("watchLater", JSON.stringify(watchLater));
-  }, [watchLater]);
 
   // Save user state when it changes
   useEffect(() => {
-    if (watchedVideos.size > 0 || hideWatched) {
+    if (watchedVideos.size > 0 || hideWatched || watchLater.length > 0) {
       saveUserState();
     }
-  }, [watchedVideos, hideWatched, filterListId]);
+  }, [watchedVideos, hideWatched, filterListId, watchLater]);
 
   // Save hideWatched preference to localStorage
   useEffect(() => {
@@ -798,6 +789,7 @@ export default function Home() {
             <div className="max-w-2xl">
               <WatchLater
                 items={watchLater}
+                watchedVideos={watchedVideos}
                 onRemove={handleRemoveFromWatchLater}
                 onPlay={handleWatchVideo}
               />

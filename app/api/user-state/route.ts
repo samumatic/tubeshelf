@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       typeof body.filterListId === "string" && body.filterListId.length > 0
         ? body.filterListId
         : "all",
+    watchLater: Array.isArray(body.watchLater) ? body.watchLater : [],
   };
 
   await writeUserState(state);

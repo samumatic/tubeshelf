@@ -5,11 +5,20 @@ export interface UserState {
   watchedVideos: string[];
   hideWatched: boolean;
   filterListId?: string;
+  watchLater?: Array<{
+    id: string;
+    videoId: string;
+    title: string;
+    channel: string;
+    thumbnail: string;
+    addedAt: string;
+  }>;
 }
 
 const dataDir = path.join(process.cwd(), "data");
 const watchedFile = path.join(dataDir, "watchedVideos.json");
 const configFile = path.join(dataDir, "userConfig.json");
+const watchLaterFile = path.join(dataDir, "watchLater.json");
 
 async function ensureDir() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -38,17 +47,32 @@ async function ensureConfigFile() {
   }
 }
 
-export async function readUserState(): Promise<UserState> {
-  await Promise.all([ensureWatchedFile(), ensureConfigFile()]);
+async function ensureWatchLaterFile() {
+  try {
+    await fs.access(watchLaterFile);
+  } catch {
+    await ensureDir();
+    await fs.writeFile(watchLaterFile, "[]", "utf8");
+  }
+}
 
-  const [watchedRaw, configRaw] = await Promise.all([
+export async function readUserState(): Promise<UserState> {
+  await Promise.all([
+    ensureWatchedFile(),
+    ensureConfigFile(),
+    ensureWatchLaterFile(),
+  ]);
+
+  const [watchedRaw, configRaw, watchLaterRaw] = await Promise.all([
     fs.readFile(watchedFile, "utf8"),
     fs.readFile(configFile, "utf8"),
+    fs.readFile(watchLaterFile, "utf8"),
   ]);
 
   let watchedVideos: string[] = [];
   let hideWatched = false;
   let filterListId = "all";
+  let watchLater: UserState["watchLater"] = [];
 
   try {
     const parsedWatched = JSON.parse(watchedRaw);
@@ -72,11 +96,22 @@ export async function readUserState(): Promise<UserState> {
     filterListId = "all";
   }
 
-  return { watchedVideos, hideWatched, filterListId };
+  try {
+    const parsedWatchLater = JSON.parse(watchLaterRaw);
+    watchLater = Array.isArray(parsedWatchLater) ? parsedWatchLater : [];
+  } catch {
+    watchLater = [];
+  }
+
+  return { watchedVideos, hideWatched, filterListId, watchLater };
 }
 
 export async function writeUserState(state: UserState) {
-  await Promise.all([ensureWatchedFile(), ensureConfigFile()]);
+  await Promise.all([
+    ensureWatchedFile(),
+    ensureConfigFile(),
+    ensureWatchLaterFile(),
+  ]);
 
   const watchedWrite = fs.writeFile(
     watchedFile,
@@ -97,5 +132,11 @@ export async function writeUserState(state: UserState) {
     "utf8"
   );
 
-  await Promise.all([watchedWrite, configWrite]);
+  const watchLaterWrite = fs.writeFile(
+    watchLaterFile,
+    JSON.stringify(state.watchLater ?? [], null, 2),
+    "utf8"
+  );
+
+  await Promise.all([watchedWrite, configWrite, watchLaterWrite]);
 }
