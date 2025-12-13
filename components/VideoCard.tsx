@@ -53,6 +53,7 @@ export function VideoCard({
 }: VideoCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleWatch = () => {
@@ -116,12 +117,19 @@ export function VideoCard({
           handleWatch();
         }}
       >
+        {/* Skeleton placeholder while image loads */}
+        {!imageLoaded && (
+          <div className="absolute inset-0 bg-muted animate-pulse" />
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={thumbnail}
           alt={title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          }`}
           draggable="false"
+          onLoad={() => setImageLoaded(true)}
         />
 
         {/* Duration badge - top right */}
