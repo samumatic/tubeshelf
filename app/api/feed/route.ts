@@ -17,7 +17,6 @@ let pendingResolvers: Array<(result: any) => void> = [];
 export async function GET(req: Request) {
   // If a fetch is in progress, coalesce this request and resolve when ready
   if (isFetching) {
-    console.log("[Feed] Coalescing duplicate request while fetch in-flight");
     const result = await new Promise<any>((resolve) => {
       pendingResolvers.push(resolve);
     });

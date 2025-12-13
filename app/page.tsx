@@ -4,6 +4,7 @@ import { useState, useEffect, useContext, useRef } from "react";
 import { ThemeContext } from "@/components/ThemeProvider";
 import { Play, Menu, Search, Settings, Bookmark, List, X } from "lucide-react";
 import { VideoCard } from "@/components/VideoCard";
+import { VideoCardSkeleton } from "@/components/VideoCardSkeleton";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { WatchLater } from "@/components/WatchLater";
@@ -682,7 +683,13 @@ export default function Home() {
                 {/* Videos Tab */}
                 {feedTab === "videos" && (
                   <>
-                    {filteredVideos.length === 0 ? (
+                    {loading ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <VideoCardSkeleton key={i} />
+                        ))}
+                      </div>
+                    ) : filteredVideos.length === 0 ? (
                       <div className="text-center py-12">
                         <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                         <h3 className="text-lg font-semibold mb-2">
@@ -726,7 +733,13 @@ export default function Home() {
                 {/* Reels Tab */}
                 {feedTab === "reels" && (
                   <>
-                    {filteredShorts.length === 0 ? (
+                    {loading ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {Array.from({ length: 15 }).map((_, i) => (
+                          <VideoCardSkeleton key={i} />
+                        ))}
+                      </div>
+                    ) : filteredShorts.length === 0 ? (
                       <div className="text-center py-12">
                         <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                         <h3 className="text-lg font-semibold mb-2">

@@ -16,12 +16,6 @@ const progress: FeedProgress = {
 
 export function initProgress(total: number) {
   // Don't clear subscribers, just reset the progress values
-  console.log("[FeedProgress] initProgress called", {
-    total,
-    previousTotal: progress.total,
-    previousCompleted: progress.completed,
-    subscribers: progress.subscribers.length,
-  });
   progress.total = total;
   progress.completed = 0;
   progress.currentChannel = undefined;
@@ -53,12 +47,6 @@ export function updateProgress(
   if (progress.completed > progress.total) {
     progress.completed = progress.total;
   }
-  console.log("[FeedProgress] updateProgress", {
-    completed: progress.completed,
-    total: progress.total,
-    percentage: Math.round((progress.completed / progress.total) * 100),
-    channelTitle,
-  });
   progress.currentChannel = channelId;
   progress.currentChannelTitle = channelTitle;
   notifySubscribers();
@@ -70,18 +58,11 @@ export function getProgress(): FeedProgress {
 
 export function subscribe(callback: (data: FeedProgress) => void) {
   progress.subscribers.push(callback);
-  console.log("[FeedProgress] New subscriber added", {
-    totalSubscribers: progress.subscribers.length,
-    currentProgress: { completed: progress.completed, total: progress.total },
-  });
   // Immediately send current progress
   callback({ ...progress });
 
   return () => {
     progress.subscribers = progress.subscribers.filter((cb) => cb !== callback);
-    console.log("[FeedProgress] Subscriber removed", {
-      remainingSubscribers: progress.subscribers.length,
-    });
   };
 }
 
