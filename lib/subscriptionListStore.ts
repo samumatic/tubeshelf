@@ -68,6 +68,7 @@ export async function readLists(): Promise<SubscriptionListsData> {
       return parsed;
     }
     // Migration from old format
+    console.warn("[Store] Migrating subscription data from old format");
     return {
       lists: [
         {
@@ -80,7 +81,10 @@ export async function readLists(): Promise<SubscriptionListsData> {
       ],
       defaultListId: "default",
     };
-  } catch {
+  } catch (err) {
+    console.error("[Store] Failed to read subscription lists, using defaults", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return {
       lists: [
         {
@@ -131,6 +135,7 @@ export async function updateList(
 export async function deleteList(id: string) {
   const data = await readLists();
   if (data.defaultListId === id) {
+    console.error("[Store] Cannot delete default list", { id });
     throw new Error("Cannot delete default list");
   }
   data.lists = data.lists.filter((l) => l.id !== id);
@@ -143,7 +148,12 @@ export async function addSubscriptionToList(
 ) {
   const data = await readLists();
   const list = data.lists.find((l) => l.id === listId);
-  if (!list) throw new Error("List not found");
+  if (!list) {
+    console.error("[Store] Cannot add subscription: List not found", {
+      listId,
+    });
+    throw new Error("List not found");
+  }
   if (!list.subscriptions.some((s) => s.channelId === subscription.channelId)) {
     list.subscriptions.push(subscription);
     list.updatedAt = new Date().toISOString();
@@ -157,7 +167,12 @@ export async function removeSubscriptionFromList(
 ) {
   const data = await readLists();
   const list = data.lists.find((l) => l.id === listId);
-  if (!list) throw new Error("List not found");
+  if (!list) {
+    console.error("[Store] Cannot remove subscription: List not found", {
+      listId,
+    });
+    throw new Error("List not found");
+  }
   list.subscriptions = list.subscriptions.filter(
     (s) => s.channelId !== channelId
   );
@@ -168,7 +183,12 @@ export async function removeSubscriptionFromList(
 export async function clearListSubscriptions(listId: string) {
   const data = await readLists();
   const list = data.lists.find((l) => l.id === listId);
-  if (!list) throw new Error("List not found");
+  if (!list) {
+    console.error("[Store] Cannot clear subscriptions: List not found", {
+      listId,
+    });
+    throw new Error("List not found");
+  }
   list.subscriptions = [];
   list.updatedAt = new Date().toISOString();
   await writeLists(data);
@@ -192,13 +212,37 @@ export async function moveSubscription(
   const fromList = data.lists.find((l) => l.id === fromListId);
   const toList = data.lists.find((l) => l.id === toListId);
 
-  if (!fromList) throw new Error("Source list not found");
-  if (!toList) throw new Error("Target list not found");
+  if (!fromList) {
+    console.error("[Store] Cannot move subscription: Source list not found", {
+      fromListId,
+      toListId,
+      channelId,
+    });
+    throw new Error("Source list not found");
+  }
+  if (!toList) {
+    console.error("[Store] Cannot move subscription: Target list not found", {
+      fromListId,
+      toListId,
+      channelId,
+    });
+    throw new Error("Target list not found");
+  }
 
   const subscription = fromList.subscriptions.find(
     (s) => s.channelId === channelId
   );
-  if (!subscription) throw new Error("Subscription not found");
+  if (!subscription) {
+    console.error(
+      "[Store] Cannot move subscription: Subscription not found in source list",
+      {
+        fromListId,
+        toListId,
+        channelId,
+      }
+    );
+    throw new Error("Subscription not found");
+  }
 
   // Remove from source list
   fromList.subscriptions = fromList.subscriptions.filter(

@@ -63,7 +63,15 @@ export async function fetchChannelFeed(channelId: string) {
   )}`;
   const res = await fetch(feedUrl, { next: { revalidate: 300 } });
   if (!res.ok) {
-    throw new Error(`Failed to fetch feed for channel ${channelId}`);
+    console.error("[RSS] Failed to fetch channel feed", {
+      channelId,
+      feedUrl,
+      status: res.status,
+      statusText: res.statusText,
+    });
+    throw new Error(
+      `Failed to fetch feed for channel ${channelId}: ${res.status} ${res.statusText}`
+    );
   }
   const xml = await res.text();
   const parsed = parser.parse(xml);
@@ -157,7 +165,14 @@ async function resolveHandleToChannelId(
       cache: "no-store",
       headers,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("[RSS] Handle resolution: Page fetch failed", {
+        handle: cleanHandle,
+        pageUrl,
+        status: res.status,
+      });
+      return null;
+    }
     const html = await res.text();
 
     // Look for the canonical URL first, which directly contains the channel handle
@@ -216,9 +231,10 @@ async function resolveHandleToChannelId(
 
     return null;
   } catch (err) {
-    console.error("Handle resolution failed", {
+    console.error("[RSS] Handle resolution error", {
       handle: cleanHandle,
-      error: err,
+      pageUrl,
+      error: err instanceof Error ? err.message : String(err),
     });
     return null;
   }

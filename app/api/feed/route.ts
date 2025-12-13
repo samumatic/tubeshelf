@@ -49,7 +49,10 @@ export async function GET(req: Request) {
           });
         });
       } catch (err) {
-        console.error(`Failed to load feed for ${current}:`, err);
+        console.error("[Feed] Failed to load feed for channel", {
+          channelId: current,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   };

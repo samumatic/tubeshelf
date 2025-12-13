@@ -38,6 +38,7 @@ export async function POST(req: Request) {
   const body = await req.text().catch(() => "");
 
   if (!body.trim()) {
+    console.error("[API] Import failed: No content provided");
     return NextResponse.json({ error: "No content provided" }, { status: 400 });
   }
 
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
     if (contentType.includes("application/json")) {
       const json = JSON.parse(body);
       if (!json.subscriptions || !Array.isArray(json.subscriptions)) {
+        console.error("[API] Import failed: Invalid JSON format");
         return NextResponse.json(
           { error: "Invalid JSON format: missing subscriptions array" },
           { status: 400 }
@@ -83,6 +85,9 @@ export async function POST(req: Request) {
     }
 
     if (channelItems.length === 0) {
+      console.error(
+        "[API] Import failed: No valid channel IDs found in import data"
+      );
       return NextResponse.json(
         { error: "No valid channel IDs found" },
         { status: 400 }
@@ -97,6 +102,7 @@ export async function POST(req: Request) {
     const targetList = listsData.lists.find((l) => l.id === listId);
 
     if (!targetList) {
+      console.error("[API] Import failed: Target list not found", { listId });
       return NextResponse.json(
         { error: "Target list not found" },
         { status: 404 }
@@ -125,6 +131,10 @@ export async function POST(req: Request) {
         if (feed.meta.title) title = feed.meta.title;
         if (feed.meta.thumbnail) thumbnail = feed.meta.thumbnail;
       } catch (e) {
+        console.warn("[API] Import: Failed to fetch metadata for channel", {
+          channelId: item.channelId,
+          error: e instanceof Error ? e.message : String(e),
+        });
         // Fall back to extracted title if feed fetch fails
       }
 
@@ -150,6 +160,10 @@ export async function POST(req: Request) {
       total: finalList?.subscriptions.length || 0,
     });
   } catch (err: any) {
+    console.error("[API] Import failed", {
+      error: err?.message || String(err),
+      stack: err?.stack,
+    });
     return NextResponse.json(
       { error: err?.message || "Failed to import OPML" },
       { status: 400 }

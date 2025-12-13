@@ -15,6 +15,10 @@ export async function POST(req: Request) {
   const { listId, input } = body || {};
 
   if (!listId || !input) {
+    console.error("[API] Add subscription failed: Missing required fields", {
+      listId: !!listId,
+      input: !!input,
+    });
     return NextResponse.json(
       { error: "List ID and input required" },
       { status: 400 }
@@ -24,6 +28,13 @@ export async function POST(req: Request) {
   try {
     const channelId = await resolveChannelId(input);
     if (!channelId) {
+      console.error(
+        "[API] Add subscription failed: Could not resolve channel ID",
+        {
+          input,
+          listId,
+        }
+      );
       return NextResponse.json(
         { error: "Could not parse channel ID from input" },
         { status: 400 }
@@ -45,6 +56,12 @@ export async function POST(req: Request) {
     const list = lists.lists.find((l) => l.id === listId);
     return NextResponse.json(list);
   } catch (err: any) {
+    console.error("[API] Add subscription failed", {
+      listId,
+      input,
+      error: err?.message || String(err),
+      stack: err?.stack,
+    });
     return NextResponse.json(
       { error: err?.message || "Failed to add subscription" },
       { status: 400 }
@@ -69,6 +86,12 @@ export async function DELETE(req: Request) {
       const lists = await readLists();
       return NextResponse.json(lists);
     } catch (err: any) {
+      console.error("[API] Clear subscriptions failed", {
+        action,
+        listId,
+        error: err?.message || String(err),
+        stack: err?.stack,
+      });
       return NextResponse.json(
         { error: err?.message || "Failed to clear subscriptions" },
         { status: 400 }
@@ -82,6 +105,10 @@ export async function DELETE(req: Request) {
     channelId || new URL(req.url).searchParams.get("channelId");
 
   if (!listIdParam || !channelIdParam) {
+    console.error("[API] Remove subscription failed: Missing parameters", {
+      listId: !!listIdParam,
+      channelId: !!channelIdParam,
+    });
     return NextResponse.json(
       { error: "List ID and channel ID required" },
       { status: 400 }
@@ -93,6 +120,12 @@ export async function DELETE(req: Request) {
     const lists = await readLists();
     return NextResponse.json(lists);
   } catch (err: any) {
+    console.error("[API] Remove subscription failed", {
+      listId: listIdParam,
+      channelId: channelIdParam,
+      error: err?.message || String(err),
+      stack: err?.stack,
+    });
     return NextResponse.json(
       { error: err?.message || "Failed to remove subscription" },
       { status: 400 }
@@ -106,6 +139,11 @@ export async function PATCH(req: Request) {
 
   if (action === "move") {
     if (!channelId || !fromListId || !toListId) {
+      console.error("[API] Move subscription failed: Missing parameters", {
+        channelId: !!channelId,
+        fromListId: !!fromListId,
+        toListId: !!toListId,
+      });
       return NextResponse.json(
         { error: "Channel ID, source list ID, and target list ID required" },
         { status: 400 }
@@ -117,6 +155,13 @@ export async function PATCH(req: Request) {
       const lists = await readLists();
       return NextResponse.json(lists);
     } catch (err: any) {
+      console.error("[API] Move subscription failed", {
+        channelId,
+        fromListId,
+        toListId,
+        error: err?.message || String(err),
+        stack: err?.stack,
+      });
       return NextResponse.json(
         { error: err?.message || "Failed to move subscription" },
         { status: 400 }
@@ -124,5 +169,6 @@ export async function PATCH(req: Request) {
     }
   }
 
+  console.error("[API] PATCH subscription failed: Unknown action", { action });
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

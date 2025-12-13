@@ -697,7 +697,9 @@ export default function Home() {
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
                             onChannelClick={(channelName) =>
-                              setSearchQuery(searchQuery === channelName ? "" : channelName)
+                              setSearchQuery(
+                                searchQuery === channelName ? "" : channelName
+                              )
                             }
                           />
                         ))}
@@ -739,7 +741,9 @@ export default function Home() {
                             onWatchLater={() => handleAddToWatchLater(video)}
                             onMarkWatched={() => handleToggleWatched(video.id)}
                             onChannelClick={(channelName) =>
-                              setSearchQuery(searchQuery === channelName ? "" : channelName)
+                              setSearchQuery(
+                                searchQuery === channelName ? "" : channelName
+                              )
                             }
                           />
                         ))}
