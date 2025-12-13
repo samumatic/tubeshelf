@@ -1,0 +1,23 @@
+changelog:
+  categories:
+    - title: Added
+      labels:
+        - feature
+        - enhancement
+    - title: Changed
+      labels:
+        - changed
+    - title: Fixed
+      labels:
+        - bug
+        - fix
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: Other Changes
+      labels:
+        - "*"
+  exclude:
+    labels:
+      - skip-changelog
+      - dependencies
