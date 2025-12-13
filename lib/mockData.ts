@@ -49,7 +49,7 @@ export async function getVideos(): Promise<Video[]> {
       item.thumbnail ||
       "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=225&fit=crop",
     duration: item.duration || "—",
-    uploadedAt: formatDate(item.publishedAt),
+    uploadedAt: item.publishedAt || new Date().toISOString(),
     views: item.viewCount || item.views,
     isShort: item.isShort || false,
     url: item.url,

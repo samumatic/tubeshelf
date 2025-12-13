@@ -3,8 +3,13 @@ import { Clock, Eye, MoreVertical, Check, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
 
 function formatTimeAgo(dateString: string): string {
+  // Parse ISO 8601 timestamp properly
   const date = new Date(dateString);
   const now = new Date();
+
+  // If date is invalid, return empty
+  if (isNaN(date.getTime())) return "";
+
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (seconds < 60) return "just now";
