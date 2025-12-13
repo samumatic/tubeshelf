@@ -726,7 +726,32 @@ export default function Home() {
             body: JSON.stringify({ action: "create", name }),
           });
           if (!res.ok) throw new Error("Failed to create list");
-          await refreshData();
+          const newList = await res.json();
+
+          // Fetch only the updated subscription lists (not videos)
+          const listsRes = await fetch("/api/subscription-lists");
+          const listsData = await listsRes.json();
+
+          // Update lists first, then set the IDs
+          setSubscriptionLists(listsData.lists);
+
+          // Use setTimeout to ensure state updates happen after lists are set
+          setTimeout(() => {
+            setCurrentListId(newList.id);
+            setFilterListId(newList.id);
+
+            // Persist to server and localStorage
+            fetch("/api/user-state", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                watchedVideos: Array.from(watchedVideos),
+                hideWatched,
+                filterListId: newList.id,
+              }),
+            }).catch((e) => console.error("Failed to persist filter list:", e));
+            localStorage.setItem("filterListId", JSON.stringify(newList.id));
+          }, 0);
         }}
         onDeleteList={async (listId: string) => {
           const res = await fetch("/api/subscription-lists", {
