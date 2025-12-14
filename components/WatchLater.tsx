@@ -1,5 +1,5 @@
-import React from "react";
-import { Bookmark, Trash2, Eye } from "lucide-react";
+import React, { useState } from "react";
+import { Bookmark, Trash2, Eye, Share2, Check } from "lucide-react";
 
 interface WatchLaterItem {
   id: string;
@@ -15,6 +15,8 @@ interface WatchLaterProps {
   watchedVideos?: Set<string>;
   onRemove?: (id: string) => void;
   onPlay?: (videoId: string) => void;
+  onToggleWatched?: (videoId: string) => void;
+  onShare?: (videoId: string) => void;
 }
 
 export function WatchLater({
@@ -22,7 +24,11 @@ export function WatchLater({
   watchedVideos,
   onRemove,
   onPlay,
+  onToggleWatched,
+  onShare,
 }: WatchLaterProps) {
+  const [copiedVideoId, setCopiedVideoId] = useState<string | null>(null);
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12">
@@ -83,11 +89,38 @@ export function WatchLater({
               </p>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-2 flex-shrink-0">
+            {/* Actions: Mark watched/unwatched, Share, Remove (order consistent) */}
+            <div className="flex gap-1 flex-shrink-0 items-center">
+              <button
+                onClick={() => onToggleWatched?.(item.videoId)}
+                className="p-2 hover:bg-secondary rounded transition-colors"
+                title={isWatched ? "Mark as unwatched" : "Mark as watched"}
+              >
+                <Eye
+                  className={`w-4 h-4 ${
+                    isWatched ? "text-primary" : "text-muted-foreground"
+                  }`}
+                />
+              </button>
+              <button
+                onClick={() => {
+                  onShare?.(item.videoId);
+                  setCopiedVideoId(item.videoId);
+                  setTimeout(() => setCopiedVideoId(null), 2000);
+                }}
+                className="p-2 hover:bg-secondary rounded transition-colors"
+                title="Share"
+              >
+                {copiedVideoId === item.videoId ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Share2 className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
               <button
                 onClick={() => onRemove?.(item.id)}
                 className="p-2 hover:bg-destructive/10 rounded transition-colors"
+                title="Remove"
               >
                 <Trash2 className="w-4 h-4 text-destructive" />
               </button>

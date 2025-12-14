@@ -810,6 +810,11 @@ export default function Home() {
                 watchedVideos={watchedVideos}
                 onRemove={handleRemoveFromWatchLater}
                 onPlay={handleWatchVideo}
+                onToggleWatched={handleToggleWatched}
+                onShare={(videoId) => {
+                  const url = `https://www.youtube.com/watch?v=${videoId}`;
+                  navigator.clipboard.writeText(url).catch(() => {});
+                }}
               />
             </div>
           </>

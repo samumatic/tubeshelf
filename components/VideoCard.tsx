@@ -30,6 +30,8 @@ interface VideoCardProps {
   views?: number;
   watched?: boolean;
   videoUrl?: string;
+  // Render inline action buttons under the card (used in Watch Later section)
+  inlineActions?: boolean;
   onWatch?: () => void;
   onWatchLater?: () => void;
   onMarkWatched?: () => void;
@@ -46,6 +48,7 @@ export function VideoCard({
   views,
   watched,
   videoUrl,
+  inlineActions,
   onWatch,
   onWatchLater,
   onMarkWatched,
@@ -102,6 +105,34 @@ export function VideoCard({
     }
   }, [showMenu]);
 
+  {
+    /* Inline action row (used in Watch Later page) */
+  }
+  {
+    inlineActions && (
+      <div className="flex items-center gap-2 mb-2">
+        {/* Order consistent with start page: Mark watched/unwatched, Share */}
+        <Button
+          onClick={handleMarkWatched}
+          variant="secondary"
+          size="sm"
+          className="h-7 px-2"
+        >
+          <Eye className="w-4 h-4 mr-1" />
+          {watched ? "Unwatch" : "Mark watched"}
+        </Button>
+        <Button
+          onClick={handleShare}
+          variant="outline"
+          size="sm"
+          className="h-7 px-2"
+        >
+          <Share2 className="w-4 h-4 mr-1" />
+          {copied ? "Copied" : "Share"}
+        </Button>
+      </div>
+    );
+  }
   // Only show skeleton if image hasn't loaded after 50ms
   useEffect(() => {
     setShowSkeleton(false);
