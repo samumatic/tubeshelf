@@ -56,8 +56,19 @@ export function SubscriptionManager({
   isOpen,
   onClose,
 }: SubscriptionManagerProps) {
+  // Ensure we always have a valid selected list
   const currentList = lists.find((l) => l.id === currentListId);
-  const subscriptions = currentList?.subscriptions || [];
+  const fallbackList = lists.length > 0 ? lists[0] : null;
+  const displayedList = currentList || fallbackList;
+
+  // If the provided currentListId is invalid but we have lists, auto-select the first
+  React.useEffect(() => {
+    if (!currentList && fallbackList && onSelectList) {
+      onSelectList(fallbackList.id);
+    }
+  }, [currentListId, lists, currentList, fallbackList, onSelectList]);
+
+  const subscriptions = displayedList?.subscriptions || [];
 
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,6 +76,7 @@ export function SubscriptionManager({
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -92,11 +104,21 @@ export function SubscriptionManager({
     if (!file) return;
     setImporting(true);
     setError(null);
+    setSuccess(null);
     try {
       const text = await file.text();
       // Detect format based on content
       const format = text.trim().startsWith("<") ? "opml" : "json";
-      await onImport?.(text, format);
+      // Guard against long-running imports (network stalls)
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Import timed out")), 20000)
+      );
+      await Promise.race([
+        onImport?.(text, format) ?? Promise.resolve(),
+        timeout,
+      ]);
+      setSuccess("Imported subscriptions successfully");
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err?.message || "Failed to import");
     } finally {
@@ -130,9 +152,12 @@ export function SubscriptionManager({
     if (!onExport) return;
     setExporting(true);
     setError(null);
+    setSuccess(null);
     setShowExportMenu(false);
     try {
       await onExport(format);
+      setSuccess("Exported subscriptions successfully");
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err?.message || "Failed to export");
     } finally {
@@ -152,6 +177,23 @@ export function SubscriptionManager({
   };
 
   if (!isOpen) return null;
+
+  // Fallback if no lists exist (shouldn't happen, but provide safeguard)
+  if (!displayedList) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-card border border-border rounded-lg shadow-xl w-full max-w-md p-6 text-center">
+          <h2 className="text-xl font-bold mb-4">Subscriptions</h2>
+          <p className="text-muted-foreground mb-4">
+            No lists available. Refresh the page.
+          </p>
+          <Button onClick={onClose} variant="outline" size="sm">
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -181,7 +223,7 @@ export function SubscriptionManager({
               {/* List Dropdown */}
               <div className="flex-1 relative">
                 <select
-                  value={currentListId}
+                  value={displayedList?.id || ""}
                   onChange={(e) => onSelectList?.(e.target.value)}
                   className="w-full h-10 px-3 py-2 bg-secondary border border-border rounded-lg text-sm font-medium appearance-none cursor-pointer hover:bg-secondary/80 transition-colors pr-8"
                   style={{
@@ -214,18 +256,32 @@ export function SubscriptionManager({
               </Button>
 
               <Button
-                onClick={() => handleDeleteList(currentListId)}
+                onClick={() =>
+                  handleDeleteList(displayedList?.id || currentListId)
+                }
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 title={
-                  currentList?.id === "default"
+                  displayedList?.id === "default"
                     ? "Cannot delete default list"
                     : "Delete current list"
                 }
-                disabled={!currentList || currentList.id === "default"}
+                disabled={!displayedList || displayedList.id === "default"}
               >
                 <Trash2 className="w-4 h-4" />
+              </Button>
+
+              {/* Import button before Export; Export positioned to the far right */}
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                size="icon"
+                disabled={importing}
+                title="Import OPML or JSON"
+                className="h-10 w-10 shrink-0"
+              >
+                <Upload className="w-4 h-4" />
               </Button>
 
               <div className="relative">
@@ -256,17 +312,6 @@ export function SubscriptionManager({
                   </div>
                 )}
               </div>
-
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                size="icon"
-                disabled={importing}
-                title="Import OPML or JSON"
-                className="h-10 w-10 shrink-0"
-              >
-                <Upload className="w-4 h-4" />
-              </Button>
             </div>
 
             {/* Create List Form */}
@@ -309,6 +354,17 @@ export function SubscriptionManager({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Inline Toasts */}
+          {success && (
+            <div className="mb-3 p-2 rounded bg-emerald-600/15 border border-emerald-600/30 text-emerald-500 text-xs">
+              {success}
+            </div>
+          )}
+          {error && (
+            <div className="mb-3 p-2 rounded bg-destructive/15 border border-destructive/30 text-destructive text-xs">
+              {error}
+            </div>
+          )}
           {/* Add New */}
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2">
@@ -331,7 +387,7 @@ export function SubscriptionManager({
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
-            {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+            {/* per-field error already surfaced by toast above */}
           </div>
 
           {/* Import Info */}
@@ -379,15 +435,23 @@ export function SubscriptionManager({
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 flex-1 min-w-0"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={
-                        sub.thumbnail ||
-                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
-                      }
-                      alt={sub.title}
-                      className="w-10 h-10 rounded-full object-cover bg-secondary"
-                    />
+                    <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          sub.thumbnail ||
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M 30 70 Q 30 60 50 60 Q 70 60 70 70 L 70 100 L 30 100 Z' fill='%239ca3af'/%3E%3C/svg%3E"
+                        }
+                        alt={sub.title}
+                        className="w-10 h-10 rounded-full object-cover animate-pulse"
+                        onLoad={(e) =>
+                          e.currentTarget.classList.remove("animate-pulse")
+                        }
+                        onError={(e) => {
+                          e.currentTarget.classList.add("animate-pulse");
+                        }}
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">
                         {sub.title}

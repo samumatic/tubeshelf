@@ -53,8 +53,10 @@ export function VideoCard({
 }: VideoCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  // Only show skeleton if image takes longer than 50ms to load
+  const [showSkeleton, setShowSkeleton] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const handleWatch = () => {
     if (videoUrl) {
@@ -99,6 +101,17 @@ export function VideoCard({
       };
     }
   }, [showMenu]);
+
+  // Only show skeleton if image hasn't loaded after 50ms
+  useEffect(() => {
+    setShowSkeleton(false);
+    const timer = setTimeout(() => {
+      if (imgRef.current && !imgRef.current.complete) {
+        setShowSkeleton(true);
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [thumbnail]);
   return (
     <div
       className="group overflow-visible rounded-lg hover:shadow-lg transition-all duration-300 bg-card border border-border"
@@ -117,27 +130,37 @@ export function VideoCard({
           handleWatch();
         }}
       >
-        {/* Skeleton placeholder while image loads */}
-        {!imageLoaded && (
-          <div className="absolute inset-0 bg-muted animate-pulse" />
+        {/* Skeleton placeholder while image loads - only render if needed */}
+        {showSkeleton && (
+          <div className="absolute inset-0 bg-muted animate-pulse pointer-events-none" />
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          ref={imgRef}
           src={thumbnail}
-          alt={title}
-          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          }`}
+          alt=""
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           draggable="false"
-          onLoad={() => setImageLoaded(true)}
+          onLoad={(e) => {
+            setShowSkeleton(false);
+          }}
+          onError={() => {
+            setShowSkeleton(false);
+          }}
         />
 
         {/* Duration badge - top right */}
-        {duration && (
-          <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-            {duration}
-          </div>
-        )}
+        {(() => {
+          const d = (duration ?? "").trim();
+          const isOnlyDash = /^[-–—]+$/.test(d); // '-', '–', '—'
+          const hasDigits = /\d/.test(d);
+          const show = d.length > 0 && !isOnlyDash && hasDigits;
+          return show ? (
+            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {duration}
+            </div>
+          ) : null;
+        })()}
 
         {watched && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">

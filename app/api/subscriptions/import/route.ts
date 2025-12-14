@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 import { readLists, addSubscriptionToList } from "@/lib/subscriptionListStore";
-import { fetchChannelFeed } from "@/lib/rss";
 
 function collectOutlines(node: any, out: any[] = []) {
   if (!node) return out;
@@ -116,6 +115,8 @@ export async function POST(req: Request) {
     let added = 0;
     let skipped = 0;
 
+    // Fast path: do not fetch channel metadata during import to avoid stalls.
+    // We add subscriptions immediately; metadata can be enriched later by feed builds.
     for (const item of channelItems) {
       if (existingIds.has(item.channelId)) {
         skipped++;
@@ -123,27 +124,12 @@ export async function POST(req: Request) {
       }
       existingIds.add(item.channelId);
 
-      // Fetch real channel metadata
-      let title = item.title;
-      let thumbnail: string | undefined;
-      try {
-        const feed = await fetchChannelFeed(item.channelId);
-        if (feed.meta.title) title = feed.meta.title;
-        if (feed.meta.thumbnail) thumbnail = feed.meta.thumbnail;
-      } catch (e) {
-        console.warn("[API] Import: Failed to fetch metadata for channel", {
-          channelId: item.channelId,
-          error: e instanceof Error ? e.message : String(e),
-        });
-        // Fall back to extracted title if feed fetch fails
-      }
-
       const subscription = {
         id: item.channelId,
         channelId: item.channelId,
-        title,
+        title: item.title,
         url: `https://www.youtube.com/channel/${item.channelId}`,
-        thumbnail,
+        thumbnail: undefined,
         addedAt: new Date().toISOString(),
       };
 

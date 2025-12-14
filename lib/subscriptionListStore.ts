@@ -62,6 +62,26 @@ async function ensureFile() {
 export async function readLists(): Promise<SubscriptionListsData> {
   await ensureFile();
   const raw = await fs.readFile(dataFile, "utf8");
+
+  // Handle empty or whitespace-only files
+  if (!raw || !raw.trim()) {
+    console.warn("[Store] Empty subscription lists file, creating defaults");
+    const defaultData: SubscriptionListsData = {
+      lists: [
+        {
+          id: "default",
+          name: "Default",
+          subscriptions: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      defaultListId: "default",
+    };
+    await writeLists(defaultData);
+    return defaultData;
+  }
+
   try {
     const parsed = JSON.parse(raw);
     if (parsed.lists && Array.isArray(parsed.lists)) {
@@ -102,7 +122,18 @@ export async function readLists(): Promise<SubscriptionListsData> {
 
 export async function writeLists(data: SubscriptionListsData) {
   await ensureFile();
-  await fs.writeFile(dataFile, JSON.stringify(data, null, 2), "utf8");
+  // Atomic write: write to temp file first, then rename
+  const tempFile = dataFile + ".tmp";
+  try {
+    await fs.writeFile(tempFile, JSON.stringify(data, null, 2), "utf8");
+    await fs.rename(tempFile, dataFile);
+  } catch (err) {
+    // Clean up temp file if rename fails
+    try {
+      await fs.unlink(tempFile);
+    } catch {}
+    throw err;
+  }
 }
 
 export async function createList(name: string): Promise<SubscriptionList> {

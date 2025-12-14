@@ -17,6 +17,7 @@ export interface ChannelMeta {
   channelId: string;
   title: string;
   thumbnail?: string;
+  avatar?: string;
 }
 
 const parser = new XMLParser({
@@ -57,6 +58,55 @@ function parseEntry(entry: any): FeedVideo | null {
   };
 }
 
+async function fetchChannelAvatar(
+  channelId: string,
+  timeoutMs = 1500
+): Promise<string | undefined> {
+  const pageUrl = `https://www.youtube.com/channel/${channelId}`;
+  const headers = {
+    "user-agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "accept-language": "en-US,en;q=0.8",
+    cookie: "CONSENT=YES+1",
+  };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch(`${pageUrl}?hl=en&gl=US`, {
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+    if (!res.ok) {
+      return undefined;
+    }
+
+    const html = await res.text();
+
+    // Prefer the Open Graph image (channel avatar)
+    const ogImageMatch = html.match(/property="og:image"\s+content="([^"]+)"/);
+    if (ogImageMatch?.[1]) {
+      return ogImageMatch[1].replace(/\\u0026/g, "&");
+    }
+
+    // Fallback: look for avatar thumbnails in embedded JSON
+    const avatarMatch = html.match(
+      /"avatar"\s*:\s*\{"thumbnails"\s*:\s*\[\s*\{"url":"([^"]+)"/
+    );
+    if (avatarMatch?.[1]) {
+      return avatarMatch[1].replace(/\\u0026/g, "&");
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function fetchChannelFeed(channelId: string) {
   const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(
     channelId
@@ -87,15 +137,19 @@ export async function fetchChannelFeed(channelId: string) {
     .filter(Boolean) as FeedVideo[];
 
   const channelTitle = feed?.title || "";
-  const channelThumbnail =
+  // Prefer thumbnails already present in the feed; only fetch avatar if missing to avoid extra latency.
+  const channelThumbnailFromFeed =
     entries[0]?.["media:group"]?.["media:thumbnail"]?.url ||
     entries[0]?.["media:thumbnail"]?.url ||
     (videos[0]?.thumbnail ? videos[0].thumbnail : undefined);
+
+  const channelThumbnail = channelThumbnailFromFeed || undefined;
 
   const meta: ChannelMeta = {
     channelId,
     title: channelTitle,
     thumbnail: channelThumbnail,
+    avatar: undefined, // Avatar fetched separately in background
   };
 
   return { videos, meta };

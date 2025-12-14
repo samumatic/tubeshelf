@@ -74,7 +74,7 @@ export default function Home() {
     setMounted(true);
   }, []);
 
-  const refreshData = async () => {
+  const refreshData = async (forceRefresh = false) => {
     // Prevent concurrent or duplicate refreshes (e.g., React Strict Mode)
     if (refreshingRef.current) return;
     refreshingRef.current = true;
@@ -82,23 +82,30 @@ export default function Home() {
     setError(null);
     setShowLoadingProgress(true);
     try {
-      const [listsData, vids] = await Promise.all([
-        fetch("/api/subscription-lists").then((r) => r.json()),
-        getVideos(),
-      ]);
-      setSubscriptionLists(listsData.lists);
-      // Only change currentListId if it's not set or the current list no longer exists
+      // Fetch lists first and independently
+      const listsRes = await fetch("/api/subscription-lists");
+      const listsData = await listsRes.json();
+      setSubscriptionLists(listsData.lists || []);
       setCurrentListId((prevId) => {
-        const listStillExists = listsData.lists.some(
+        const listStillExists = (listsData.lists || []).some(
           (l: any) => l.id === prevId
         );
-        return prevId && listStillExists ? prevId : listsData.defaultListId;
+        return prevId && listStillExists ? prevId : "default";
       });
-      setVideos(vids.filter((v) => !v.isShort));
-      setShorts(vids.filter((v) => v.isShort));
-      setFilteredVideos(vids.filter((v) => !v.isShort));
-      setFilteredShorts(vids.filter((v) => v.isShort));
+
+      // Then fetch videos independently; don't fail if videos error
+      try {
+        const vids = await getVideos(forceRefresh);
+        setVideos(vids.filter((v) => !v.isShort));
+        setShorts(vids.filter((v) => v.isShort));
+        setFilteredVideos(vids.filter((v) => !v.isShort));
+        setFilteredShorts(vids.filter((v) => v.isShort));
+      } catch (vidErr) {
+        console.error("Failed to fetch videos:", vidErr);
+        // Continue with empty videos instead of failing the entire refresh
+      }
     } catch (err: any) {
+      console.error("Failed to load lists:", err);
       setError(err?.message || "Failed to load data");
     } finally {
       setLoading(false);
@@ -306,7 +313,18 @@ export default function Home() {
 
   const handleImportSubscriptions = async (data: string, format?: string) => {
     await importSubscriptions(data, format, currentListId);
-    await refreshData();
+    // Force refresh of feed to pick up newly imported subscriptions
+    await refreshData(true);
+    // Re-fetch lists after feed generation completes to pick up enriched thumbnails
+    setTimeout(async () => {
+      try {
+        const listsRes = await fetch("/api/subscription-lists");
+        if (listsRes.ok) {
+          const listsData = await listsRes.json();
+          setSubscriptionLists(listsData.lists || []);
+        }
+      } catch {}
+    }, 2000);
   };
 
   const handleExportSubscriptions = async (format: "opml" | "json") => {

@@ -34,8 +34,9 @@ function formatDate(dateStr: string) {
   });
 }
 
-export async function getVideos(): Promise<Video[]> {
-  const res = await fetch("/api/feed", { cache: "no-store" });
+export async function getVideos(forceRefresh = false): Promise<Video[]> {
+  const url = `/api/feed${forceRefresh ? "?refresh=true" : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     throw new Error("Failed to fetch feed");
   }
