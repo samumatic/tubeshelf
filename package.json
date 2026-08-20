@@ -10,7 +10,8 @@
     "start": "node server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "cli": "node cli.js"
+    "cli": "node cli.js",
+    "docker:build": "bash scripts/build-local.sh"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

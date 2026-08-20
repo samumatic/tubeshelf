@@ -7,6 +7,11 @@ export interface UserState {
   hideMemberOnly?: boolean;
   filterListId?: string;
   hasCompletedWelcome?: boolean;
+  /**
+   * How long this user wants videos kept, in days. 0 = forever,
+   * null = follow the instance default (`videoRetentionDays`).
+   */
+  videoRetentionDays?: number | null;
   watchLater?: Array<{
     id: string;
     videoId: string;
@@ -74,6 +79,10 @@ export async function readUserState(userId: string): Promise<UserState> {
     hideMemberOnly: config.hideMemberOnly ?? false,
     filterListId: config.filterListId ?? "all",
     hasCompletedWelcome: config.hasCompletedWelcome ?? false,
+    videoRetentionDays:
+      typeof config.videoRetentionDays === "number"
+        ? config.videoRetentionDays
+        : null,
     watchLater,
   };
 }
@@ -115,6 +124,16 @@ export async function writeUserState(state: UserState, userId: string) {
       userId,
       "hasCompletedWelcome",
       JSON.stringify(hasCompletedValue)
+    );
+    // null means "follow the instance default" - store it so the row round-trips.
+    configStmt.run(
+      userId,
+      "videoRetentionDays",
+      JSON.stringify(
+        typeof state.videoRetentionDays === "number"
+          ? state.videoRetentionDays
+          : null
+      )
     );
 
     // Update watch later

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readUserState, writeUserState, UserState } from "@/lib/userStateStore";
 import { getCurrentUser } from "@/lib/currentUser";
+import { clampNumericSetting } from "@/lib/settingsStore";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -43,6 +44,15 @@ export async function POST(req: Request) {
       )
     : current.watchedVideos;
 
+  // null explicitly means "follow the instance default"; anything else keeps
+  // the stored value.
+  const nextVideoRetentionDays =
+    body.videoRetentionDays === null
+      ? null
+      : body.videoRetentionDays === undefined
+      ? current.videoRetentionDays ?? null
+      : clampNumericSetting("videoRetentionDays", body.videoRetentionDays);
+
   const state: UserState = {
     watchedVideos: nextWatchedVideos,
     hideWatched:
@@ -58,6 +68,7 @@ export async function POST(req: Request) {
         ? body.filterListId
         : current.filterListId ?? "all",
     hasCompletedWelcome: nextHasCompletedWelcome,
+    videoRetentionDays: nextVideoRetentionDays,
     watchLater: Array.isArray(body.watchLater)
       ? body.watchLater
       : current.watchLater ?? [],

@@ -10,11 +10,65 @@ import {
   Lock,
   Users,
 } from "lucide-react";
+import { RETENTION_OPTIONS, defaultSettings } from "@/lib/settingsSchema";
+
+type FeedSettings = {
+  videoRetentionDays: number;
+  feedConcurrency: number;
+  feedChannelTimeoutSeconds: number;
+  feedRequestTimeoutSeconds: number;
+  feedRefreshMinutes: number;
+  feedErrorRetryMinutes: number;
+};
+
+const FEED_SETTING_FIELDS: Array<{
+  key: keyof Omit<FeedSettings, "videoRetentionDays">;
+  label: string;
+  hint: string;
+}> = [
+  {
+    key: "feedConcurrency",
+    label: "Parallel channel fetches",
+    hint: "Higher is faster, but hits YouTube harder",
+  },
+  {
+    key: "feedChannelTimeoutSeconds",
+    label: "Channel timeout (seconds)",
+    hint: "Give up on a single channel after this long",
+  },
+  {
+    key: "feedRequestTimeoutSeconds",
+    label: "Request timeout (seconds)",
+    hint: "Answer from the cache after this long; the refresh keeps running",
+  },
+  {
+    key: "feedRefreshMinutes",
+    label: "Refresh channels every (minutes)",
+    hint: "Minimum age before a channel is fetched again",
+  },
+  {
+    key: "feedErrorRetryMinutes",
+    label: "Retry failed channels after (minutes)",
+    hint: "Shorter retry for channels whose last fetch failed",
+  },
+];
+
+const defaultFeedSettings: FeedSettings = {
+  videoRetentionDays: defaultSettings.videoRetentionDays,
+  feedConcurrency: defaultSettings.feedConcurrency,
+  feedChannelTimeoutSeconds: defaultSettings.feedChannelTimeoutSeconds,
+  feedRequestTimeoutSeconds: defaultSettings.feedRequestTimeoutSeconds,
+  feedRefreshMinutes: defaultSettings.feedRefreshMinutes,
+  feedErrorRetryMinutes: defaultSettings.feedErrorRetryMinutes,
+};
 
 export function AdminSystem() {
   const { user, loading } = useAuth();
   const [oidcOnly, setOidcOnly] = useState(false);
   const [publicRegistration, setPublicRegistration] = useState(false);
+  const [feedSettings, setFeedSettings] =
+    useState<FeedSettings>(defaultFeedSettings);
+  const [savingFeedSettings, setSavingFeedSettings] = useState(false);
   const [hasOIDCProvider, setHasOIDCProvider] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [message, setMessage] = useState<{
@@ -109,6 +163,25 @@ export function AdminSystem() {
 
       setOidcOnly(settingsData.oidcOnly || false);
       setPublicRegistration(settingsData.publicRegistration || false);
+      setFeedSettings({
+        videoRetentionDays:
+          settingsData.videoRetentionDays ??
+          defaultFeedSettings.videoRetentionDays,
+        feedConcurrency:
+          settingsData.feedConcurrency ?? defaultFeedSettings.feedConcurrency,
+        feedChannelTimeoutSeconds:
+          settingsData.feedChannelTimeoutSeconds ??
+          defaultFeedSettings.feedChannelTimeoutSeconds,
+        feedRequestTimeoutSeconds:
+          settingsData.feedRequestTimeoutSeconds ??
+          defaultFeedSettings.feedRequestTimeoutSeconds,
+        feedRefreshMinutes:
+          settingsData.feedRefreshMinutes ??
+          defaultFeedSettings.feedRefreshMinutes,
+        feedErrorRetryMinutes:
+          settingsData.feedErrorRetryMinutes ??
+          defaultFeedSettings.feedErrorRetryMinutes,
+      });
       setLastSavedOidcOnly(settingsData.oidcOnly || false);
       setLastSavedPublicReg(settingsData.publicRegistration || false);
       setHasOIDCProvider(
@@ -122,6 +195,37 @@ export function AdminSystem() {
       console.error("Failed to load settings:", error);
     } finally {
       setLoadingSettings(false);
+    }
+  };
+
+  const saveFeedSettings = async () => {
+    setSavingFeedSettings(true);
+    try {
+      setMessage(null);
+      const response = await fetch("/api/admin/system-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(feedSettings),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({
+          type: "error",
+          message: data.error || "Failed to save settings",
+        });
+        return;
+      }
+
+      setMessage({ type: "success", message: "Feed settings saved" });
+      setTimeout(() => setMessage(null), 2000);
+      await loadSettings();
+    } catch (error) {
+      console.error("Failed to save feed settings:", error);
+      setMessage({ type: "error", message: "An error occurred while saving" });
+    } finally {
+      setSavingFeedSettings(false);
     }
   };
 
@@ -291,6 +395,83 @@ export function AdminSystem() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Feed & video cache */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-2">Feed &amp; Video Cache</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Instance-wide fetch behaviour and the default retention window. Users
+          can pick their own retention in their settings; a video is only
+          deleted once nobody subscribed to that channel still wants it.
+        </p>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-1">
+            Keep videos for (default)
+          </label>
+          <p className="text-xs text-muted-foreground mb-2">
+            Applies to every user who has not chosen their own window
+          </p>
+          <select
+            value={feedSettings.videoRetentionDays}
+            onChange={(e) =>
+              setFeedSettings({
+                ...feedSettings,
+                videoRetentionDays: Number.parseInt(e.target.value, 10),
+              })
+            }
+            className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            {RETENTION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {FEED_SETTING_FIELDS.map((field) => (
+            <div key={field.key}>
+              <label className="block text-sm font-medium mb-1">
+                {field.label}
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">{field.hint}</p>
+              <input
+                type="number"
+                value={feedSettings[field.key]}
+                onChange={(e) =>
+                  setFeedSettings({
+                    ...feedSettings,
+                    [field.key]: e.target.value === "" ? 0 : Number(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            onClick={saveFeedSettings}
+            disabled={savingFeedSettings}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground disabled:opacity-50"
+          >
+            {savingFeedSettings ? "Saving..." : "Save feed settings"}
+          </button>
+          <button
+            onClick={() => setFeedSettings(defaultFeedSettings)}
+            disabled={savingFeedSettings}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-muted hover:bg-muted/80 disabled:opacity-50"
+          >
+            Reset to defaults
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Out-of-range values are clamped when saved.
+        </p>
       </div>
     </div>
   );

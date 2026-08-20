@@ -4,10 +4,17 @@ import React, { useState, useContext, useEffect, useRef } from "react";
 import { AlertTriangle, HelpCircle, Palette, Zap } from "lucide-react";
 import { Button } from "./ui/button";
 import { ThemeContext } from "./ThemeProvider";
-import type { AppSettings } from "@/lib/settingsStore";
+import {
+  RETENTION_OPTIONS,
+  formatRetention,
+  type AppSettings,
+} from "@/lib/settingsSchema";
 
 interface SettingsPanelProps {
   settings: AppSettings;
+  /** Per-user retention override; null means "follow the instance default". */
+  videoRetentionDays?: number | null;
+  onRetentionChange?: (days: number | null) => void;
   onSave?: (settings: Partial<AppSettings>) => void;
   onDeleteSubscriptions?: (listId?: string) => Promise<void>;
   onClearWatchHistory?: () => Promise<void>;
@@ -20,6 +27,8 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({
   settings,
+  videoRetentionDays = null,
+  onRetentionChange,
   onSave,
   onDeleteSubscriptions,
   onClearWatchHistory,
@@ -344,6 +353,50 @@ export function SettingsPanel({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Video Retention */}
+            <div className="bg-card/50 border border-border/30 rounded-xl p-5 space-y-4 backdrop-blur-sm">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Keep Videos For
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  How far back your feed remembers videos, even after they drop
+                  off YouTube&apos;s recent list
+                </p>
+              </div>
+              <select
+                value={videoRetentionDays === null ? "default" : videoRetentionDays}
+                onChange={(e) =>
+                  onRetentionChange?.(
+                    e.target.value === "default"
+                      ? null
+                      : Number.parseInt(e.target.value, 10)
+                  )
+                }
+                className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm appearance-none cursor-pointer hover:border-primary/50 transition-colors"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 0.75rem center",
+                  paddingRight: "2rem",
+                }}
+              >
+                <option value="default">
+                  Use instance default (
+                  {formatRetention(settings.videoRetentionDays)})
+                </option>
+                {RETENTION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Videos are only deleted once no one subscribed to that channel
+                wants them any more, so a longer window here always wins.
+              </p>
             </div>
 
             {/* Video Player Mode */}

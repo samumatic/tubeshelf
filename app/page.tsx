@@ -123,6 +123,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [hideWatched, setHideWatched] = useState(false);
   const [hideMemberOnly, setHideMemberOnly] = useState(false);
+  const [videoRetentionDays, setVideoRetentionDays] = useState<number | null>(
+    null
+  );
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [subscriptionLists, setSubscriptionLists] = useState<
@@ -550,6 +553,11 @@ export default function Home() {
             : data.hideMemberOnly || false
         );
         setFilterPrefsHydrated(true);
+        setVideoRetentionDays(
+          typeof data.videoRetentionDays === "number"
+            ? data.videoRetentionDays
+            : null
+        );
         if (typeof data.filterListId === "string") {
           setFilterListId(data.filterListId);
         }
@@ -588,6 +596,22 @@ export default function Home() {
       // Revert on error
       setHideMemberOnly(previousValue);
       showToast("Failed to save setting", "error");
+    }
+  };
+
+  // Change and persist how far back this user's feed keeps videos.
+  // The server filters the feed by this window, so reload it afterwards.
+  const handleRetentionChange = async (days: number | null) => {
+    const previousValue = videoRetentionDays;
+
+    setVideoRetentionDays(days);
+
+    try {
+      await persistUserState({ videoRetentionDays: days });
+      await feedManager.refresh();
+    } catch (e) {
+      setVideoRetentionDays(previousValue);
+      showToast("Failed to save retention setting", "error");
     }
   };
 
@@ -883,6 +907,7 @@ export default function Home() {
       filterListId: string;
       watchLater: WatchLaterItem[];
       hasCompletedWelcome: boolean;
+      videoRetentionDays: number | null;
     }>
   ) => {
     const runPersist = async () => {
@@ -2180,6 +2205,8 @@ export default function Home() {
                 <div>
                   <SettingsPanel
                     settings={settings}
+                    videoRetentionDays={videoRetentionDays}
+                    onRetentionChange={handleRetentionChange}
                     onSave={handleSaveSettings}
                     onDeleteSubscriptions={handleDeleteAllSubscriptions}
                     onClearWatchHistory={handleClearWatchHistory}
