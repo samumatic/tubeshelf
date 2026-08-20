@@ -374,17 +374,25 @@ function parseLockupViewModel(
     const metadataViewModel = lockup.metadata?.lockupMetadataViewModel;
     const title = metadataViewModel?.title?.content || "";
 
-    const metadataParts: Array<{ text?: { content?: string } }> =
-      metadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows?.[0]
-        ?.metadataParts || [];
+    // Usually one row of [views, time ago], but a collab video's first row
+    // is a "Channel A and Channel B" credit line instead, pushing the
+    // views/time row down to index 1 - so every row has to be checked, not
+    // just the first.
+    const metadataRows: Array<{
+      metadataParts?: Array<{ text?: { content?: string } }>;
+    }> =
+      metadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows ||
+      [];
     let viewCount: number | undefined;
     let publishedAt = new Date(referenceNowMs).toISOString();
-    for (const part of metadataParts) {
-      const text = part.text?.content || "";
-      if (/views?$/i.test(text) || /watching$/i.test(text)) {
-        viewCount = parseViewCount(text);
-      } else if (/ago$/i.test(text)) {
-        publishedAt = parseRelativeTime(text, referenceNowMs);
+    for (const row of metadataRows) {
+      for (const part of row.metadataParts || []) {
+        const text = part.text?.content || "";
+        if (/views?$/i.test(text) || /watching$/i.test(text)) {
+          viewCount = parseViewCount(text);
+        } else if (/ago$/i.test(text)) {
+          publishedAt = parseRelativeTime(text, referenceNowMs);
+        }
       }
     }
 
