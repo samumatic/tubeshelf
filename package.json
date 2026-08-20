@@ -21,7 +21,7 @@
     "clsx": "^2.1.1",
     "fast-xml-parser": "^5.3.6",
     "jose": "^6.1.3",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.0.0",
     "next": "^16.0.8",
     "plyr": "^3.8.4",
     "react": "^19.2.1",
