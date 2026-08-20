@@ -9,7 +9,8 @@
  * Primary source is YouTube's InnerTube player endpoint, which answers with
  * ~14 KB of JSON and still carries `videoDetails.lengthSeconds` even when
  * playback itself is refused. The watch page is the fallback: it always works
- * but costs ~1.3 MB per video.
+ * but costs ~1.3 MB per video, and is the only source used when no InnerTube
+ * key is configured.
  */
 
 import {
@@ -22,8 +23,18 @@ import {
 const BATCH_LIMIT = 50;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/** Public InnerTube web key. Long-lived, but the watch page covers it going stale. */
-const INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+/**
+ * InnerTube is YouTube's own web client's internal API, not a documented
+ * public one, so there is no key to request. The value every browser sends is
+ * the same public, non-secret client identifier baked into youtube.com's own
+ * page source (view-source on any watch page) - it grants no elevated access,
+ * but shipping it as a literal in this repo still reads as a leaked secret to
+ * scanners and to anyone auditing the code. Operators who want the faster
+ * InnerTube path opt in by setting YOUTUBE_INNERTUBE_KEY themselves (see
+ * README); leaving it unset just means every lookup falls through to the
+ * watch-page scrape below, which needs no key at all.
+ */
+const INNERTUBE_KEY = process.env.YOUTUBE_INNERTUBE_KEY || "";
 const INNERTUBE_CLIENT = {
   clientName: "WEB",
   clientVersion: "2.20240101.00.00",
@@ -66,6 +77,8 @@ async function fetchWithTimeout(
  * response is unusable, so the caller can fall through to the watch page.
  */
 async function fetchViaInnerTube(videoId: string): Promise<VideoDetails | null> {
+  if (!INNERTUBE_KEY) return null;
+
   try {
     const res = await fetchWithTimeout(
       `https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}`,

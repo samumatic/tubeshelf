@@ -120,6 +120,20 @@ own window. Channels nobody subscribes to fall back to the instance default.
 | Refresh channels every | `15 min` | Minimum age before a channel is fetched again |
 | Retry failed channels after | `5 min` | Shorter retry for channels whose last fetch failed |
 
+### Video durations
+
+Neither RSS nor the standard fetcher reports video length, so durations are
+looked up one video at a time in the background and cached permanently. The
+first source tried is YouTube's InnerTube player endpoint (cheap, ~14 KB per
+video); if `YOUTUBE_INNERTUBE_KEY` is not set, that step is skipped entirely
+and every lookup falls straight through to scraping the watch page instead
+(works either way, just costs ~1.3 MB per video instead of ~14 KB).
+
+```yaml
+environment:
+  YOUTUBE_INNERTUBE_KEY: "replace-with-your-own-innertube-key"
+```
+
 ## CLI Management
 
 Run commands in the container to manage users and settings:
