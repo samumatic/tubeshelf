@@ -11,8 +11,10 @@ import {
   getChannelFetchStates,
   markChannelFetched,
   pruneVideos,
+  resetDurationAttempts,
   upsertVideos,
 } from "@/lib/videoCacheStore";
+import { backfillDurations } from "@/lib/durationBackfill";
 import { readSettings, type AppSettings } from "@/lib/settingsStore";
 import { readUserState } from "@/lib/userStateStore";
 
@@ -21,6 +23,9 @@ const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 // One in-flight fetch per channel, shared across users and requests.
 const inFlightChannels = new Map<string, Promise<void>>();
 let lastPruneAt = 0;
+// One duration backfill batch at a time, so concurrent page loads do not stack
+// batches on top of each other.
+let durationBackfillInFlight = false;
 
 function compareFeedItems(a: CachedVideo, b: CachedVideo): number {
   const timeDiff =
@@ -122,6 +127,28 @@ async function refreshChannels(
       worker
     )
   );
+}
+
+/**
+ * Resolve unknown video durations without holding up the response.
+ *
+ * Neither the RSS nor the standard fetcher reliably reports video length, so
+ * lengths are filled in one video at a time and stored permanently. The batch
+ * is bounded, so a large feed converges over several page loads rather than in
+ * one burst of requests to YouTube.
+ */
+function scheduleDurationBackfill(
+  channelIds: string[],
+  settings: AppSettings
+): void {
+  if (durationBackfillInFlight) return;
+  durationBackfillInFlight = true;
+
+  backfillDurations(channelIds, settings.feedConcurrency)
+    .catch((err) => console.warn("[Duration] Backfill failed:", err))
+    .finally(() => {
+      durationBackfillInFlight = false;
+    });
 }
 
 function getStaleChannels(
@@ -247,6 +274,16 @@ async function handleFeedRequest(
       );
     }
   }
+
+  if (forceRefresh) {
+    // An explicit refresh is also a retry for videos written off earlier.
+    const retried = resetDurationAttempts(channelIds);
+    if (retried > 0) {
+      console.log(`[Duration] Reset attempts for ${retried} videos`);
+    }
+  }
+
+  scheduleDurationBackfill(channelIds, settings);
 
   const items = getCachedVideos(channelIds, retentionDays).sort(
     compareFeedItems

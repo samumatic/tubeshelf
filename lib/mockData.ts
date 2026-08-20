@@ -5,6 +5,8 @@ export interface Video {
   channelId: string;
   thumbnail: string;
   duration?: string;
+  /** Video length in seconds; the value everything displays is derived from this. */
+  durationSeconds?: number;
   uploadedAt: string;
   isMemberOnly?: boolean;
   views?: number;
@@ -41,6 +43,7 @@ export async function getVideos(forceRefresh = false): Promise<Video[]> {
       item.thumbnail ||
       "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=225&fit=crop",
     duration: item.duration || "—",
+    durationSeconds: item.durationSeconds,
     uploadedAt: item.publishedAt || new Date().toISOString(),
     views: item.viewCount || item.views,
     isMemberOnly:

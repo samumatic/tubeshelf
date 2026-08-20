@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { getProxiedImageUrl } from "@/lib/videoUtils";
+import { formatVideoDuration } from "@/lib/duration";
 
 function formatViewCount(views: number): string {
   if (views >= 1000000) {
@@ -44,7 +45,7 @@ interface VideoCardProps {
   title: string;
   channel: string;
   thumbnail: string;
-  duration?: string;
+  durationSeconds?: number;
   uploadedAt?: string;
   views?: number;
   watched?: boolean;
@@ -66,7 +67,7 @@ export function VideoCard({
   title,
   channel,
   thumbnail,
-  duration,
+  durationSeconds,
   uploadedAt,
   views,
   watched,
@@ -89,6 +90,9 @@ export function VideoCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const thumbnailSrc = getProxiedImageUrl(thumbnail);
+  const durationLabel = showDurationPlaceholder
+    ? formatVideoDuration(durationSeconds)
+    : null;
 
   const handleWatch = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Prevent the default link behavior
@@ -228,20 +232,6 @@ export function VideoCard({
           }}
         />
 
-        {/* Duration badge - bottom right */}
-        {(() => {
-          // Show badge only if duration display is enabled AND duration exists
-          if (!showDurationPlaceholder || !duration) {
-            return null;
-          }
-
-          return (
-            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
-              {duration}
-            </div>
-          );
-        })()}
-
         {watched && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
             <Eye className="w-8 h-8 text-white" />
@@ -333,6 +323,11 @@ export function VideoCard({
           )}
           {uploadedAt && (isMemberOnly || views) && <span>•</span>}
           {uploadedAt && <span>{formatTimeAgo(uploadedAt)}</span>}
+          {/* Length sits at the far right of this row. It is backfilled per
+              video, so it is simply absent until the lookup resolves. */}
+          {durationLabel && (
+            <span className="ml-auto pl-2 flex-shrink-0">{durationLabel}</span>
+          )}
         </div>
       </div>
     </div>
