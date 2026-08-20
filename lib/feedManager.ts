@@ -4,6 +4,7 @@
  */
 
 import { Video } from "./mockData";
+import { videoListsMatch } from "./videoUtils";
 
 type FeedData = {
   videos: Video[];
@@ -16,6 +17,11 @@ type FeedData = {
 type Listener = (data: FeedData) => void;
 
 const CACHE_KEY = "tubeshelf_feed_cache";
+
+/** How long to wait between checks for newly resolved video lengths. */
+const DURATION_POLL_INTERVAL_MS = 5000;
+/** Consecutive fruitless polls before giving up on the remaining videos. */
+const DURATION_POLL_MAX_STAGNANT = 2;
 
 export class AuthExpiredError extends Error {
   constructor(message = "Session expired. Please sign in again.") {
@@ -37,6 +43,8 @@ class FeedManager {
   private initialized = false;
   private initPromise: Promise<void> | null = null;
   private hasCachedData = false;
+  private durationPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private durationPollsWithoutProgress = 0;
 
   private constructor() {}
 
@@ -65,17 +73,6 @@ class FeedManager {
     } catch (e) {
       console.error("Failed to save cache:", e);
     }
-  }
-
-  private arraysHaveSameIds(arr1: Video[], arr2: Video[]): boolean {
-    if (arr1.length !== arr2.length) return false;
-    const ids1 = new Set(arr1.map((v) => v.id));
-    const ids2 = new Set(arr2.map((v) => v.id));
-    if (ids1.size !== ids2.size) return false;
-    for (const id of ids1) {
-      if (!ids2.has(id)) return false;
-    }
-    return true;
   }
 
   static getInstance(): FeedManager {
@@ -121,6 +118,86 @@ class FeedManager {
     this.notify();
   }
 
+  private mapItems(items: any[]): Video[] {
+    return items.map((raw: any) => ({
+      id: raw.id || raw.videoId,
+      title: raw.title || "Untitled",
+      channel:
+        raw.channelTitle || raw.uploaderName || raw.channel || "Unknown Channel",
+      channelId: raw.channelId || raw.uploaderId || "",
+      thumbnail:
+        raw.thumbnail ||
+        raw.thumbnailUrl ||
+        `https://i.ytimg.com/vi/${raw.id || raw.videoId}/hqdefault.jpg`,
+      duration: raw.duration,
+      durationSeconds: raw.durationSeconds,
+      views: raw.viewCount ?? raw.views,
+      uploadedAt:
+        raw.publishedAt ||
+        raw.uploadDate ||
+        raw.uploaded ||
+        new Date().toISOString(),
+      url:
+        raw.url || `https://www.youtube.com/watch?v=${raw.id || raw.videoId}`,
+      isMemberOnly: raw.isMemberOnly || raw.membersOnly || false,
+    }));
+  }
+
+  private countKnownDurations(videos: Video[]): number {
+    return videos.filter((video) => typeof video.durationSeconds === "number")
+      .length;
+  }
+
+  private cancelDurationPoll() {
+    if (this.durationPollTimer) {
+      clearTimeout(this.durationPollTimer);
+      this.durationPollTimer = null;
+    }
+  }
+
+  /**
+   * Video lengths are resolved on the server a batch at a time, after the feed
+   * response has already been sent. Poll while any are still missing so the
+   * badges and the total fill in on their own instead of waiting for a reload.
+   *
+   * Polling stops as soon as every video has a length, or once the server
+   * stops making progress — some videos never resolve, and those must not keep
+   * the timer alive forever.
+   */
+  private scheduleDurationPoll() {
+    if (this.durationPollTimer) return;
+
+    const videos = this.data.videos;
+    if (videos.length === 0) return;
+    if (this.countKnownDurations(videos) === videos.length) return;
+    if (this.durationPollsWithoutProgress >= DURATION_POLL_MAX_STAGNANT) return;
+
+    this.durationPollTimer = setTimeout(() => {
+      this.durationPollTimer = null;
+      this.pollDurations().catch(() => undefined);
+    }, DURATION_POLL_INTERVAL_MS);
+  }
+
+  private async pollDurations() {
+    const known = this.countKnownDurations(this.data.videos);
+
+    const response = await fetch("/api/feed?refresh=false");
+    if (!response.ok) return;
+
+    const json = await response.json();
+    const videos = this.mapItems(json.items || []);
+
+    if (this.countKnownDurations(videos) > known) {
+      this.durationPollsWithoutProgress = 0;
+      this.updateData({ videos });
+      this.saveCache();
+    } else {
+      this.durationPollsWithoutProgress++;
+    }
+
+    this.scheduleDurationPoll();
+  }
+
   async initialize(forceRefresh = false) {
     if (this.initialized) {
       return;
@@ -132,6 +209,9 @@ class FeedManager {
 
     this.initPromise = (async () => {
       try {
+        // A fetch is about to supply fresher data than any pending poll would.
+        this.cancelDurationPoll();
+
         // Show fetching state to indicate background refresh
         // Show loading only if we don't have cached data
         if (!this.hasCachedData) {
@@ -169,38 +249,12 @@ class FeedManager {
             }
 
             const json = await response.json();
-            const items = json.items || [];
-
-            const videos: Video[] = items.map((raw: any) => ({
-              id: raw.id || raw.videoId,
-              title: raw.title || "Untitled",
-              channel:
-                raw.channelTitle ||
-                raw.uploaderName ||
-                raw.channel ||
-                "Unknown Channel",
-              channelId: raw.channelId || raw.uploaderId || "",
-              thumbnail:
-                raw.thumbnail ||
-                raw.thumbnailUrl ||
-                `https://i.ytimg.com/vi/${raw.id || raw.videoId}/hqdefault.jpg`,
-              duration: raw.duration,
-              views: raw.viewCount ?? raw.views,
-              uploadedAt:
-                raw.publishedAt ||
-                raw.uploadDate ||
-                raw.uploaded ||
-                new Date().toISOString(),
-              url:
-                raw.url ||
-                `https://www.youtube.com/watch?v=${raw.id || raw.videoId}`,
-              isMemberOnly: raw.isMemberOnly || raw.membersOnly || false,
-            }));
+            const videos = this.mapItems(json.items || []);
 
             // Only update if data actually changed (prevents visual flicker when cache matches fresh data)
             const dataChanged =
               this.data.videos.length !== videos.length ||
-              !this.arraysHaveSameIds(this.data.videos, videos);
+              !videoListsMatch(this.data.videos, videos);
 
             if (dataChanged || !this.hasCachedData) {
               this.updateData({
@@ -221,6 +275,9 @@ class FeedManager {
 
             this.initialized = true;
             this.saveCache();
+            // Lengths are backfilled after this response was built, so watch
+            // for the ones that are still missing.
+            this.scheduleDurationPoll();
             return;
           } catch (err) {
             if (err instanceof AuthExpiredError) {
@@ -262,6 +319,9 @@ class FeedManager {
 
   async refresh() {
     this.initialized = false;
+    // A manual refresh also clears written-off lengths server-side, so give
+    // polling a fresh budget to pick the retried ones up.
+    this.durationPollsWithoutProgress = 0;
     // Don't clear hasCachedData - keep showing cached videos while refreshing
     // This prevents flicker during manual refresh
     // Manual refresh bypasses the server-side per-channel refresh interval.

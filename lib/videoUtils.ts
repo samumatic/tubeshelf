@@ -3,14 +3,23 @@ import type { AppSettings } from "./settingsStore";
 import type { SubscriptionList } from "./subscriptionListStore";
 
 /**
- * Compare two arrays of videos by their IDs
+ * Whether two feeds are interchangeable for display purposes.
+ *
+ * Used to suppress pointless re-renders, so it has to cover every field the UI
+ * shows that can change without the video set changing: durations and view
+ * counts are backfilled per video well after the video itself is known, so
+ * comparing ids alone would pin the feed to its first render.
  */
-export function arraysHaveSameIds(arr1?: Video[], arr2?: Video[]): boolean {
+export function videoListsMatch(arr1?: Video[], arr2?: Video[]): boolean {
   if (arr1 === arr2) return true;
   if (!arr1 || !arr2) return false;
   if (arr1.length !== arr2.length) return false;
-  const s = new Set(arr1.map((v) => v.id));
-  for (const v of arr2) if (!s.has(v.id)) return false;
+
+  const signature = (v: Video) =>
+    `${v.id}:${v.durationSeconds ?? ""}:${v.views ?? ""}`;
+  const s = new Set(arr1.map(signature));
+
+  for (const v of arr2) if (!s.has(signature(v))) return false;
   return true;
 }
 

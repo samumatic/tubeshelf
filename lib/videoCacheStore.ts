@@ -1,7 +1,14 @@
 import { getDb } from "./db";
+import { formatDurationText, parseDurationText } from "./duration";
 
 const SQLITE_MAX_VARIABLES = 900;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How often a single video may fail duration lookup before it is written off.
+ * A manual refresh clears the counter, so an upstream outage is not permanent.
+ */
+export const MAX_DURATION_ATTEMPTS = 3;
 
 export interface FetchedVideo {
   id?: string;
@@ -13,6 +20,7 @@ export interface FetchedVideo {
   url?: string;
   thumbnail?: string;
   duration?: string;
+  durationSeconds?: number;
   viewCount?: number;
   views?: number;
   isMemberOnly?: boolean;
@@ -28,6 +36,7 @@ export interface CachedVideo {
   url: string;
   thumbnail?: string;
   duration?: string;
+  durationSeconds?: number;
   viewCount?: number;
   views?: number;
   isMemberOnly: boolean;
@@ -87,10 +96,11 @@ export function upsertVideos(
   const insert = db.prepare(`
     INSERT INTO videos (
       video_id, channel_id, channel_title, title, url, thumbnail, duration,
-      view_count, is_member_only, published_at, first_seen_at, last_seen_at
+      duration_seconds, view_count, is_member_only, published_at,
+      first_seen_at, last_seen_at
     ) VALUES (
       @videoId, @channelId, @channelTitle, @title, @url, @thumbnail, @duration,
-      @viewCount, @isMemberOnly, @publishedAt,
+      @durationSeconds, @viewCount, @isMemberOnly, @publishedAt,
       COALESCE(
         (SELECT first_seen_at FROM video_first_seen WHERE video_id = @videoId),
         @firstSeenAt
@@ -104,6 +114,9 @@ export function upsertVideos(
       url = excluded.url,
       thumbnail = COALESCE(excluded.thumbnail, videos.thumbnail),
       duration = COALESCE(excluded.duration, videos.duration),
+      duration_seconds = COALESCE(
+        excluded.duration_seconds, videos.duration_seconds
+      ),
       view_count = COALESCE(excluded.view_count, videos.view_count),
       is_member_only = COALESCE(excluded.is_member_only, videos.is_member_only),
       published_at = MIN(excluded.published_at, videos.published_at),
@@ -117,6 +130,10 @@ export function upsertVideos(
       const videoId = String(video.id || video.videoId || "").trim();
       if (!videoId) return;
 
+      // Fetchers report a display string; seconds are what everything reads.
+      const durationSeconds =
+        video.durationSeconds ?? parseDurationText(video.duration);
+
       insert.run({
         videoId,
         channelId: String(video.channelId || channelId),
@@ -125,6 +142,7 @@ export function upsertVideos(
         url: video.url || `https://www.youtube.com/watch?v=${videoId}`,
         thumbnail: video.thumbnail || null,
         duration: video.duration || null,
+        durationSeconds: durationSeconds ?? null,
         viewCount: video.viewCount ?? video.views ?? null,
         // undefined means "this fetch method cannot tell" - keep what we have.
         isMemberOnly:
@@ -166,7 +184,8 @@ export function getCachedVideos(
     const placeholders = part.map(() => "?").join(", ");
     const stmt = db.prepare(
       `SELECT video_id, channel_id, channel_title, title, url, thumbnail,
-              duration, view_count, is_member_only, published_at, first_seen_at
+              duration, duration_seconds, view_count, is_member_only,
+              published_at, first_seen_at
        FROM videos
        WHERE channel_id IN (${placeholders})
          ${cutoff ? "AND published_at >= ?" : ""}`
@@ -187,6 +206,7 @@ export function getCachedVideos(
       url: row.url,
       thumbnail: row.thumbnail || undefined,
       duration: row.duration || undefined,
+      durationSeconds: row.duration_seconds ?? undefined,
       viewCount: row.view_count ?? undefined,
       views: row.view_count ?? undefined,
       isMemberOnly: !!row.is_member_only,
@@ -266,6 +286,115 @@ export function markChannelFetched(
        last_error = excluded.last_error,
        video_count = excluded.video_count`
   ).run(channelId, now, error ? null : now, error, result.videoCount);
+}
+
+/**
+ * Videos on the given channels whose length is still unknown and which have
+ * not exhausted their attempts, newest first so the top of the feed fills in
+ * before the archive does.
+ */
+export function getDurationBackfillCandidates(
+  channelIds: string[],
+  limit: number
+): string[] {
+  const unique = Array.from(new Set(channelIds.filter(Boolean)));
+  if (unique.length === 0 || limit <= 0) return [];
+
+  const db = getDb();
+  const candidates: string[] = [];
+
+  for (const part of chunk(unique, SQLITE_MAX_VARIABLES - 2)) {
+    if (candidates.length >= limit) break;
+
+    const placeholders = part.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT video_id FROM videos
+         WHERE channel_id IN (${placeholders})
+           AND duration_seconds IS NULL
+           AND duration_attempts < ?
+         ORDER BY published_at DESC
+         LIMIT ?`
+      )
+      .all(...part, MAX_DURATION_ATTEMPTS, limit - candidates.length) as Array<{
+      video_id: string;
+    }>;
+
+    candidates.push(...rows.map((row) => row.video_id));
+  }
+
+  return candidates;
+}
+
+/**
+ * Store a length resolved by the backfill.
+ *
+ * The legacy display string is kept in sync so anything still reading
+ * `duration` keeps working. A view count is only written when we have none:
+ * this is a one-shot lookup, so it must not clobber a fresher number a fetcher
+ * may have supplied.
+ */
+export function saveVideoDuration(
+  videoId: string,
+  seconds: number,
+  viewCount?: number | null
+): void {
+  const db = getDb();
+
+  db.prepare(
+    `UPDATE videos
+     SET duration_seconds = ?,
+         duration = ?,
+         duration_attempts = 0,
+         view_count = COALESCE(view_count, ?)
+     WHERE video_id = ?`
+  ).run(
+    Math.round(seconds),
+    formatDurationText(seconds),
+    typeof viewCount === "number" && Number.isFinite(viewCount)
+      ? Math.round(viewCount)
+      : null,
+    videoId
+  );
+}
+
+/**
+ * Count one failed lookup. After MAX_DURATION_ATTEMPTS the video stops being a
+ * candidate, so a deleted or region-blocked video cannot starve the batch.
+ */
+export function markDurationAttemptFailed(videoId: string): void {
+  getDb()
+    .prepare(
+      "UPDATE videos SET duration_attempts = duration_attempts + 1 WHERE video_id = ?"
+    )
+    .run(videoId);
+}
+
+/**
+ * Give written-off videos another chance. Called on an explicit refresh so a
+ * transient upstream outage does not permanently hide durations.
+ */
+export function resetDurationAttempts(channelIds: string[]): number {
+  const unique = Array.from(new Set(channelIds.filter(Boolean)));
+  if (unique.length === 0) return 0;
+
+  const db = getDb();
+  let reset = 0;
+
+  for (const part of chunk(unique, SQLITE_MAX_VARIABLES)) {
+    const placeholders = part.map(() => "?").join(", ");
+    const info = db
+      .prepare(
+        `UPDATE videos SET duration_attempts = 0
+         WHERE channel_id IN (${placeholders})
+           AND duration_seconds IS NULL
+           AND duration_attempts > 0`
+      )
+      .run(...part);
+    reset += info.changes;
+  }
+
+  return reset;
 }
 
 /**

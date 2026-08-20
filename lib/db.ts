@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
+import { parseDurationText } from "./duration";
 
 const dbPath = path.join(process.cwd(), "data", "tubeshelf.db");
 let db: Database.Database | null = null;
@@ -150,6 +151,8 @@ function initializeSchema() {
       url TEXT NOT NULL,
       thumbnail TEXT,
       duration TEXT,
+      duration_seconds INTEGER,
+      duration_attempts INTEGER NOT NULL DEFAULT 0,
       view_count INTEGER,
       is_member_only INTEGER,
       published_at TEXT NOT NULL,
@@ -393,6 +396,62 @@ function runMigrations() {
         email_verified = COALESCE(email_verified, 1)
       WHERE updated_at IS NULL OR email_verified IS NULL;
     `);
+
+    // Migration: store video lengths as seconds.
+    //
+    // `duration` holds YouTube's display string, which cannot be summed and
+    // which the RSS fetcher never provides. `duration_seconds` is the value
+    // everything reads; `duration_attempts` bounds the per-video backfill so
+    // videos that will never yield a length are not refetched forever.
+    const videosInfo = db.pragma("table_info(videos)") as Array<any>;
+    const hasDurationSeconds = videosInfo.some(
+      (col: any) => col.name === "duration_seconds",
+    );
+    const hasDurationAttempts = videosInfo.some(
+      (col: any) => col.name === "duration_attempts",
+    );
+
+    if (!hasDurationSeconds) {
+      console.log("[Migration] Adding duration_seconds column to videos table");
+      db.exec("ALTER TABLE videos ADD COLUMN duration_seconds INTEGER;");
+
+      // Convert the display strings we already have. Only the M:SS and H:MM:SS
+      // forms are recognised; anything else stays NULL and the backfill picks
+      // it up rather than the parser guessing.
+      const rows = db
+        .prepare(
+          "SELECT video_id, duration FROM videos WHERE duration IS NOT NULL AND duration_seconds IS NULL",
+        )
+        .all() as Array<{ video_id: string; duration: string }>;
+
+      const update = db.prepare(
+        "UPDATE videos SET duration_seconds = ? WHERE video_id = ?",
+      );
+      let converted = 0;
+
+      db.transaction(() => {
+        for (const row of rows) {
+          const seconds = parseDurationText(row.duration);
+          if (seconds !== null) {
+            update.run(seconds, row.video_id);
+            converted++;
+          }
+        }
+      })();
+
+      console.log(
+        `[Migration] Converted ${converted}/${rows.length} stored durations to seconds`,
+      );
+    }
+
+    if (!hasDurationAttempts) {
+      console.log(
+        "[Migration] Adding duration_attempts column to videos table",
+      );
+      db.exec(
+        "ALTER TABLE videos ADD COLUMN duration_attempts INTEGER NOT NULL DEFAULT 0;",
+      );
+    }
 
     // Migration: Make playback_history user-scoped
     // Check if playback_history has user_id column
