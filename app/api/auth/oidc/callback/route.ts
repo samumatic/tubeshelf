@@ -41,9 +41,9 @@ export async function GET(req: Request) {
     }
 
     const auth = await getAuth(req);
-    return await auth.api.oAuth2Callback({
+    return await auth.api.callbackOAuth({
       headers: req.headers,
-      params: { providerId },
+      params: { id: providerId },
       query: {
         code,
         state,
