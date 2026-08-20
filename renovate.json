@@ -19,6 +19,11 @@
       "description": "eslint-config-next's plugins (eslint-plugin-react, typescript-eslint) do not support ESLint 10 yet - it crashes on any lint run. Unpin once they do.",
       "matchPackageNames": ["eslint"],
       "allowedVersions": "<10"
+    },
+    {
+      "description": "typescript-eslint (even latest) only supports typescript <6.1.0. TS7 doesn't just warn on the peer mismatch, it crashes `npm run lint` outright (TypeError reading 'Cjs' in typescript-estree's create-program). tsc itself is fine on 7 - this is purely about the lint toolchain. Unpin once typescript-eslint supports it.",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6.1.0"
     }
   ],
   "major": {
