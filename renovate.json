@@ -24,6 +24,11 @@
       "description": "better-auth 1.7.x renamed/removed generic-oauth plugin API (signInWithOAuth2, oAuth2Callback, the issuer config field) that lib/betterAuth.ts and the OIDC routes depend on - it breaks the type check and the OIDC login flow. Unpin once that integration is updated to match the new API.",
       "matchPackageNames": ["better-auth", "@better-auth/core"],
       "allowedVersions": "<1.7.0"
+    },
+    {
+      "description": "better-auth 1.6.x only declares better-sqlite3 ^12 as a peer; better-sqlite3 13 makes `npm ci` fail outright (ERESOLVE) in the Docker build, which does not use --legacy-peer-deps. Bump this together with the better-auth pin above once that's unblocked, not before.",
+      "matchPackageNames": ["better-sqlite3", "@types/better-sqlite3"],
+      "allowedVersions": "<13.0.0"
     }
   ],
   "major": {
