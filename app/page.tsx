@@ -1756,11 +1756,11 @@ export default function Home() {
             ) : (
               <>
                 {/* Tabs and Controls */}
-                <div className="flex items-center justify-between mb-6 border-b border-border/30">
-                  <div className="flex gap-1">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 border-b border-border/30">
+                  <div className="flex gap-1 overflow-x-auto max-w-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <button
                       onClick={() => setFeedTab("videos")}
-                      className={`px-4 py-3 font-medium transition-all duration-200 relative flex items-center gap-2 ${
+                      className={`px-3 sm:px-4 py-3 font-medium transition-all duration-200 relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap ${
                         feedTab === "videos"
                           ? "text-foreground"
                           : "text-muted-foreground hover:text-foreground"
@@ -1777,7 +1777,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setFeedTab("watch-later")}
-                      className={`px-4 py-3 font-medium transition-all duration-200 relative flex items-center gap-2 ${
+                      className={`px-3 sm:px-4 py-3 font-medium transition-all duration-200 relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap ${
                         feedTab === "watch-later"
                           ? "text-foreground"
                           : "text-muted-foreground hover:text-foreground"
@@ -1799,7 +1799,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setFeedTab("watch-history")}
-                      className={`px-4 py-3 font-medium transition-all duration-200 relative flex items-center gap-2 ${
+                      className={`px-3 sm:px-4 py-3 font-medium transition-all duration-200 relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap ${
                         feedTab === "watch-history"
                           ? "text-foreground"
                           : "text-muted-foreground hover:text-foreground"
@@ -1815,10 +1815,10 @@ export default function Home() {
                       Watch History
                     </button>
                   </div>
-                  <div className="flex items-center gap-3 pb-2">
+                  <div className="relative flex items-center justify-end gap-3 min-w-0 pb-2">
                     {/* Filter menu - only show on home page videos tab */}
                     {currentPage === "home" && feedTab === "videos" && (
-                      <div className="relative" ref={moreMenuRef}>
+                      <div className="sm:relative" ref={moreMenuRef}>
                         <button
                           onClick={() => setShowMoreMenu((s) => !s)}
                           aria-label="More options"
@@ -1844,7 +1844,7 @@ export default function Home() {
                         </button>
 
                         {showMoreMenu && (
-                          <div className="absolute right-0 mt-2 w-72 bg-card border border-border/50 rounded-lg shadow-xl backdrop-blur-sm p-0 z-50 overflow-hidden">
+                          <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-card border border-border/50 rounded-lg shadow-xl backdrop-blur-sm p-0 z-50 overflow-hidden">
                             {/* Header */}
                             <div className="bg-gradient-to-r from-primary/5 to-transparent border-b border-border/30 px-4 py-3">
                               <h3 className="font-semibold text-sm text-foreground">
@@ -1902,7 +1902,7 @@ export default function Home() {
                       <select
                         value={filterListId}
                         onChange={(e) => handleChangeFilterList(e.target.value)}
-                        className="px-3 py-1.5 text-sm bg-secondary border border-border/50 rounded-lg cursor-pointer hover:border-border transition-all duration-200 focus:border-primary focus:outline-none"
+                        className="min-w-0 max-w-full truncate px-3 py-1.5 text-sm bg-secondary border border-border/50 rounded-lg cursor-pointer hover:border-border transition-all duration-200 focus:border-primary focus:outline-none"
                       >
                         <option value="all">All Lists</option>
                         {subscriptionLists
