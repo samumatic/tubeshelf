@@ -10,6 +10,8 @@
     "start": "node server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "cli": "node cli.js",
     "docker:build": "bash scripts/build-local.sh"
   },
@@ -42,7 +44,8 @@
     "eslint-config-next": "^16.0.8",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.1.17",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=20"
