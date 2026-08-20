@@ -942,6 +942,9 @@ const VideoPlayerComponent = ({
         if (hud.kind === "speed" && current.kind === "speed") {
           return Math.abs(current.rate - hud.rate) < 0.001 ? null : current;
         }
+        if (hud.kind === "watched" && current.kind === "watched") {
+          return current.watched === hud.watched ? null : current;
+        }
         return current;
       });
       playerActionHudTimerRef.current = null;
