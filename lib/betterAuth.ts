@@ -17,7 +17,13 @@ import {
 } from "@/lib/oidc";
 
 const BCRYPT_ROUNDS = 12;
-const LEGACY_SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60;
+// Sessions last 3 months and are refreshed on use (see SESSION_UPDATE_AGE_SECONDS),
+// so an account that is opened at least once a month effectively stays signed in.
+const SESSION_DURATION_SECONDS = 90 * 24 * 60 * 60;
+// How stale a session may get before BetterAuth extends its expiry (and re-sends
+// the cookie). Daily is frequent enough to keep regular users signed in forever
+// without writing to auth_sessions on every request.
+const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
 const GENERATED_BETTER_AUTH_SECRET_FILE = path.join(
   process.cwd(),
   "data",
@@ -645,7 +651,7 @@ function createAuth(request?: Request) {
         session_token: {
           name: "session",
           attributes: {
-            maxAge: LEGACY_SESSION_DURATION_SECONDS,
+            maxAge: SESSION_DURATION_SECONDS,
             sameSite: "lax",
             path: "/",
             httpOnly: true,
@@ -707,7 +713,8 @@ function createAuth(request?: Request) {
         ipAddress: "ip_address",
         userAgent: "user_agent",
       },
-      expiresIn: LEGACY_SESSION_DURATION_SECONDS,
+      expiresIn: SESSION_DURATION_SECONDS,
+      updateAge: SESSION_UPDATE_AGE_SECONDS,
     },
     account: {
       modelName: "auth_accounts",
