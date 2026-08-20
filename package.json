@@ -16,7 +16,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.4.19",
-    "better-sqlite3": "^12.5.0",
+    "better-sqlite3": "^13.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fast-xml-parser": "^5.3.6",
