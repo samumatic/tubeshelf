@@ -3,11 +3,15 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 
-# Update packages for security
-RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
+# Update packages for security, and add the toolchain node-gyp needs to
+# compile native modules (better-sqlite3 has no prebuilt binary for musl/
+# Alpine yet, so it always builds from source here)
+RUN apk update && apk upgrade && \
+    apk add --no-cache python3 make g++ && \
+    rm -rf /var/cache/apk/*
 
 # Copy package files
-COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* .npmrc* ./
 
 # Install dependencies
 RUN npm ci || npm install
