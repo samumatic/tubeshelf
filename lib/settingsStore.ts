@@ -1,29 +1,21 @@
 import { getDb } from "./db";
 import { migrateFromJson } from "./migrate";
+import {
+  clampNumericSetting,
+  defaultSettings,
+  numericSettingLimits,
+  type AppSettings,
+  type NumericSettingKey,
+} from "./settingsSchema";
 
-export interface AppSettings {
-  defaultSortOrder: "newest" | "oldest";
-  theme: "light" | "dark" | "system";
-  videoPlayerMode: "built-in" | "new-tab";
-  defaultPlayerResolution: "360p" | "480p" | "720p" | "1080p";
-  sponsorBlockEnabled: boolean;
-  playerDebugEnabled: boolean;
-  fetchMethod: "standard" | "rss";
-  oidcOnly: boolean;
-  publicRegistration: boolean;
-}
-
-export const defaultSettings: AppSettings = {
-  defaultSortOrder: "newest",
-  theme: "system",
-  videoPlayerMode: "built-in",
-  defaultPlayerResolution: "1080p",
-  sponsorBlockEnabled: true,
-  playerDebugEnabled: false,
-  fetchMethod: "standard",
-  oidcOnly: false,
-  publicRegistration: false,
-};
+export {
+  clampNumericSetting,
+  defaultSettings,
+  numericSettingLimits,
+  RETENTION_OPTIONS,
+  formatRetention,
+} from "./settingsSchema";
+export type { AppSettings, NumericSettingKey } from "./settingsSchema";
 
 // Run migration on first import
 let migrationPromise: Promise<void> | null = null;
@@ -50,9 +42,17 @@ export async function readSettings(): Promise<AppSettings> {
   for (const row of rows) {
     try {
       const value = JSON.parse(row.value);
-      if (row.key in settings) {
-        (settings as any)[row.key] = value;
+      if (!(row.key in settings)) continue;
+
+      if (row.key in numericSettingLimits) {
+        const clamped = clampNumericSetting(row.key as NumericSettingKey, value);
+        if (clamped !== null) {
+          (settings as any)[row.key] = clamped;
+        }
+        continue;
       }
+
+      (settings as any)[row.key] = value;
     } catch {
       // Skip invalid JSON
     }
@@ -81,6 +81,12 @@ export async function writeSettings(
     "fetchMethod",
     "oidcOnly",
     "publicRegistration",
+    "videoRetentionDays",
+    "feedConcurrency",
+    "feedChannelTimeoutSeconds",
+    "feedRequestTimeoutSeconds",
+    "feedRefreshMinutes",
+    "feedErrorRetryMinutes",
   ];
 
   const stmt = db.prepare(

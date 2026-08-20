@@ -63,6 +63,63 @@ docker compose up -d
 
 Access the web UI at **http://localhost:3000**
 
+### Building a local image
+
+To run your own build instead of the published image:
+
+```bash
+# Build tubeshelf:local (and tubeshelf:git-<sha>) from the working tree
+npm run docker:build
+
+# Rebuild from scratch / pass any other docker build flag
+npm run docker:build -- --no-cache
+
+# Start it
+docker compose -f docker-compose.local.yml up -d
+```
+
+`docker-compose.local.yml` references `image: tubeshelf:local` and also carries
+`build: .`, so `docker compose -f docker-compose.local.yml up -d --build` works
+as a one-step alternative to the script.
+
+## Feed cache
+
+Fetched videos are stored in SQLite (`videos` table) and the feed is served from
+that cache, so:
+
+- videos stay in the feed after they drop out of the upstream fetch window
+  (~15 entries per channel via RSS, ~30 via the standard fetcher)
+- a failed or slow refresh shows the last known feed instead of nothing
+- page loads are served from the cache while stale channels refresh in the
+  background; the refresh button forces an immediate refetch
+
+### Retention
+
+How far back the feed remembers is configurable in the app, not through
+environment variables.
+
+- **Per user** — *Settings › Keep Videos For*: 1 month … 2 years, forever, or
+  "use instance default".
+- **Instance default** — *Admin › System Settings › Feed & Video Cache*: applies
+  to every user who has not picked their own window.
+
+Because one cached row serves every user, a video is deleted only when nobody
+subscribed to that channel still wants it: the longest window among a channel's
+subscribers decides how much is kept, and each user's feed is filtered to their
+own window. Channels nobody subscribes to fall back to the instance default.
+
+### Fetch tuning (admin)
+
+*Admin › System Settings › Feed & Video Cache* also controls:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| Parallel channel fetches | `8` | Channels fetched at the same time |
+| Channel timeout | `15s` | Give up on a single channel after this long |
+| Request timeout | `60s` | Answer from cache after this long; refresh continues in the background |
+| Refresh channels every | `15 min` | Minimum age before a channel is fetched again |
+| Retry failed channels after | `5 min` | Shorter retry for channels whose last fetch failed |
+
 ## CLI Management
 
 Run commands in the container to manage users and settings:

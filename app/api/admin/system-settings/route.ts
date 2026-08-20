@@ -1,7 +1,29 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/currentUser";
-import { readSettings, writeSettings } from "@/lib/settingsStore";
+import {
+  clampNumericSetting,
+  numericSettingLimits,
+  readSettings,
+  writeSettings,
+  type AppSettings,
+  type NumericSettingKey,
+} from "@/lib/settingsStore";
 import { getOIDCProviders } from "@/lib/oidc";
+
+const NUMERIC_KEYS = Object.keys(numericSettingLimits) as NumericSettingKey[];
+
+function serialize(settings: AppSettings) {
+  const numeric = Object.fromEntries(
+    NUMERIC_KEYS.map((key) => [key, settings[key]])
+  );
+
+  return {
+    oidcOnly: !!settings.oidcOnly,
+    publicRegistration: !!settings.publicRegistration,
+    ...numeric,
+    limits: numericSettingLimits,
+  };
+}
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -10,10 +32,7 @@ export async function GET() {
   }
 
   const settings = await readSettings();
-  return NextResponse.json({
-    oidcOnly: !!settings.oidcOnly,
-    publicRegistration: !!settings.publicRegistration,
-  });
+  return NextResponse.json(serialize(settings));
 }
 
 export async function POST(req: Request) {
@@ -23,7 +42,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
-  const updates: Record<string, boolean> = {};
+  const updates: Partial<AppSettings> = {};
 
   if (typeof body?.oidcOnly === "boolean") {
     if (body.oidcOnly && getOIDCProviders().length === 0) {
@@ -39,6 +58,19 @@ export async function POST(req: Request) {
     updates.publicRegistration = body.publicRegistration;
   }
 
+  for (const key of NUMERIC_KEYS) {
+    if (body?.[key] === undefined) continue;
+
+    const value = clampNumericSetting(key, body[key]);
+    if (value === null) {
+      return NextResponse.json(
+        { error: `${key} must be a number` },
+        { status: 400 }
+      );
+    }
+    updates[key] = value;
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(
       { error: "No valid settings provided" },
@@ -49,8 +81,5 @@ export async function POST(req: Request) {
   await writeSettings(updates);
   const settings = await readSettings();
 
-  return NextResponse.json({
-    oidcOnly: !!settings.oidcOnly,
-    publicRegistration: !!settings.publicRegistration,
-  });
+  return NextResponse.json(serialize(settings));
 }

@@ -121,7 +121,7 @@ class FeedManager {
     this.notify();
   }
 
-  async initialize() {
+  async initialize(forceRefresh = false) {
     if (this.initialized) {
       return;
     }
@@ -157,7 +157,9 @@ class FeedManager {
               await new Promise((resolve) => setTimeout(resolve, delay));
             }
 
-            const response = await fetch(`/api/feed?refresh=false`);
+            const response = await fetch(
+              `/api/feed?refresh=${forceRefresh ? "true" : "false"}`
+            );
 
             if (!response.ok) {
               if (response.status === 401) {
@@ -262,7 +264,8 @@ class FeedManager {
     this.initialized = false;
     // Don't clear hasCachedData - keep showing cached videos while refreshing
     // This prevents flicker during manual refresh
-    return this.initialize();
+    // Manual refresh bypasses the server-side per-channel refresh interval.
+    return this.initialize(true);
   }
 
   getData(): FeedData {

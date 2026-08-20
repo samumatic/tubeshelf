@@ -1,0 +1,24 @@
+services:
+  tubeshelf:
+    # Image built by ./scripts/build-local.sh (or by `docker compose build`).
+    image: tubeshelf:local
+    build:
+      context: .
+    container_name: tubeshelf
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      BETTER_AUTH_SECRET: "replace-with-a-random-32+-char-secret"
+
+      # Feed fetching and video retention are configured in the app:
+      #   Admin > System Settings > Feed & Video Cache  (instance defaults)
+      #   Settings > Keep Videos For                    (per user)
+
+      # Set to debug for per-channel fetch logging.
+      # LOG_LEVEL: "debug"
+    volumes:
+      - ./data:/app/data

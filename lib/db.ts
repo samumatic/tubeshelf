@@ -138,6 +138,42 @@ function initializeSchema() {
     ON video_first_seen(first_seen_at);
   `);
 
+  // Persistent video cache. The feed is served from this table so videos stay
+  // available after they scroll out of the upstream fetch window (~15 entries
+  // for RSS, ~30 for the standard fetcher) and survive failed refreshes.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS videos (
+      video_id TEXT PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      channel_title TEXT,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      thumbnail TEXT,
+      duration TEXT,
+      view_count INTEGER,
+      is_member_only INTEGER,
+      published_at TEXT NOT NULL,
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_videos_channel_id ON videos(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_videos_published_at ON videos(published_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_videos_last_seen_at ON videos(last_seen_at);
+  `);
+
+  // Per-channel refresh bookkeeping, used to decide which channels are stale
+  // and to keep the last fetch error for diagnostics.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS channel_fetch_state (
+      channel_id TEXT PRIMARY KEY,
+      last_fetched_at TEXT,
+      last_success_at TEXT,
+      last_error TEXT,
+      video_count INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
   // Subscription lists
   db.exec(`
     CREATE TABLE IF NOT EXISTS subscription_lists (
