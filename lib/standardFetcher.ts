@@ -280,6 +280,165 @@ function parseVideoRenderer(
 }
 
 /**
+ * Parse a relative time string ("2 hours ago", "3 days ago") into an ISO
+ * timestamp. Shared between the legacy videoRenderer parser and the current
+ * lockupViewModel one, since YouTube expresses both the same way.
+ */
+function parseRelativeTime(text: string, referenceNowMs: number): string {
+  const now = new Date(referenceNowMs);
+  const timeMatch = text.match(
+    /(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i
+  );
+  if (!timeMatch) return now.toISOString();
+
+  const value = parseInt(timeMatch[1]);
+  const unit = timeMatch[2].toLowerCase();
+
+  switch (unit) {
+    case "second":
+      now.setSeconds(now.getSeconds() - value);
+      now.setMilliseconds(0);
+      break;
+    case "minute":
+      now.setMinutes(now.getMinutes() - value);
+      now.setSeconds(0, 0);
+      break;
+    case "hour":
+      now.setHours(now.getHours() - value);
+      // YouTube only exposes hour precision here; avoid fake minute/second order.
+      now.setMinutes(0, 0, 0);
+      break;
+    case "day":
+      now.setDate(now.getDate() - value);
+      now.setHours(0, 0, 0, 0);
+      break;
+    case "week":
+      now.setDate(now.getDate() - value * 7);
+      now.setHours(0, 0, 0, 0);
+      break;
+    case "month":
+      now.setMonth(now.getMonth() - value);
+      now.setHours(0, 0, 0, 0);
+      break;
+    case "year":
+      now.setFullYear(now.getFullYear() - value);
+      now.setHours(0, 0, 0, 0);
+      break;
+  }
+  return now.toISOString();
+}
+
+/**
+ * Parse a view-count string ("54K views") into a number. Shared between the
+ * legacy videoRenderer parser and the current lockupViewModel one.
+ */
+function parseViewCount(text: string): number | undefined {
+  const viewMatch = text.match(/([\d,\.]+)\s*[KMB]?\s*views?/i);
+  if (!viewMatch) return undefined;
+
+  let views = viewMatch[1].replace(/,/g, "");
+  const multiplierMatch = text.match(/([\d,\.]+)\s*([KMB])\s*views?/i);
+  if (multiplierMatch) {
+    const base = parseFloat(multiplierMatch[1]);
+    const multiplier = multiplierMatch[2];
+    if (multiplier === "K") views = String(base * 1000);
+    else if (multiplier === "M") views = String(base * 1000000);
+    else if (multiplier === "B") views = String(base * 1000000000);
+  }
+  return parseInt(views);
+}
+
+/**
+ * Parse a video entry in YouTube's current channel-page grid format.
+ *
+ * Replaced `videoRenderer`/`gridVideoRenderer` sometime in 2026: each grid
+ * item is now a `lockupViewModel` (YouTube's newer "view model" UI layer),
+ * which nests the same information under different, deeper paths. Channel
+ * id/title are not repeated per item here (they're implicit - this is
+ * already that channel's own page), so they're passed in from the caller.
+ */
+function parseLockupViewModel(
+  lockup: any,
+  channelId: string,
+  channelTitle: string,
+  referenceNowMs: number
+): StandardVideo | null {
+  try {
+    if (lockup.contentType && lockup.contentType !== "LOCKUP_CONTENT_TYPE_VIDEO") {
+      return null;
+    }
+
+    const videoId = lockup.contentId;
+    if (!videoId) return null;
+
+    const metadataViewModel = lockup.metadata?.lockupMetadataViewModel;
+    const title = metadataViewModel?.title?.content || "";
+
+    const metadataParts: Array<{ text?: { content?: string } }> =
+      metadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows?.[0]
+        ?.metadataParts || [];
+    let viewCount: number | undefined;
+    let publishedAt = new Date(referenceNowMs).toISOString();
+    for (const part of metadataParts) {
+      const text = part.text?.content || "";
+      if (/views?$/i.test(text) || /watching$/i.test(text)) {
+        viewCount = parseViewCount(text);
+      } else if (/ago$/i.test(text)) {
+        publishedAt = parseRelativeTime(text, referenceNowMs);
+      }
+    }
+
+    const thumbnails =
+      lockup.contentImage?.thumbnailViewModel?.image?.sources || [];
+    const thumbnail =
+      thumbnails.length > 0
+        ? thumbnails[thumbnails.length - 1]?.url
+        : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+    // Duration and membership badges both live in the thumbnail overlays;
+    // a duration reads "M:SS"/"H:MM:SS", anything else is a status badge.
+    let duration: string | undefined;
+    let isMemberOnly = false;
+    const overlays: any[] =
+      lockup.contentImage?.thumbnailViewModel?.overlays || [];
+    for (const overlay of overlays) {
+      const badges =
+        overlay.thumbnailBottomOverlayViewModel?.badges ||
+        overlay.thumbnailOverlayBadgeViewModel?.badges ||
+        [];
+      for (const badge of badges) {
+        const text: string =
+          badge.thumbnailBadgeViewModel?.text ||
+          badge.thumbnailOverlayBadgeViewModel?.text?.simpleText ||
+          "";
+        if (!text) continue;
+        if (/^\d{1,2}(:\d{2}){1,2}$/.test(text)) {
+          duration = text;
+        } else if (/members?[\s-]?only|^members$/i.test(text)) {
+          isMemberOnly = true;
+        }
+      }
+    }
+
+    return {
+      id: videoId,
+      title,
+      channelId,
+      channelTitle,
+      publishedAt,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      thumbnail: thumbnail?.startsWith("//") ? `https:${thumbnail}` : thumbnail,
+      duration,
+      viewCount,
+      isMemberOnly,
+    };
+  } catch (error) {
+    console.warn("[StandardFetcher] Failed to parse lockupViewModel:", error);
+    return null;
+  }
+}
+
+/**
  * Fetch channel videos using standard web scraping
  */
 export async function fetchChannelVideos(
@@ -350,10 +509,13 @@ export async function fetchChannelVideos(
         ?.image?.sources?.[0]?.url;
     const subscriberText = channelHeader?.subscriberCountText?.simpleText || "";
 
-    // Find the video list
+    // Find the video list. Each grid item is a `lockupViewModel` as of the
+    // current channel-page layout; `videoRenderer`/`gridVideoRenderer` are
+    // kept as a fallback in case a request lands on the older layout.
     const tabs =
       initialData.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
     let videoRenderers: any[] = [];
+    let lockupViewModels: any[] = [];
 
     for (const tab of tabs) {
       const tabRenderer = tab.tabRenderer;
@@ -365,12 +527,16 @@ export async function fetchChannelVideos(
 
       if (richGrid) {
         const contents = richGrid.contents || [];
-        videoRenderers = contents
-          .map((item: any) => {
-            const content = item.richItemRenderer?.content || {};
-            return content.videoRenderer || content.gridVideoRenderer || null;
-          })
-          .filter(Boolean);
+        for (const item of contents) {
+          const itemContent = item.richItemRenderer?.content || {};
+          if (itemContent.lockupViewModel) {
+            lockupViewModels.push(itemContent.lockupViewModel);
+          } else if (itemContent.videoRenderer || itemContent.gridVideoRenderer) {
+            videoRenderers.push(
+              itemContent.videoRenderer || itemContent.gridVideoRenderer
+            );
+          }
+        }
       } else if (sectionList) {
         const sections = sectionList.contents || [];
         for (const section of sections) {
@@ -392,8 +558,14 @@ export async function fetchChannelVideos(
 
     // Parse videos
     const referenceNowMs = Date.now();
-    const videos = videoRenderers
-      .map((renderer) => parseVideoRenderer(renderer, referenceNowMs))
+    const videos = [
+      ...lockupViewModels.map((lockup) =>
+        parseLockupViewModel(lockup, channelId, channelTitle, referenceNowMs)
+      ),
+      ...videoRenderers.map((renderer) =>
+        parseVideoRenderer(renderer, referenceNowMs)
+      ),
+    ]
       .filter((v): v is StandardVideo => v !== null)
       .slice(0, limit);
 
