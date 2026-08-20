@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -23,18 +23,56 @@ function applyTheme(theme: Theme) {
   }
 }
 
+// The stored theme is external state, so it is read through
+// useSyncExternalStore: the server renders "system" and the client swaps in
+// the stored value on hydration without a state update in an effect.
+const listeners = new Set<() => void>();
+
+function subscribe(onStoreChange: () => void) {
+  listeners.add(onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    listeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
+// Fallback when localStorage is unavailable, so the theme still switches for
+// the current session.
+let memoryTheme: Theme | null = null;
+
+function getStoredTheme(): Theme {
+  try {
+    const stored = localStorage.getItem("theme");
+    return stored === "light" || stored === "dark" || stored === "system"
+      ? stored
+      : memoryTheme ?? "system";
+  } catch {
+    // localStorage can throw when cookies/storage are blocked.
+    return memoryTheme ?? "system";
+  }
+}
+
+function getServerTheme(): Theme {
+  return "system";
+}
+
+function storeTheme(theme: Theme) {
+  memoryTheme = theme;
+  try {
+    localStorage.setItem("theme", theme);
+  } catch {
+    // Ignore write failures; memoryTheme keeps the choice for this session.
+  }
+  listeners.forEach((listener) => listener());
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [mounted, setMounted] = useState(false);
+  const theme = useSyncExternalStore(subscribe, getStoredTheme, getServerTheme);
 
   useEffect(() => {
-    setMounted(true);
-    // Get theme from localStorage or default to system
-    const stored = localStorage.getItem("theme") as Theme | null;
-    const themeToUse = stored || "system";
-    setThemeState(themeToUse);
-    applyTheme(themeToUse);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     // Listen for system theme changes when in system mode
@@ -46,16 +84,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("theme", newTheme);
-    applyTheme(newTheme);
-  };
-
-  if (!mounted) return <>{children}</>;
-
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme: storeTheme }}>
       {children}
     </ThemeContext.Provider>
   );

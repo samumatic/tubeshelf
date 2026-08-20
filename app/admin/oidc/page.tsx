@@ -507,7 +507,7 @@ export default function AdminOIDC({ onBack }: AdminOIDCProps = {}) {
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">
                   <strong className="text-foreground">Redirect URI:</strong>{" "}
-                  Configure this URL in your OIDC provider's settings:
+                  Configure this URL in your OIDC provider&apos;s settings:
                   <br />
                   <code className="font-mono text-xs bg-muted px-2 py-1 rounded mt-1 inline-block">
                     {typeof window !== "undefined"

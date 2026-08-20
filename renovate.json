@@ -14,6 +14,11 @@
       "description": "Keep majors in PRs (no automerge)",
       "matchUpdateTypes": ["major"],
       "automerge": false
+    },
+    {
+      "description": "eslint-config-next's plugins (eslint-plugin-react, typescript-eslint) do not support ESLint 10 yet - it crashes on any lint run. Unpin once they do.",
+      "matchPackageNames": ["eslint"],
+      "allowedVersions": "<10"
     }
   ],
   "major": {

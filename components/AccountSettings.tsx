@@ -157,7 +157,7 @@ export function AccountSettings({
             <strong>Note:</strong> Your account is connected to{" "}
             {user?.oidcProvider || "an OIDC provider"}. To change your profile
             information, email, or password, please update them through your
-            OIDC provider's account settings.
+            OIDC provider&apos;s account settings.
           </p>
         </div>
       </div>
