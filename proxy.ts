@@ -42,7 +42,9 @@ export function proxy(request: NextRequest) {
 
   // For authenticated routes, we'll check the session in the API route itself
   // The middleware just passes the session cookie through
-  const sessionId = request.cookies.get("session")?.value;
+  const sessionId =
+    request.cookies.get("__Secure-session")?.value ||
+    request.cookies.get("session")?.value;
 
   if (!sessionId && pathname.startsWith("/api/")) {
     return NextResponse.json(

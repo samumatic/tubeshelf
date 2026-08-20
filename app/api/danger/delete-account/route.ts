@@ -26,9 +26,10 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set("session", "", {
+  const secure = shouldUseSecureCookies(req);
+  cookieStore.set(secure ? "__Secure-session" : "session", "", {
     httpOnly: true,
-    secure: shouldUseSecureCookies(req),
+    secure,
     sameSite: "lax",
     maxAge: 0,
     path: "/",
