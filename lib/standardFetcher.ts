@@ -284,7 +284,7 @@ function parseVideoRenderer(
  * timestamp. Shared between the legacy videoRenderer parser and the current
  * lockupViewModel one, since YouTube expresses both the same way.
  */
-function parseRelativeTime(text: string, referenceNowMs: number): string {
+export function parseRelativeTime(text: string, referenceNowMs: number): string {
   const now = new Date(referenceNowMs);
   const timeMatch = text.match(
     /(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i
@@ -332,7 +332,7 @@ function parseRelativeTime(text: string, referenceNowMs: number): string {
  * Parse a view-count string ("54K views") into a number. Shared between the
  * legacy videoRenderer parser and the current lockupViewModel one.
  */
-function parseViewCount(text: string): number | undefined {
+export function parseViewCount(text: string): number | undefined {
   const viewMatch = text.match(/([\d,\.]+)\s*[KMB]?\s*views?/i);
   if (!viewMatch) return undefined;
 
@@ -357,7 +357,7 @@ function parseViewCount(text: string): number | undefined {
  * id/title are not repeated per item here (they're implicit - this is
  * already that channel's own page), so they're passed in from the caller.
  */
-function parseLockupViewModel(
+export function parseLockupViewModel(
   lockup: any,
   channelId: string,
   channelTitle: string,

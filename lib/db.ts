@@ -3,7 +3,12 @@ import path from "path";
 import { existsSync, mkdirSync } from "fs";
 import { parseDurationText } from "./duration";
 
-const dbPath = path.join(process.cwd(), "data", "tubeshelf.db");
+// Overridable for tests only, so they run against an isolated database
+// instead of a real instance's data/tubeshelf.db. Unset in every real
+// deployment, so production behavior is unchanged.
+const dbPath =
+  process.env.TUBESHELF_TEST_DB_PATH ||
+  path.join(process.cwd(), "data", "tubeshelf.db");
 let db: Database.Database | null = null;
 
 export function getDb(): Database.Database {

@@ -23,7 +23,7 @@ const BCRYPT_ROUNDS = 12;
 // computes this itself for local credential accounts as
 // `local:${encodeURIComponent(providerId)}`; mirrored here so backfilled rows
 // match exactly what better-auth writes for new ones.
-const LOCAL_CREDENTIAL_ISSUER = "local:credential";
+export const LOCAL_CREDENTIAL_ISSUER = "local:credential";
 // Sessions last 3 months and are refreshed on use (see SESSION_UPDATE_AGE_SECONDS),
 // so an account that is opened at least once a month effectively stays signed in.
 const SESSION_DURATION_SECONDS = 90 * 24 * 60 * 60;
@@ -568,7 +568,7 @@ function ensureLegacyAccountsBackfilled() {
  * value never matches and every existing local-password user is locked out
  * silently ("User not found") even though the row is otherwise intact.
  */
-function ensureAccountIssuerBackfilled() {
+export function ensureAccountIssuerBackfilled() {
   const db = getDb();
 
   const hasAuthAccounts = db
