@@ -265,6 +265,14 @@ export function VideoCard({
             aria-valuemax={100}
           />
         )}
+
+        {/* Duration badge - bottom right, matching YouTube's own placement.
+            Simply absent until the length is backfilled. */}
+        {durationLabel && (
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium pointer-events-none">
+            {durationLabel}
+          </div>
+        )}
       </a>
 
       {/* Content */}
@@ -351,11 +359,6 @@ export function VideoCard({
           )}
           {uploadedAt && (isMemberOnly || views) && <span>•</span>}
           {uploadedAt && <span>{formatTimeAgo(uploadedAt)}</span>}
-          {/* Length sits at the far right of this row. It is backfilled per
-              video, so it is simply absent until the lookup resolves. */}
-          {durationLabel && (
-            <span className="ml-auto pl-2 flex-shrink-0">{durationLabel}</span>
-          )}
         </div>
       </div>
     </div>
