@@ -19,6 +19,11 @@
       "description": "eslint-config-next's plugins (eslint-plugin-react, typescript-eslint) do not support ESLint 10 yet - it crashes on any lint run. Unpin once they do.",
       "matchPackageNames": ["eslint"],
       "allowedVersions": "<10"
+    },
+    {
+      "description": "better-auth 1.7.x renamed/removed generic-oauth plugin API (signInWithOAuth2, oAuth2Callback, the issuer config field) that lib/betterAuth.ts and the OIDC routes depend on - it breaks the type check and the OIDC login flow. Unpin once that integration is updated to match the new API.",
+      "matchPackageNames": ["better-auth", "@better-auth/core"],
+      "allowedVersions": "<1.7.0"
     }
   ],
   "major": {
