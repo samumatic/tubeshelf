@@ -32,9 +32,9 @@ export async function GET(req: Request) {
 
     const baseUrl = getBaseUrl(req);
     const auth = await getAuth(req);
-    const result = await auth.api.signInWithOAuth2({
+    const result = await auth.api.signInSocial({
       body: {
-        providerId,
+        provider: providerId,
         callbackURL: `${baseUrl}/`,
         newUserCallbackURL: `${baseUrl}/`,
         errorCallbackURL: `${baseUrl}/`,

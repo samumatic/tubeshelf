@@ -17,6 +17,13 @@ import {
 } from "@/lib/oidc";
 
 const BCRYPT_ROUNDS = 12;
+// better-auth 1.7+ requires every account row to carry an `issuer` - a stable
+// namespace it uses to tell apart accounts from different providers that
+// might otherwise collide (e.g. two providers both using numeric IDs). It
+// computes this itself for local credential accounts as
+// `local:${encodeURIComponent(providerId)}`; mirrored here so backfilled rows
+// match exactly what better-auth writes for new ones.
+const LOCAL_CREDENTIAL_ISSUER = "local:credential";
 // Sessions last 3 months and are refreshed on use (see SESSION_UPDATE_AGE_SECONDS),
 // so an account that is opened at least once a month effectively stays signed in.
 const SESSION_DURATION_SECONDS = 90 * 24 * 60 * 60;
@@ -239,7 +246,6 @@ function toGenericOAuthConfig(
     discoveryUrl:
       provider.discoveryUrl ||
       `${provider.issuer}/.well-known/openid-configuration`,
-    issuer: provider.issuer,
     clientId: provider.clientId,
     clientSecret: provider.clientSecret,
     scopes: parseScopes(provider.scopes) || [
@@ -503,13 +509,13 @@ function ensureLegacyAccountsBackfilled() {
 
   const insertCredential = db.prepare(
     `INSERT INTO auth_accounts (
-      id, created_at, updated_at, provider_id, account_id, user_id, password
-    ) VALUES (?, ?, ?, 'credential', ?, ?, ?)`,
+      id, created_at, updated_at, provider_id, account_id, user_id, password, issuer
+    ) VALUES (?, ?, ?, 'credential', ?, ?, ?, '${LOCAL_CREDENTIAL_ISSUER}')`,
   );
   const insertOidc = db.prepare(
     `INSERT INTO auth_accounts (
-      id, created_at, updated_at, provider_id, account_id, user_id
-    ) VALUES (?, ?, ?, ?, ?, ?)`,
+      id, created_at, updated_at, provider_id, account_id, user_id, issuer
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   const hasCredential = db.prepare(
     `SELECT 1 FROM auth_accounts WHERE user_id = ? AND provider_id = 'credential' LIMIT 1`,
@@ -545,6 +551,7 @@ function ensureLegacyAccountsBackfilled() {
             user.oidcProvider,
             user.oidcSubject,
             user.id,
+            getOIDCProvider(user.oidcProvider)?.issuer ?? null,
           );
         }
       }
@@ -552,6 +559,56 @@ function ensureLegacyAccountsBackfilled() {
   });
 
   tx();
+}
+
+/**
+ * Backfill `issuer` on account rows written before better-auth 1.7 added it.
+ * better-auth matches a sign-in attempt's credential account by
+ * `issuer === createLocalAccountIssuer(providerId)`, so a row missing this
+ * value never matches and every existing local-password user is locked out
+ * silently ("User not found") even though the row is otherwise intact.
+ */
+function ensureAccountIssuerBackfilled() {
+  const db = getDb();
+
+  const hasAuthAccounts = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='auth_accounts'",
+    )
+    .get() as { name: string } | undefined;
+
+  if (!hasAuthAccounts) return;
+
+  const columns = db.pragma("table_info(auth_accounts)") as Array<{
+    name: string;
+  }>;
+  if (!columns.some((c) => c.name === "issuer")) {
+    db.exec("ALTER TABLE auth_accounts ADD COLUMN issuer TEXT");
+  }
+
+  const missing = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM auth_accounts WHERE issuer IS NULL",
+    )
+    .get() as { count: number };
+  if (missing.count === 0) return;
+
+  console.log(
+    `[Migration] Backfilling issuer for ${missing.count} account(s)`,
+  );
+
+  db.prepare(
+    "UPDATE auth_accounts SET issuer = ? WHERE provider_id = 'credential' AND issuer IS NULL",
+  ).run(LOCAL_CREDENTIAL_ISSUER);
+
+  const updateProviderIssuer = db.prepare(
+    "UPDATE auth_accounts SET issuer = ? WHERE provider_id = ? AND issuer IS NULL",
+  );
+  for (const provider of getOIDCProviders()) {
+    if (provider.issuer) {
+      updateProviderIssuer.run(provider.issuer, provider.id);
+    }
+  }
 }
 
 function ensureBetterAuthTables() {
@@ -570,6 +627,7 @@ function ensureBetterAuthTables() {
       refresh_token_expires_at DATE,
       scope TEXT,
       password TEXT,
+      issuer TEXT,
       created_at DATE NOT NULL,
       updated_at DATE NOT NULL
     );
@@ -615,6 +673,7 @@ async function initBetterAuthSchema() {
   // Skip better-auth built-in migrations since we handle schema manually
   // to avoid conflicts with SQLite foreign key constraints during table renames
 
+  ensureAccountIssuerBackfilled();
   ensureLegacyAccountsBackfilled();
 }
 
@@ -729,6 +788,7 @@ function createAuth(request?: Request) {
         idToken: "id_token",
         accessTokenExpiresAt: "access_token_expires_at",
         refreshTokenExpiresAt: "refresh_token_expires_at",
+        issuer: "issuer",
       },
     },
     verification: {
