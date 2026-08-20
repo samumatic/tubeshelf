@@ -6,6 +6,9 @@ import { Button } from "./ui/button";
 import { ThemeContext } from "./ThemeProvider";
 import {
   RETENTION_OPTIONS,
+  WATCHED_THRESHOLD_DEFAULT,
+  WATCHED_THRESHOLD_MAX,
+  WATCHED_THRESHOLD_MIN,
   formatRetention,
   type AppSettings,
 } from "@/lib/settingsSchema";
@@ -15,6 +18,9 @@ interface SettingsPanelProps {
   /** Per-user retention override; null means "follow the instance default". */
   videoRetentionDays?: number | null;
   onRetentionChange?: (days: number | null) => void;
+  /** How far a video must play before it counts as watched. */
+  watchedThresholdPercent?: number;
+  onWatchedThresholdChange?: (percent: number) => void;
   onSave?: (settings: Partial<AppSettings>) => void;
   onDeleteSubscriptions?: (listId?: string) => Promise<void>;
   onClearWatchHistory?: () => Promise<void>;
@@ -29,6 +35,8 @@ export function SettingsPanel({
   settings,
   videoRetentionDays = null,
   onRetentionChange,
+  watchedThresholdPercent = WATCHED_THRESHOLD_DEFAULT,
+  onWatchedThresholdChange,
   onSave,
   onDeleteSubscriptions,
   onClearWatchHistory,
@@ -428,6 +436,48 @@ export function SettingsPanel({
               </div>
             </div>
 
+            {/* Watched threshold */}
+            <div className="bg-card/50 border border-border/30 rounded-xl p-5 space-y-4 backdrop-blur-sm">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Mark as Watched
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  How far a video must play in the built-in player before it
+                  counts as watched. Opening a video on YouTube marks it watched
+                  right away.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="watched-threshold"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Watched after
+                  </label>
+                  <span className="text-sm font-medium tabular-nums">
+                    {watchedThresholdPercent}%
+                  </span>
+                </div>
+                <input
+                  id="watched-threshold"
+                  type="range"
+                  min={WATCHED_THRESHOLD_MIN}
+                  max={WATCHED_THRESHOLD_MAX}
+                  step={5}
+                  value={watchedThresholdPercent}
+                  onChange={(e) =>
+                    onWatchedThresholdChange?.(Number(e.target.value))
+                  }
+                  className="w-full accent-primary cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Measured by position in the video, so seeking past the mark
+                  counts. Until then the thumbnail shows how far you got.
+                </p>
+              </div>
+            </div>
           </div>
         </>
       )}

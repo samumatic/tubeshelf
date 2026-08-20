@@ -40,6 +40,41 @@ export async function readPlaybackHistory(
     }));
 }
 
+export interface VideoProgress {
+  videoId: string;
+  progress: number;
+  duration: number;
+}
+
+/**
+ * Just the numbers the feed needs to draw a progress bar.
+ *
+ * Watched videos are excluded because their cards render the watched overlay
+ * instead of a bar, so shipping them would grow the response for nothing.
+ */
+export async function readVideoProgress(
+  userId: string
+): Promise<VideoProgress[]> {
+  const db = getDb();
+
+  return db
+    .prepare(
+      `SELECT
+        video_id as videoId,
+        progress,
+        duration
+      FROM playback_history p
+      WHERE p.user_id = ?
+        AND p.progress > 0
+        AND p.duration > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM watched_videos w
+          WHERE w.user_id = p.user_id AND w.video_id = p.video_id
+        )`
+    )
+    .all(userId) as VideoProgress[];
+}
+
 export async function getPlaybackSession(
   videoId: string,
   userId: string
@@ -104,6 +139,25 @@ export async function savePlaybackSession(
     session.progress,
     session.completed ? 1 : 0
   );
+}
+
+/**
+ * Send a video back to the start without losing its history entry.
+ *
+ * Used when a video is marked unwatched by hand: the bar disappears and the
+ * next open plays from the beginning, but the row stays so the watch history
+ * list keeps the entry until it is removed there explicitly.
+ */
+export async function resetPlaybackProgress(
+  videoId: string,
+  userId: string
+): Promise<void> {
+  const db = getDb();
+  db.prepare(
+    `UPDATE playback_history
+     SET progress = 0, completed = 0
+     WHERE video_id = ? AND user_id = ?`
+  ).run(videoId, userId);
 }
 
 export async function deletePlaybackSession(

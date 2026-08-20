@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readUserState, writeUserState, UserState } from "@/lib/userStateStore";
 import { getCurrentUser } from "@/lib/currentUser";
 import { clampNumericSetting } from "@/lib/settingsStore";
+import { clampWatchedThreshold } from "@/lib/settingsSchema";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -68,6 +69,9 @@ export async function POST(req: Request) {
         ? body.filterListId
         : current.filterListId ?? "all",
     hasCompletedWelcome: nextHasCompletedWelcome,
+    watchedThresholdPercent: clampWatchedThreshold(
+      body.watchedThresholdPercent ?? current.watchedThresholdPercent
+    ),
     videoRetentionDays: nextVideoRetentionDays,
     watchLater: Array.isArray(body.watchLater)
       ? body.watchLater

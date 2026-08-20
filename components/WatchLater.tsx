@@ -14,6 +14,8 @@ interface WatchLaterItem {
 interface WatchLaterProps {
   items: WatchLaterItem[];
   watchedVideos?: Set<string>;
+  /** Watch progress per video id, 0-100. Drawn under unwatched thumbnails. */
+  progressPercents?: Map<string, number>;
   onRemove?: (id: string) => void;
   onPlay?: (item: WatchLaterItem) => void;
   onToggleWatched?: (videoId: string) => void;
@@ -24,6 +26,7 @@ interface WatchLaterProps {
 export function WatchLater({
   items,
   watchedVideos,
+  progressPercents,
   onRemove,
   onPlay,
   onToggleWatched,
@@ -56,6 +59,11 @@ export function WatchLater({
         const addedDate = new Date(item.addedAt);
         const timeAgo = getTimeAgo(addedDate);
         const proxiedThumbnail = getProxiedImageUrl(item.thumbnail);
+        const rawPercent = progressPercents?.get(item.videoId);
+        const barPercent =
+          !isWatched && typeof rawPercent === "number" && rawPercent >= 1
+            ? Math.min(100, rawPercent)
+            : null;
 
         return (
           <div
@@ -87,6 +95,18 @@ export function WatchLater({
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
                     <Eye className="w-5 h-5 text-white" />
                   </div>
+                )}
+
+                {barPercent !== null && (
+                  <div
+                    className="absolute bottom-0 left-0 h-0.5 bg-[#FF0000] pointer-events-none"
+                    style={{ width: `${barPercent}%` }}
+                    role="progressbar"
+                    aria-label="Watch progress"
+                    aria-valuenow={Math.round(barPercent)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  />
                 )}
               </div>
 

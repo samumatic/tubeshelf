@@ -16,6 +16,8 @@ import {
   Gauge,
   Volume2,
   VolumeX,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { getProxiedImageUrl } from "@/lib/videoUtils";
 
@@ -69,6 +71,10 @@ type PlayerActionHud =
   | {
       kind: "speed";
       rate: number;
+    }
+  | {
+      kind: "watched";
+      watched: boolean;
     };
 
 type PlayerDebugSnapshot = {
@@ -218,6 +224,12 @@ interface VideoPlayerProps {
   onQualityChange?: (quality: string) => void;
   sponsorBlockEnabled?: boolean;
   onSponsorBlockEnabledChange?: (enabled: boolean) => void | Promise<void>;
+  /** Share of the video that must be reached before it counts as watched. */
+  watchedThresholdPercent?: number;
+  /** Whether this video is currently marked watched, for the header toggle. */
+  watched?: boolean;
+  /** Flip the watched flag from the header button or the `W` shortcut. */
+  onToggleWatched?: () => void;
   debugOverlayEnabled?: boolean;
   onDebugOverlayEnabledChange?: (enabled: boolean) => void | Promise<void>;
   onDefaultResolutionChange?: (
@@ -266,6 +278,9 @@ const VideoPlayerComponent = ({
   onQualityChange,
   sponsorBlockEnabled = true,
   onSponsorBlockEnabledChange,
+  watchedThresholdPercent = 90,
+  watched = false,
+  onToggleWatched,
   debugOverlayEnabled = false,
   onDebugOverlayEnabledChange,
   onDefaultResolutionChange,
@@ -342,6 +357,10 @@ const VideoPlayerComponent = ({
   } | null>(null);
   const [playerDebugSnapshot, setPlayerDebugSnapshot] =
     useState<PlayerDebugSnapshot | null>(null);
+  const watchedThresholdRef = useRef(watchedThresholdPercent);
+  const watchedRef = useRef(watched);
+  const autoWatchedFiredRef = useRef(false);
+  const onToggleWatchedRef = useRef(onToggleWatched);
 
   // Extract video ID from YouTube URL
   const getYouTubeVideoId = (url: string) => {
@@ -395,6 +414,18 @@ const VideoPlayerComponent = ({
     if (!playerReadyRef.current) return false;
     return hasAttachedPlayerIframe();
   };
+
+  useEffect(() => {
+    watchedThresholdRef.current = watchedThresholdPercent;
+  }, [watchedThresholdPercent]);
+
+  useEffect(() => {
+    watchedRef.current = watched;
+  }, [watched]);
+
+  useEffect(() => {
+    onToggleWatchedRef.current = onToggleWatched;
+  }, [onToggleWatched]);
 
   useEffect(() => {
     sponsorSkipNoticeRef.current = sponsorSkipNotice;
@@ -1259,7 +1290,50 @@ const VideoPlayerComponent = ({
     setReplyThreads({});
     commentsRequestIdRef.current += 1;
     replyRequestIdRef.current = {};
+    autoWatchedFiredRef.current = false;
   }, [ytVideoId]);
+
+  /**
+   * Mark watched once playback passes the threshold.
+   *
+   * Same position test as auto-like: seeking past the mark counts, and a live
+   * stream (duration 0 or unknown) never qualifies.
+   */
+  const maybeMarkWatched = (time: number, duration: number) => {
+    if (autoWatchedFiredRef.current) return;
+    if (watchedRef.current) return;
+    if (!Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) {
+      return;
+    }
+
+    const percent = (time / duration) * 100;
+    if (percent < watchedThresholdRef.current) return;
+
+    autoWatchedFiredRef.current = true;
+    onMarkWatchedRef.current?.();
+    showPlayerActionHud({ kind: "watched", watched: true }, 2600);
+  };
+
+  const handleToggleWatched = () => {
+    const next = !watchedRef.current;
+    // A hand toggle settles it; the threshold must not undo the user's choice.
+    autoWatchedFiredRef.current = true;
+    watchedRef.current = next;
+    onToggleWatchedRef.current?.();
+    showPlayerActionHud({ kind: "watched", watched: next }, 1200);
+  };
+
+  /**
+   * Handing off to youtube.com ends our ability to follow the position, so the
+   * video counts as watched right away.
+   */
+  const handleOpenOnYouTube = () => {
+    if (!watchedRef.current) {
+      autoWatchedFiredRef.current = true;
+      watchedRef.current = true;
+      onMarkWatchedRef.current?.();
+    }
+  };
 
   const loadCommentsPage = async (options?: {
     append?: boolean;
@@ -1591,7 +1665,6 @@ const VideoPlayerComponent = ({
             // Ignore seek failures during early provider init.
           }
         }
-        onMarkWatchedRef.current?.();
         containerRef.current?.focus();
         updatePlayerDebugSnapshot(localPlayer);
       });
@@ -1622,7 +1695,16 @@ const VideoPlayerComponent = ({
         if (Number.isFinite(duration) && duration > 0) {
           setPlayerDuration(Math.floor(duration));
         }
+        maybeMarkWatched(time, duration);
         updatePlayerDebugSnapshot(localPlayer, { currentTime: time, duration });
+      });
+
+      // Closing the tab right at the end can beat the last timeupdate, and a
+      // video shorter than the threshold gap never reports a position past it.
+      localPlayer.on("ended", () => {
+        if (!isLocalPlayerLive()) return;
+        const duration = Number(localPlayer?.duration || 0);
+        maybeMarkWatched(duration, duration);
       });
 
       localPlayer.on("seeking", () => {
@@ -2128,6 +2210,12 @@ const VideoPlayerComponent = ({
             e.preventDefault();
             player.toggleCaptions();
             break;
+
+          case "w":
+            // Same shortcut the feed grid uses for the highlighted card.
+            e.preventDefault();
+            handleToggleWatched();
+            break;
         }
       } catch (err) {
         console.error("Error handling keyboard shortcut:", err);
@@ -2588,6 +2676,14 @@ const VideoPlayerComponent = ({
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-300">
+                                Toggle watched
+                              </span>
+                              <kbd className="px-2 py-1 bg-white/10 rounded text-white font-mono text-xs">
+                                W
+                              </kbd>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-300">
                                 Close player
                               </span>
                               <kbd className="px-2 py-1 bg-white/10 rounded text-white font-mono text-xs">
@@ -2602,10 +2698,31 @@ const VideoPlayerComponent = ({
                 )}
               </div>
 
+              <button
+                onClick={handleToggleWatched}
+                aria-pressed={watched}
+                className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+                  watched
+                    ? "bg-white/25 hover:bg-white/35 text-white"
+                    : "bg-white/10 hover:bg-white/20 text-white"
+                }`}
+                title={
+                  watched ? "Mark as unwatched (W)" : "Mark as watched (W)"
+                }
+                aria-label={watched ? "Mark as unwatched" : "Mark as watched"}
+              >
+                {watched ? (
+                  <Eye className="w-5 h-5" />
+                ) : (
+                  <EyeOff className="w-5 h-5" />
+                )}
+              </button>
+
               <a
                 href={youtubeUrlWithTimestamp}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleOpenOnYouTube}
                 className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                 title="Open on YouTube"
               >
@@ -2674,6 +2791,23 @@ const VideoPlayerComponent = ({
                           {playerActionHud.direction === "forward"
                             ? "Forward"
                             : "Back"}
+                        </div>
+                      </div>
+                    </div>
+                  ) : playerActionHud.kind === "watched" ? (
+                    <div className="absolute left-1/2 bottom-20 -translate-x-1/2">
+                      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-white shadow-xl backdrop-blur-sm">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/5">
+                          {playerActionHud.watched ? (
+                            <Eye className="w-4 h-4" />
+                          ) : (
+                            <EyeOff className="w-4 h-4" />
+                          )}
+                        </span>
+                        <div className="text-sm font-medium">
+                          {playerActionHud.watched
+                            ? "Marked as watched"
+                            : "Marked as unwatched"}
                         </div>
                       </div>
                     </div>
@@ -2912,9 +3046,6 @@ const VideoPlayerComponent = ({
                     {showComments ? "Hide comments" : "View comments"}
                   </button>
 
-                  <span className="text-xs text-gray-500">
-                    Auto-marked as watched
-                  </span>
                 </div>
               </div>
             </div>
@@ -3211,7 +3342,9 @@ export const VideoPlayer = memo(
       prevProps.defaultResolution === nextProps.defaultResolution &&
       prevProps.sponsorBlockEnabled === nextProps.sponsorBlockEnabled &&
       prevProps.debugOverlayEnabled === nextProps.debugOverlayEnabled &&
-      prevProps.initialProgress === nextProps.initialProgress
+      prevProps.initialProgress === nextProps.initialProgress &&
+      prevProps.watched === nextProps.watched &&
+      prevProps.watchedThresholdPercent === nextProps.watchedThresholdPercent
     );
   }
 );
