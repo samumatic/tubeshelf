@@ -85,6 +85,7 @@ export function VideoCard({
   const [copied, setCopied] = useState(false);
   // Only show skeleton if image takes longer than 50ms to load
   const [showSkeleton, setShowSkeleton] = useState(false);
+  const [skeletonThumbnail, setSkeletonThumbnail] = useState(thumbnail);
   const menuRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const thumbnailSrc = getProxiedImageUrl(thumbnail);
@@ -177,9 +178,15 @@ export function VideoCard({
       </div>
     );
   }
+  // Reset the skeleton while rendering the new thumbnail instead of in an
+  // effect, so it never flashes for an image that is already cached.
+  if (thumbnail !== skeletonThumbnail) {
+    setSkeletonThumbnail(thumbnail);
+    setShowSkeleton(false);
+  }
+
   // Only show skeleton if image hasn't loaded after 50ms
   useEffect(() => {
-    setShowSkeleton(false);
     const timer = setTimeout(() => {
       if (imgRef.current && !imgRef.current.complete) {
         setShowSkeleton(true);

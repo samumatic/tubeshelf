@@ -73,7 +73,7 @@ export default function Setup() {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">Welcome to TubeShelf</h1>
             <p className="text-muted-foreground">
-              Let's set up your administrator account to get started
+              Let&apos;s set up your administrator account to get started
             </p>
           </div>
 
@@ -114,7 +114,7 @@ export default function Setup() {
                 autoComplete="email"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                You'll use this email to sign in
+                You&apos;ll use this email to sign in
               </p>
             </div>
 

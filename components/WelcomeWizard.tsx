@@ -105,10 +105,10 @@ export function WelcomeWizard({
           </div>
           <div className="space-y-3">
             <p className="text-lg font-medium text-foreground">
-              Let's get your feed set up
+              Let&apos;s get your feed set up
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              We'll ask you a few quick questions to customize your experience.
+              We&apos;ll ask you a few quick questions to customize your experience.
             </p>
             <p className="text-xs text-muted-foreground">
               You can change these settings anytime in Settings.
@@ -158,7 +158,7 @@ export function WelcomeWizard({
                   No, skip for now
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  I'll add subscriptions later
+                  I&apos;ll add subscriptions later
                 </p>
               </div>
               <span className="text-xl">➕</span>
@@ -273,7 +273,7 @@ export function WelcomeWizard({
                   Fast Mode
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Using YouTube's RSS feed. Much faster but lacks duration/view
+                  Using YouTube&apos;s RSS feed. Much faster but lacks duration/view
                   count and may return fewer items (~15 recent videos).
                 </p>
               </div>
@@ -301,7 +301,7 @@ export function WelcomeWizard({
               Your feed is configured!
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              All settings have been saved. You're ready to start exploring your
+              All settings have been saved. You&apos;re ready to start exploring your
               chronological YouTube feed.
             </p>
           </div>
