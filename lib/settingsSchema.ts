@@ -80,6 +80,31 @@ export function clampNumericSetting(
   return Math.min(max, Math.max(min, Math.round(parsed)));
 }
 
+/**
+ * Watched threshold bounds, as a share of the video played. Videos are no
+ * longer marked watched when the player opens — they cross into "watched" once
+ * playback reaches this share (or the video ends).
+ */
+export const WATCHED_THRESHOLD_DEFAULT = 90;
+export const WATCHED_THRESHOLD_MIN = 25;
+export const WATCHED_THRESHOLD_MAX = 100;
+
+export function clampWatchedThreshold(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number.parseInt(value, 10)
+      : NaN;
+
+  if (!Number.isFinite(parsed)) return WATCHED_THRESHOLD_DEFAULT;
+
+  return Math.min(
+    WATCHED_THRESHOLD_MAX,
+    Math.max(WATCHED_THRESHOLD_MIN, Math.round(parsed))
+  );
+}
+
 /** Retention windows offered in the UI. 0 = forever. */
 export const RETENTION_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 30, label: "1 month" },

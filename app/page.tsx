@@ -80,6 +80,7 @@ import {
   Subscription,
 } from "@/lib/mockData";
 import type { AppSettings } from "@/lib/settingsStore";
+import { WATCHED_THRESHOLD_DEFAULT } from "@/lib/settingsSchema";
 import type {
   SubscriptionList,
   SubscriptionListsData,
@@ -127,6 +128,17 @@ export default function Home() {
   const [videoRetentionDays, setVideoRetentionDays] = useState<number | null>(
     null
   );
+  const [watchedThresholdPercent, setWatchedThresholdPercent] = useState(
+    WATCHED_THRESHOLD_DEFAULT
+  );
+  // videoId -> where playback stopped. Feeds both the thumbnail progress bars
+  // and the resume position, so no per-video request is needed to open a video.
+  const [videoProgress, setVideoProgress] = useState<
+    Map<string, { progress: number; duration: number }>
+  >(new Map());
+  const videoProgressRef = useRef<
+    Map<string, { progress: number; duration: number }>
+  >(new Map());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [subscriptionLists, setSubscriptionLists] = useState<
@@ -178,6 +190,24 @@ export default function Home() {
   const closingPlayerRef = useRef(false);
   const settingsPreloadRef = useRef(false);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  /**
+   * Where a video should start when it opens. A position in the first seconds
+   * is treated as an accidental open, and one within seconds of the end would
+   * drop the viewer straight into the end screen.
+   */
+  const resolveResumeSeconds = useCallback((videoId: string): number => {
+    const entry = videoProgressRef.current.get(videoId);
+    if (!entry) return 0;
+
+    const { progress, duration } = entry;
+    if (!Number.isFinite(progress) || !Number.isFinite(duration)) return 0;
+    if (duration <= 0) return 0;
+    if (progress < 10) return 0;
+    if (duration - progress < 15) return 0;
+
+    return progress;
+  }, []);
 
   // Preload settings eagerly
   const preloadSettings = useCallback(async () => {
@@ -260,6 +290,8 @@ export default function Home() {
             channelId: video.channelId,
             thumbnail: video.thumbnail,
           });
+          // Deep links skip handlePlayInPlayer, so resume is resolved here too.
+          setInitialProgress(resolveResumeSeconds(video.id));
           setShowPlayer(true);
         }
       } else if (!match && showPlayer) {
@@ -275,14 +307,7 @@ export default function Home() {
     // Listen for hash changes (browser back/forward)
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [mounted, videos.length]);
-
-  // Mark as watched when player opens
-  useEffect(() => {
-    if (showPlayer && playerVideo) {
-      handleWatchVideo(playerVideo.videoId);
-    }
-  }, [showPlayer, playerVideo?.videoId]);
+  }, [mounted, videos.length, resolveResumeSeconds]);
 
   // Close the ad-hoc "more" menu when clicking outside
   useEffect(() => {
@@ -576,6 +601,11 @@ export default function Home() {
             ? data.videoRetentionDays
             : null
         );
+        setWatchedThresholdPercent(
+          typeof data.watchedThresholdPercent === "number"
+            ? data.watchedThresholdPercent
+            : WATCHED_THRESHOLD_DEFAULT
+        );
         if (typeof data.filterListId === "string") {
           setFilterListId(data.filterListId);
         }
@@ -614,6 +644,67 @@ export default function Home() {
       // Revert on error
       setHideMemberOnly(previousValue);
       showToast("Failed to save setting", "error");
+    }
+  };
+
+  /**
+   * Watch positions for videos that are not marked watched yet. The endpoint
+   * already filters those out, so this stays small however long the watch
+   * history grows.
+   */
+  const loadVideoProgress = async () => {
+    try {
+      const res = await fetch("/api/playback-history?compact=1", {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return;
+
+      const next = new Map<string, { progress: number; duration: number }>();
+      for (const row of rows) {
+        if (
+          row &&
+          typeof row.videoId === "string" &&
+          typeof row.progress === "number" &&
+          typeof row.duration === "number" &&
+          row.duration > 0
+        ) {
+          next.set(row.videoId, {
+            progress: row.progress,
+            duration: row.duration,
+          });
+        }
+      }
+      videoProgressRef.current = next;
+      setVideoProgress(next);
+    } catch (e) {
+      console.error("Failed to load video progress:", e);
+    }
+  };
+
+  /** Watch progress as a percentage per video id, for the thumbnail bars. */
+  const videoProgressPercents = useMemo(() => {
+    const percents = new Map<string, number>();
+    videoProgress.forEach((entry, videoId) => {
+      if (entry.duration > 0) {
+        percents.set(videoId, (entry.progress / entry.duration) * 100);
+      }
+    });
+    return percents;
+  }, [videoProgress]);
+
+  // How far a video must play before it counts as watched, per user.
+  const handleWatchedThresholdChange = async (percent: number) => {
+    const previousValue = watchedThresholdPercent;
+
+    setWatchedThresholdPercent(percent);
+
+    try {
+      await persistUserState({ watchedThresholdPercent: percent });
+    } catch (e) {
+      setWatchedThresholdPercent(previousValue);
+      showToast("Failed to save watched threshold", "error");
     }
   };
 
@@ -811,6 +902,9 @@ export default function Home() {
         // Load full user state for other settings
         await loadUserState();
 
+        // Watch positions for the thumbnail progress bars and resume.
+        await loadVideoProgress();
+
         // Load subscription lists
         try {
           const listsRes = await fetch("/api/subscription-lists", {
@@ -926,6 +1020,7 @@ export default function Home() {
       watchLater: WatchLaterItem[];
       hasCompletedWelcome: boolean;
       videoRetentionDays: number | null;
+      watchedThresholdPercent: number;
     }>
   ) => {
     const runPersist = async () => {
@@ -1103,22 +1198,9 @@ export default function Home() {
     });
   };
 
-  const handlePlayWatchLater = async (item: WatchLaterItem) => {
+  const handlePlayWatchLater = (item: WatchLaterItem) => {
     const videoUrl = `https://www.youtube.com/watch?v=${item.videoId}`;
     if (settings?.videoPlayerMode !== "new-tab") {
-      try {
-        const res = await fetch(
-          `/api/playback-history?videoId=${encodeURIComponent(item.videoId)}`
-        );
-        const session = res.ok ? await res.json() : null;
-        const progress =
-          session && typeof session.progress === "number"
-            ? session.progress
-            : 0;
-        setInitialProgress(progress);
-      } catch {
-        setInitialProgress(0);
-      }
       handlePlayInPlayer(
         videoUrl,
         item.videoId,
@@ -1129,6 +1211,8 @@ export default function Home() {
       );
     } else {
       window.open(videoUrl, "_blank", "noopener,noreferrer");
+      // Leaving for youtube.com ends any chance of following the position.
+      handleWatchVideo(item.videoId);
     }
   };
 
@@ -1139,7 +1223,10 @@ export default function Home() {
       title: string,
       channel: string,
       channelId?: string,
-      thumbnail?: string
+      thumbnail?: string,
+      // Watch history knows positions for videos already marked watched, which
+      // the progress map deliberately leaves out.
+      fallbackResumeSeconds?: number
     ) => {
       // Prevent hash change event from re-triggering
       closingPlayerRef.current = true;
@@ -1161,15 +1248,23 @@ export default function Home() {
       // Update URL hash with video ID for shareable links
       window.location.hash = `player=${videoId}`;
 
-      // Mark as watched when player is opened
-      handleWatchVideo(videoId);
+      // Opening no longer counts as watching; the player marks it watched once
+      // playback passes the threshold. Pick up where this video was left off.
+      const knownResume = resolveResumeSeconds(videoId);
+      setInitialProgress(
+        knownResume ||
+          (typeof fallbackResumeSeconds === "number" &&
+          fallbackResumeSeconds >= 10
+            ? fallbackResumeSeconds
+            : 0)
+      );
 
       // Allow hash changes again after a brief moment
       setTimeout(() => {
         closingPlayerRef.current = false;
       }, 50);
     },
-    [settings?.defaultPlayerResolution]
+    [settings?.defaultPlayerResolution, resolveResumeSeconds]
   );
 
   const handleClosePlayer = useCallback(() => {
@@ -1191,6 +1286,15 @@ export default function Home() {
   const handlePlayerProgress = (progress: number, duration: number) => {
     if (!playerVideo) return;
 
+    // Keep the local map in step so the thumbnail bar is already right when the
+    // player closes, without refetching the positions.
+    if (Number.isFinite(progress) && Number.isFinite(duration) && duration > 0) {
+      const next = new Map(videoProgressRef.current);
+      next.set(playerVideo.videoId, { progress, duration });
+      videoProgressRef.current = next;
+      setVideoProgress(next);
+    }
+
     // Always save playback progress (no minimum threshold)
     // This will be reported every 5 seconds by the player
     fetch("/api/playback-history", {
@@ -1207,12 +1311,19 @@ export default function Home() {
         timestamp: new Date().toISOString(),
         duration,
         progress,
-        completed: progress / duration >= 0.9,
+        completed: (progress / duration) * 100 >= watchedThresholdPercent,
       }),
     }).catch((err) => console.error("Failed to save playback progress:", err));
   };
 
-  const handleToggleWatched = (videoId: string) => {
+  /**
+   * `silent` suppresses the toast for callers that announce the change
+   * themselves, such as the player's own heads-up display.
+   */
+  const handleToggleWatched = (
+    videoId: string,
+    options?: { silent?: boolean }
+  ) => {
     const wasWatched = watchedVideosRef.current.has(videoId);
     const previousWatched = new Set(watchedVideosRef.current);
     const newWatched = new Set(watchedVideosRef.current);
@@ -1227,6 +1338,24 @@ export default function Home() {
     watchedVideosRef.current = newWatched;
     setWatchedVideos(newWatched);
 
+    // Marking unwatched means "start this one over": the position goes back to
+    // zero, but the history entry survives so the watch history keeps it.
+    if (wasWatched) {
+      const next = new Map(videoProgressRef.current);
+      next.delete(videoId);
+      videoProgressRef.current = next;
+      setVideoProgress(next);
+
+      fetch("/api/playback-history", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ videoId }),
+      }).catch((err) =>
+        console.error("Failed to reset playback progress:", err)
+      );
+    }
+
     // Persist in background
     persistUserState({ watchedVideos: Array.from(newWatched) }).catch(() => {
       // Revert on error
@@ -1234,6 +1363,8 @@ export default function Home() {
       setWatchedVideos(previousWatched);
       showToast("Failed to save watch status", "error");
     });
+
+    if (options?.silent) return;
 
     // Show toast with undo
     if (wasWatched) {
@@ -2056,6 +2187,9 @@ export default function Home() {
                               uploadedAt={video.uploadedAt}
                               views={video.views}
                               watched={watchedVideos.has(video.id)}
+                              progressPercent={videoProgressPercents.get(
+                                video.id
+                              )}
                               videoUrl={video.url}
                               showDurationPlaceholder={true}
                               isMemberOnly={video.isMemberOnly}
@@ -2073,7 +2207,6 @@ export default function Home() {
                                 settings?.videoPlayerMode !== "new-tab"
                               }
                               onPlayInPlayer={(videoUrl) => {
-                                setInitialProgress(0); // Reset progress for new videos
                                 handlePlayInPlayer(
                                   videoUrl,
                                   video.id,
@@ -2096,6 +2229,7 @@ export default function Home() {
                   <WatchLater
                     items={watchLater}
                     watchedVideos={watchedVideos}
+                    progressPercents={videoProgressPercents}
                     onRemove={handleRemoveFromWatchLater}
                     onPlay={handlePlayWatchLater}
                     onToggleWatched={handleToggleWatched}
@@ -2115,16 +2249,14 @@ export default function Home() {
                     onToggleWatched={handleToggleWatched}
                     onPlayVideo={(videoId, progress, metadata) => {
                       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-                      setInitialProgress(
-                        typeof progress === "number" && progress > 0 ? progress : 0
-                      );
                       handlePlayInPlayer(
                         videoUrl,
                         videoId,
                         metadata?.title || "Video",
                         metadata?.channel || "Unknown channel",
                         metadata?.channelId || undefined,
-                        metadata?.thumbnail || undefined
+                        metadata?.thumbnail || undefined,
+                        typeof progress === "number" ? progress : undefined
                       );
                     }}
                   />
@@ -2157,6 +2289,7 @@ export default function Home() {
               <WatchLater
                 items={watchLater}
                 watchedVideos={watchedVideos}
+                progressPercents={videoProgressPercents}
                 onRemove={handleRemoveFromWatchLater}
                 onPlay={handlePlayWatchLater}
                 onToggleWatched={handleToggleWatched}
@@ -2233,6 +2366,8 @@ export default function Home() {
                     settings={settings}
                     videoRetentionDays={videoRetentionDays}
                     onRetentionChange={handleRetentionChange}
+                    watchedThresholdPercent={watchedThresholdPercent}
+                    onWatchedThresholdChange={handleWatchedThresholdChange}
                     onSave={handleSaveSettings}
                     onDeleteSubscriptions={handleDeleteAllSubscriptions}
                     onClearWatchHistory={handleClearWatchHistory}
@@ -2350,6 +2485,11 @@ export default function Home() {
           quality={playerQuality}
           defaultResolution={settings?.defaultPlayerResolution ?? "1080p"}
           onQualityChange={(q) => setPlayerQuality(q as typeof playerQuality)}
+          watchedThresholdPercent={watchedThresholdPercent}
+          watched={watchedVideos.has(playerVideo.videoId)}
+          onToggleWatched={() =>
+            handleToggleWatched(playerVideo.videoId, { silent: true })
+          }
           sponsorBlockEnabled={settings?.sponsorBlockEnabled ?? true}
           onSponsorBlockEnabledChange={(enabled) => {
             setSettings((prev) =>

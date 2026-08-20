@@ -49,6 +49,11 @@ interface VideoCardProps {
   uploadedAt?: string;
   views?: number;
   watched?: boolean;
+  /**
+   * How far playback got, 0-100. Drawn as a thin bar along the bottom of the
+   * thumbnail. Ignored while `watched`, where the overlay says it already.
+   */
+  progressPercent?: number;
   videoUrl?: string;
   showDurationPlaceholder?: boolean;
   isMemberOnly?: boolean;
@@ -71,6 +76,7 @@ export function VideoCard({
   uploadedAt,
   views,
   watched,
+  progressPercent,
   videoUrl,
   showDurationPlaceholder,
   isMemberOnly = false,
@@ -93,6 +99,14 @@ export function VideoCard({
   const durationLabel = showDurationPlaceholder
     ? formatVideoDuration(durationSeconds)
     : null;
+  // Below 1% the bar is a stray dot rather than information, so it stays off.
+  const barPercent =
+    !watched &&
+    typeof progressPercent === "number" &&
+    Number.isFinite(progressPercent) &&
+    progressPercent >= 1
+      ? Math.min(100, progressPercent)
+      : null;
 
   const handleWatch = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Prevent the default link behavior
@@ -100,20 +114,22 @@ export function VideoCard({
     e.stopPropagation();
 
     if (useBuiltInPlayer && videoUrl) {
-      // Use built-in player
+      // Use built-in player. Opening is not watching: the player marks the
+      // video watched once playback passes the threshold.
       onPlayInPlayer?.(videoUrl);
-    } else {
-      // Get the URL from the link's href attribute
-      const url = e.currentTarget.href;
-
-      // Open in new tab - only once, with full control
-      if (url) {
-        const newTab = window.open(url, "_blank", "noopener,noreferrer");
-        if (newTab) newTab.opener = null;
-      }
+      return;
     }
 
-    // Call callback for tracking
+    // Get the URL from the link's href attribute
+    const url = e.currentTarget.href;
+
+    // Open in new tab - only once, with full control
+    if (url) {
+      const newTab = window.open(url, "_blank", "noopener,noreferrer");
+      if (newTab) newTab.opener = null;
+    }
+
+    // On youtube.com the position is out of reach, so count it as watched now.
     onWatch?.();
   };
 
@@ -236,6 +252,18 @@ export function VideoCard({
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
             <Eye className="w-8 h-8 text-white" />
           </div>
+        )}
+
+        {barPercent !== null && (
+          <div
+            className="absolute bottom-0 left-0 h-0.5 bg-[#FF0000] pointer-events-none"
+            style={{ width: `${barPercent}%` }}
+            role="progressbar"
+            aria-label="Watch progress"
+            aria-valuenow={Math.round(barPercent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
         )}
       </a>
 

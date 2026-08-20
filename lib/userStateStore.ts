@@ -1,5 +1,9 @@
 import { getDb } from "./db";
 import { migrateFromJson } from "./migrate";
+import {
+  WATCHED_THRESHOLD_DEFAULT,
+  clampWatchedThreshold,
+} from "./settingsSchema";
 
 export interface UserState {
   watchedVideos: string[];
@@ -7,6 +11,8 @@ export interface UserState {
   hideMemberOnly?: boolean;
   filterListId?: string;
   hasCompletedWelcome?: boolean;
+  /** Share of the video that must be played before it counts as watched. */
+  watchedThresholdPercent?: number;
   /**
    * How long this user wants videos kept, in days. 0 = forever,
    * null = follow the instance default (`videoRetentionDays`).
@@ -79,6 +85,10 @@ export async function readUserState(userId: string): Promise<UserState> {
     hideMemberOnly: config.hideMemberOnly ?? false,
     filterListId: config.filterListId ?? "all",
     hasCompletedWelcome: config.hasCompletedWelcome ?? false,
+    watchedThresholdPercent:
+      typeof config.watchedThresholdPercent === "number"
+        ? clampWatchedThreshold(config.watchedThresholdPercent)
+        : WATCHED_THRESHOLD_DEFAULT,
     videoRetentionDays:
       typeof config.videoRetentionDays === "number"
         ? config.videoRetentionDays
@@ -118,6 +128,11 @@ export async function writeUserState(state: UserState, userId: string) {
       userId,
       "filterListId",
       JSON.stringify(state.filterListId ?? "all")
+    );
+    configStmt.run(
+      userId,
+      "watchedThresholdPercent",
+      JSON.stringify(clampWatchedThreshold(state.watchedThresholdPercent))
     );
     const hasCompletedValue = !!state.hasCompletedWelcome;
     configStmt.run(
