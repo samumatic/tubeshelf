@@ -1,9 +1,11 @@
+name: tubeshelf-local
+
 services:
   tubeshelf:
     # Image built by ./scripts/build-local.sh (or by `docker compose build`).
     image: tubeshelf:local
     build:
-      context: .
+      context: ..
     container_name: tubeshelf
     restart: unless-stopped
     ports:
@@ -21,4 +23,4 @@ services:
       # Set to debug for per-channel fetch logging.
       # LOG_LEVEL: "debug"
     volumes:
-      - ./data:/app/data
+      - ../data:/app/data

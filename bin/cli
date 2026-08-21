@@ -6,4 +6,4 @@
 export CLI_MODE=true
 
 # Execute the CLI command without npm/npx
-exec node /app/cli.js "$@"
+exec node /app/bin/cli.js "$@"

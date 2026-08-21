@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "cli": "node cli.js",
+    "cli": "node bin/cli.js",
     "docker:build": "bash scripts/build-local.sh"
   },
   "dependencies": {

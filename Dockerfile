@@ -39,20 +39,22 @@ COPY --from=builder /app/public ./public
 # Copy lib folder (needed for CLI commands)
 COPY --from=builder /app/lib ./lib
 
-# Copy CLI script (keep standalone server.js from Next build)
-COPY --from=builder /app/cli.js ./
-COPY cli ./
-COPY entrypoint.sh ./
+# Copy CLI script (keep standalone server.js from Next build). Kept under
+# bin/ here too so cli.js's "../lib/cli.js" import resolves the same way it
+# does in the source tree.
+COPY --from=builder /app/bin/cli.js ./bin/cli.js
+COPY bin/cli ./bin/cli
+COPY bin/entrypoint.sh ./bin/entrypoint.sh
 
 # Make scripts executable
-RUN chmod +x ./cli.js ./server.js ./cli ./entrypoint.sh
+RUN chmod +x ./bin/cli.js ./server.js ./bin/cli ./bin/entrypoint.sh
 
 # Remove npm to avoid shipping known vulnerabilities in the runtime image
 # (runtime doesn't need npm or npx)
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Create symlink for easy CLI access
-RUN ln -s /app/cli /usr/local/bin/cli
+RUN ln -s /app/bin/cli /usr/local/bin/cli
 
 # Create required writable dirs for non-root runtime user
 RUN mkdir -p /app/data /app/.next/cache && \
@@ -62,7 +64,7 @@ RUN mkdir -p /app/data /app/.next/cache && \
 EXPOSE 3000
 
 # Use entrypoint script for proper signal handling and privilege dropping
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/bin/entrypoint.sh"]
 
 # Start the application with the server script
 CMD ["node", "server.js"]
