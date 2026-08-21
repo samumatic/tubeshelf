@@ -1,7 +1,7 @@
 /**
  * RSS Feed Fetcher for YouTube channels
  *
- * Fast alternative using YouTube's RSS feeds via playlist_id.
+ * Fast alternative using YouTube's RSS feeds via channel_id.
  * Limited to recent videos (typically ~15-20) but faster than standard method.
  * Does NOT provide duration data - RSS feeds don't include this.
  */
@@ -9,11 +9,12 @@
 import { FeedVideo, ChannelMeta, FetchResult } from "./videoFetcher";
 
 // YouTube RSS Feed URL patterns
-const getChannelRssUrl = (channelId: string): string => {
-  // Use UULF prefix for long-form uploads only (excludes Shorts)
-  return `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(
-    2
-  )}`;
+export const getChannelRssUrl = (channelId: string): string => {
+  // YouTube no longer serves the synthetic "UU"/"UULF" uploads-playlist IDs
+  // via this endpoint (always 404s) - channel_id is the only form that still
+  // works. This includes Shorts; RSS mode has no duration data to filter
+  // them by length anyway.
+  return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
 };
 
 const getUserRssUrl = (handle: string): string => {

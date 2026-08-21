@@ -1,11 +1,14 @@
 import { randomUUID } from "crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 process.env.TUBESHELF_TEST_DB_PATH = ":memory:";
 
 const { getDb } = await import("./db");
-const { LOCAL_CREDENTIAL_ISSUER, ensureAccountIssuerBackfilled } =
-  await import("./betterAuth");
+const {
+  LOCAL_CREDENTIAL_ISSUER,
+  ensureAccountIssuerBackfilled,
+  getAuthSecretStatus,
+} = await import("./betterAuth");
 
 beforeEach(() => {
   const db = getDb();
@@ -115,5 +118,47 @@ describe("ensureAccountIssuerBackfilled", () => {
       .prepare("SELECT issuer FROM auth_accounts WHERE provider_id = 'credential'")
       .get() as { issuer: string };
     expect(row.issuer).toBe(LOCAL_CREDENTIAL_ISSUER);
+  });
+});
+
+describe("getAuthSecretStatus", () => {
+  const ENV_KEYS = ["BETTER_AUTH_SECRET", "AUTH_SECRET", "SECRET_KEY"] as const;
+  const env = process.env as Record<string, string | undefined>;
+  let saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>;
+
+  beforeEach(() => {
+    saved = {};
+    for (const key of ENV_KEYS) {
+      saved[key] = env[key];
+      delete env[key];
+    }
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (saved[key] === undefined) delete env[key];
+      else env[key] = saved[key];
+    }
+  });
+
+  it("flags the docker-compose placeholder secret even though it's long enough to pass the length check", () => {
+    env.BETTER_AUTH_SECRET = "replace-with-a-random-32+-char-secret";
+    const status = getAuthSecretStatus();
+    expect(status.length).toBeGreaterThanOrEqual(32);
+    expect(status.isTooShort).toBe(false);
+    expect(status.isKnownPlaceholder).toBe(true);
+  });
+
+  it("does not flag a real random secret of the same length", () => {
+    env.BETTER_AUTH_SECRET = "a".repeat(38);
+    const status = getAuthSecretStatus();
+    expect(status.isKnownPlaceholder).toBe(false);
+  });
+
+  it("still flags a too-short secret via isTooShort, independent of the placeholder check", () => {
+    env.BETTER_AUTH_SECRET = "short";
+    const status = getAuthSecretStatus();
+    expect(status.isTooShort).toBe(true);
+    expect(status.isKnownPlaceholder).toBe(false);
   });
 });

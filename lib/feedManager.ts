@@ -182,7 +182,15 @@ class FeedManager {
     const known = this.countKnownDurations(this.data.videos);
 
     const response = await fetch("/api/feed?refresh=false");
-    if (!response.ok) return;
+    if (!response.ok) {
+      // Treat a failed poll like a no-progress one: keep retrying (a single
+      // transient error shouldn't permanently stop durations from filling
+      // in), but still count toward the stagnation cutoff so a server that's
+      // consistently erroring doesn't poll forever.
+      this.durationPollsWithoutProgress++;
+      this.scheduleDurationPoll();
+      return;
+    }
 
     const json = await response.json();
     const videos = this.mapItems(json.items || []);

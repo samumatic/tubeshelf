@@ -11,7 +11,7 @@ export async function GET() {
       publicRegistration: !!settings.publicRegistration,
       warnings: {
         generatedAuthSecretFallback: authSecretStatus.isGeneratedFallback,
-        insecureDefaultAuthSecret: false,
+        insecureDefaultAuthSecret: authSecretStatus.isKnownPlaceholder,
       },
     });
   } catch (error) {
@@ -22,7 +22,7 @@ export async function GET() {
       publicRegistration: false,
       warnings: {
         generatedAuthSecretFallback: authSecretStatus.isGeneratedFallback,
-        insecureDefaultAuthSecret: false,
+        insecureDefaultAuthSecret: authSecretStatus.isKnownPlaceholder,
       },
     });
   }

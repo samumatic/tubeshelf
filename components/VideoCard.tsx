@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { getProxiedImageUrl } from "@/lib/videoUtils";
-import { formatVideoDuration } from "@/lib/duration";
+import { formatDurationText } from "@/lib/duration";
 
 function formatViewCount(views: number): string {
   if (views >= 1000000) {
@@ -96,9 +96,13 @@ export function VideoCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const thumbnailSrc = getProxiedImageUrl(thumbnail);
-  const durationLabel = showDurationPlaceholder
-    ? formatVideoDuration(durationSeconds)
-    : null;
+  const durationLabel =
+    showDurationPlaceholder &&
+    typeof durationSeconds === "number" &&
+    Number.isFinite(durationSeconds) &&
+    durationSeconds > 0
+      ? formatDurationText(durationSeconds)
+      : null;
   // Below 1% the bar is a stray dot rather than information, so it stays off.
   const barPercent =
     !watched &&
