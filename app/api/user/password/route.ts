@@ -2,11 +2,28 @@ import { NextResponse } from "next/server";
 import { APIError } from "better-auth";
 import { getCurrentUser } from "@/lib/currentUser";
 import { appendSetCookieHeaders, getAuth } from "@/lib/betterAuth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userLimit = checkRateLimit({
+    bucket: "user-password-change",
+    key: user.id,
+    limit: 10,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!userLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many password change attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(userLimit.retryAfterSeconds) },
+      }
+    );
   }
 
   if (user.authType === "oidc") {

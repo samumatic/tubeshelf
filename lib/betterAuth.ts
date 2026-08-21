@@ -64,8 +64,17 @@ type AuthSecretStatus = {
   source: AuthSecretSource;
   isGeneratedFallback: boolean;
   isTooShort: boolean;
+  isKnownPlaceholder: boolean;
   length: number;
 };
+
+// The literal placeholder shipped in docker-compose.yml, docker-compose.local.yml,
+// and the README quick-start snippet. Long enough to pass the length check, so it
+// needs its own explicit detection - an operator who deploys the compose file
+// unedited must not sail through silently.
+const KNOWN_PLACEHOLDER_AUTH_SECRETS = new Set([
+  "replace-with-a-random-32+-char-secret",
+]);
 
 function generateRandomSecret(): string {
   return crypto.randomBytes(32).toString("hex");
@@ -154,6 +163,7 @@ function resolveAuthSecret(): { secret: string; status: AuthSecretStatus } {
       isGeneratedFallback:
         source === "generated-file" || source === "generated-memory",
       isTooShort: length < 32,
+      isKnownPlaceholder: KNOWN_PLACEHOLDER_AUTH_SECRETS.has(secret),
       length,
     },
   };
@@ -161,7 +171,12 @@ function resolveAuthSecret(): { secret: string; status: AuthSecretStatus } {
 
 function warnIfAuthSecretIsInsecure() {
   const { status } = resolveAuthSecret();
-  if (!status.isGeneratedFallback && !status.isTooShort) return;
+  if (
+    !status.isGeneratedFallback &&
+    !status.isTooShort &&
+    !status.isKnownPlaceholder
+  )
+    return;
   if (globalThis.__tubeshelfAuthSecretWarningLogged) return;
   globalThis.__tubeshelfAuthSecretWarningLogged = true;
 
@@ -169,7 +184,14 @@ function warnIfAuthSecretIsInsecure() {
     console.warn(
       "[Auth] No BETTER_AUTH_SECRET is configured. Using an auto-generated instance-local BetterAuth secret. Set BETTER_AUTH_SECRET (32+ chars) for portability and multi-instance deployments. Changing the secret will invalidate BetterAuth sessions.",
     );
-    if (!status.isTooShort) return;
+    if (!status.isTooShort && !status.isKnownPlaceholder) return;
+  }
+
+  if (status.isKnownPlaceholder) {
+    console.warn(
+      "[Auth] BETTER_AUTH_SECRET is still set to the docker-compose placeholder value. This secret is public (it's in the repo) and is shared by every instance that didn't change it - sessions and any OIDC client secrets encrypted with it are not safe. Set BETTER_AUTH_SECRET to a unique random value, e.g. `openssl rand -base64 32`.",
+    );
+    return;
   }
 
   console.warn(
@@ -789,6 +811,17 @@ function createAuth(request?: Request) {
         accessTokenExpiresAt: "access_token_expires_at",
         refreshTokenExpiresAt: "refresh_token_expires_at",
         issuer: "issuer",
+      },
+      // Without this, a first-time OIDC login whose claimed email matches an
+      // existing local-password account gets silently linked to (and signed in
+      // as) that account - full takeover by anyone who can register that email
+      // on the IdP, since no provider is configured as `trustedProviders` and
+      // every local user has `email_verified` hardcoded to 1. TubeShelf has no
+      // in-app "link account" flow that relies on implicit linking, so this
+      // only closes the hole; it doesn't disable OIDC auto-provisioning of new
+      // users, and it doesn't affect an OIDC identity that's already linked.
+      accountLinking: {
+        enabled: false,
       },
     },
     verification: {
