@@ -9,6 +9,7 @@ process.env.TUBESHELF_TEST_DB_PATH = ":memory:";
 const { getDb } = await import("./db");
 const {
   clearVideoCache,
+  clearVideoCacheForChannels,
   countCachedVideos,
   effectiveRetentionDays,
   getCachedVideos,
@@ -204,6 +205,42 @@ describe("clearVideoCache", () => {
 
   it("returns zero counts when the cache is already empty", () => {
     expect(clearVideoCache()).toEqual({ videosCleared: 0, channelsReset: 0 });
+  });
+});
+
+describe("clearVideoCacheForChannels", () => {
+  it("only clears videos and fetch state for the given channels", () => {
+    upsertVideos("UCa", [video({ id: "v1", channelId: "UCa" })]);
+    upsertVideos("UCb", [video({ id: "v2", channelId: "UCb" })]);
+    markChannelFetched("UCa", { videoCount: 1 });
+    markChannelFetched("UCb", { videoCount: 1 });
+
+    const result = clearVideoCacheForChannels(["UCa"]);
+
+    expect(result).toEqual({ videosCleared: 1, channelsReset: 1 });
+    expect(getCachedVideos(["UCa"])).toEqual([]);
+    expect(getCachedVideos(["UCb"]).map((v) => v.videoId)).toEqual(["v2"]);
+    expect(getChannelFetchStates(["UCa"]).size).toBe(0);
+    expect(getChannelFetchStates(["UCb"]).size).toBe(1);
+  });
+
+  it("returns zero counts for an empty or all-falsy channel list", () => {
+    expect(clearVideoCacheForChannels([])).toEqual({
+      videosCleared: 0,
+      channelsReset: 0,
+    });
+    expect(clearVideoCacheForChannels(["", undefined as any])).toEqual({
+      videosCleared: 0,
+      channelsReset: 0,
+    });
+  });
+
+  it("de-duplicates repeated channel ids", () => {
+    upsertVideos("UCa", [video({ id: "v1", channelId: "UCa" })]);
+
+    const result = clearVideoCacheForChannels(["UCa", "UCa", "UCa"]);
+
+    expect(result.videosCleared).toBe(1);
   });
 });
 

@@ -8,6 +8,7 @@ interface DangerZonePanelProps {
   onDeleteSubscriptions?: (listId?: string) => Promise<void>;
   onClearWatchHistory?: () => Promise<void>;
   onResetSettings?: () => Promise<void>;
+  onClearVideoCache?: () => Promise<void>;
   onDeleteAccount?: () => Promise<void>;
   subscriptionLists?: Array<{ id: string; name: string }>;
   currentListId?: string;
@@ -18,6 +19,7 @@ export function DangerZonePanel({
   onDeleteSubscriptions,
   onClearWatchHistory,
   onResetSettings,
+  onClearVideoCache,
   onDeleteAccount,
   subscriptionLists = [],
   currentListId,
@@ -29,7 +31,7 @@ export function DangerZonePanel({
   const [error, setError] = useState<string | null>(null);
 
   const handleDangerAction = async (
-    action: "subscriptions" | "history" | "settings" | "account"
+    action: "subscriptions" | "history" | "settings" | "videoCache" | "account"
   ) => {
     setSaving(true);
     setError(null);
@@ -49,6 +51,12 @@ export function DangerZonePanel({
       } else if (action === "settings") {
         await onResetSettings?.();
         onShowToast?.("Settings reset to default successfully", "success");
+      } else if (action === "videoCache") {
+        await onClearVideoCache?.();
+        onShowToast?.(
+          "Video cache cleared - your subscriptions will refetch fresh",
+          "success"
+        );
       } else if (action === "account") {
         await onDeleteAccount?.();
         onShowToast?.(
@@ -84,6 +92,8 @@ export function DangerZonePanel({
                   ? "Clear Watch History"
                   : confirmAction === "settings"
                   ? "Reset Settings"
+                  : confirmAction === "videoCache"
+                  ? "Clear Video Cache"
                   : "Delete Account"}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
@@ -95,6 +105,8 @@ export function DangerZonePanel({
                   ? "This will permanently clear all your watched/unwatched video states. This action cannot be undone."
                   : confirmAction === "settings"
                   ? "Your settings will be reset to default values. Your subscriptions and watch history will not be affected."
+                  : confirmAction === "videoCache"
+                  ? "This clears the cached video data for every channel you're subscribed to, so they refetch from scratch. Useful if videos are stuck showing wrong durations or dates. Since the cache is shared, this also affects other users subscribed to the same channels - it doesn't touch your subscriptions, watch history, or watch later."
                   : "This will permanently delete your account and all associated data including subscriptions, watch history, and settings. This action cannot be undone. You will be logged out immediately."}
               </p>
             </div>
@@ -145,7 +157,11 @@ export function DangerZonePanel({
             <Button
               onClick={() =>
                 handleDangerAction(
-                  confirmAction as "subscriptions" | "history" | "settings"
+                  confirmAction as
+                    | "subscriptions"
+                    | "history"
+                    | "settings"
+                    | "videoCache"
                 )
               }
               variant="destructive"
@@ -200,6 +216,19 @@ export function DangerZonePanel({
           </p>
           <p className="text-xs text-muted-foreground mt-1.5">
             Restore all settings to default values
+          </p>
+        </button>
+
+        <button
+          onClick={() => setConfirmAction("videoCache")}
+          className="w-full bg-destructive/5 border border-destructive/20 hover:border-destructive/40 hover:bg-destructive/10 rounded-xl p-4 text-left transition-all duration-200"
+        >
+          <p className="font-semibold text-sm text-destructive">
+            Clear Video Cache
+          </p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Refetch cached video data for your subscribed channels from
+            scratch
           </p>
         </button>
 
