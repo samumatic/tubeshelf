@@ -35,4 +35,4 @@ echo "==> Done:"
 docker images "${IMAGE_NAME}" --format '    {{.Repository}}:{{.Tag}}  {{.Size}}  {{.CreatedSince}}'
 echo
 echo "Run it with:"
-echo "    docker compose -f docker-compose.local.yml up -d"
+echo "    docker compose -f scripts/docker-compose.local.yml up -d"

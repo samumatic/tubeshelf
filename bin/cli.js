@@ -12,7 +12,7 @@ process.env.CLI_MODE = 'true';
  *   node cli.js list-local-users
  */
 
-import { executeCLICommand } from "./lib/cli.js";
+import { executeCLICommand } from "../lib/cli.js";
 
 async function main() {
   const args = process.argv.slice(2);
