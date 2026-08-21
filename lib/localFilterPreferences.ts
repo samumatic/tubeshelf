@@ -1,8 +1,9 @@
 /**
- * Feed filter toggles ("Hide watched videos", "Hide member-only videos") are
- * remembered per device rather than per account: the same user usually wants a
- * different default on a phone than on a desktop, and the server copy kept
- * losing the race against the empty defaults on a fresh page load.
+ * Feed filter toggles ("Hide watched videos", "Hide member-only videos",
+ * "Hide Shorts") are remembered per device rather than per account: the same
+ * user usually wants a different default on a phone than on a desktop, and
+ * the server copy kept losing the race against the empty defaults on a fresh
+ * page load.
  *
  * The stored value wins over whatever /api/user-state returns. A device that
  * has never stored anything falls back to the server value and then adopts it.
@@ -13,6 +14,7 @@ const STORAGE_KEY_PREFIX = "tubeshelf.filterPreferences.";
 export interface LocalFilterPreferences {
   hideWatched: boolean;
   hideMemberOnly: boolean;
+  hideShorts: boolean;
 }
 
 function storageKey(userId: string): string {
@@ -41,6 +43,9 @@ export function readLocalFilterPreferences(
     }
     if (typeof parsed.hideMemberOnly === "boolean") {
       prefs.hideMemberOnly = parsed.hideMemberOnly;
+    }
+    if (typeof parsed.hideShorts === "boolean") {
+      prefs.hideShorts = parsed.hideShorts;
     }
     return prefs;
   } catch (e) {

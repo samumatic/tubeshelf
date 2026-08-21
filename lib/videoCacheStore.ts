@@ -519,3 +519,34 @@ export function pruneVideos(globalDefault: number): number {
   tx();
   return deleted;
 }
+
+/**
+ * Wipe the entire video cache and fetch bookkeeping, so every subscribed
+ * channel is treated as stale and gets refetched from scratch on the next
+ * feed load. An admin-triggered escape hatch for stuck/wrong cached data
+ * (e.g. a video stuck with a bad duration or date from an earlier bug) that
+ * won't otherwise self-correct until that exact video happens to be
+ * refetched on its own.
+ *
+ * Deliberately leaves `video_first_seen` alone rather than clearing it too -
+ * `upsertVideos` already reads from it to preserve a video's original
+ * first-seen date across a cache clear, if that table happens to hold a row
+ * for it. (Nothing currently *writes* to `video_first_seen`, so today it's
+ * always empty and this doesn't yet have an observable effect - separate,
+ * pre-existing gap, not something this function should paper over.)
+ */
+export function clearVideoCache(): {
+  videosCleared: number;
+  channelsReset: number;
+} {
+  const db = getDb();
+
+  const tx = db.transaction(() => {
+    const videosCleared = db.prepare("DELETE FROM videos").run().changes;
+    const channelsReset = db.prepare("DELETE FROM channel_fetch_state").run()
+      .changes;
+    return { videosCleared, channelsReset };
+  });
+
+  return tx();
+}

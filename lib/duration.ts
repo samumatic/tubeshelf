@@ -11,7 +11,6 @@
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 
 /**
  * Parse YouTube's display string into seconds.
@@ -91,45 +90,4 @@ export function formatVideoDuration(
     { value: Math.floor(minutes / 60), unit: "h" },
     { value: minutes % 60, unit: "m" },
   ]);
-}
-
-/**
- * Total viewing time across a feed: `15d 7h 14m`, `7h 14m`, `14m`.
- *
- * The sum is taken in exact seconds and rounded up once at the end, so the
- * error stays under a minute no matter how many videos are counted (rounding
- * each video first would overstate the total by ~30s per video).
- */
-export function formatViewingTime(totalSeconds: number): string {
-  const minutes = Math.ceil(Math.max(0, totalSeconds) / MINUTE);
-
-  return joinUnits([
-    { value: Math.floor(minutes / (DAY / MINUTE)), unit: "d" },
-    { value: Math.floor((minutes % (DAY / MINUTE)) / 60), unit: "h" },
-    { value: minutes % 60, unit: "m" },
-  ]);
-}
-
-/**
- * Sum the known durations in a feed.
- *
- * `complete` is false when at least one video has no duration yet, which the
- * header uses to mark the total as a lower bound.
- */
-export function sumViewingTime(
-  videos: Array<{ durationSeconds?: number | null }>
-): { seconds: number; complete: boolean } {
-  let seconds = 0;
-  let complete = true;
-
-  for (const video of videos) {
-    const value = video.durationSeconds;
-    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-      seconds += value;
-    } else {
-      complete = false;
-    }
-  }
-
-  return { seconds, complete };
 }

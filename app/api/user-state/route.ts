@@ -64,6 +64,10 @@ export async function POST(req: Request) {
       typeof body.hideMemberOnly === "boolean"
         ? body.hideMemberOnly
         : !!current.hideMemberOnly,
+    hideShorts:
+      typeof body.hideShorts === "boolean"
+        ? body.hideShorts
+        : current.hideShorts ?? true,
     filterListId:
       typeof body.filterListId === "string" && body.filterListId.length > 0
         ? body.filterListId

@@ -8,6 +8,7 @@ process.env.TUBESHELF_TEST_DB_PATH = ":memory:";
 
 const { getDb } = await import("./db");
 const {
+  clearVideoCache,
   countCachedVideos,
   effectiveRetentionDays,
   getCachedVideos,
@@ -151,6 +152,58 @@ describe("channel fetch state", () => {
 
     expect(state?.lastError).toBe("boom");
     expect(state?.lastSuccessAt).toBe(successAt); // unchanged by the failure
+  });
+});
+
+describe("clearVideoCache", () => {
+  it("removes every cached video and reports how many", () => {
+    upsertVideos("UCchannel", [video({ id: "v1" }), video({ id: "v2" })]);
+    upsertVideos("UCother", [video({ id: "v3", channelId: "UCother" })]);
+
+    const result = clearVideoCache();
+
+    expect(result.videosCleared).toBe(3);
+    expect(getCachedVideos(["UCchannel", "UCother"])).toEqual([]);
+  });
+
+  it("resets fetch bookkeeping so every channel is treated as stale again", () => {
+    markChannelFetched("UCchannel", { videoCount: 5 });
+
+    const result = clearVideoCache();
+
+    expect(result.channelsReset).toBe(1);
+    expect(getChannelFetchStates(["UCchannel"]).size).toBe(0);
+  });
+
+  it("does not touch subscriptions or other unrelated tables", () => {
+    const db = getDb();
+    db.exec(
+      `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL)`
+    );
+    db.prepare("INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)").run(
+      "u1",
+      "u1@example.com"
+    );
+    db.prepare(
+      "INSERT OR IGNORE INTO subscription_lists (id, name, user_id) VALUES ('u1-list', 'Default', 'u1')"
+    ).run();
+    db.prepare(
+      "INSERT OR IGNORE INTO subscriptions (list_id, channel_id, title, url, added_at) VALUES ('u1-list', 'UCchannel', 'x', 'https://x', datetime('now'))"
+    ).run();
+    upsertVideos("UCchannel", [video({ id: "v1" })]);
+
+    clearVideoCache();
+
+    const subCount = (
+      db.prepare("SELECT COUNT(*) as n FROM subscriptions").get() as {
+        n: number;
+      }
+    ).n;
+    expect(subCount).toBe(1);
+  });
+
+  it("returns zero counts when the cache is already empty", () => {
+    expect(clearVideoCache()).toEqual({ videosCleared: 0, channelsReset: 0 });
   });
 });
 

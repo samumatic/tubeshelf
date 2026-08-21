@@ -9,6 +9,7 @@ export interface UserState {
   watchedVideos: string[];
   hideWatched: boolean;
   hideMemberOnly?: boolean;
+  hideShorts?: boolean;
   filterListId?: string;
   hasCompletedWelcome?: boolean;
   /** Share of the video that must be played before it counts as watched. */
@@ -83,6 +84,9 @@ export async function readUserState(userId: string): Promise<UserState> {
     watchedVideos,
     hideWatched: config.hideWatched ?? false,
     hideMemberOnly: config.hideMemberOnly ?? false,
+    // Defaults to hidden - new installs and any device that has never set
+    // this shouldn't see Shorts mixed into the feed unasked.
+    hideShorts: config.hideShorts ?? true,
     filterListId: config.filterListId ?? "all",
     hasCompletedWelcome: config.hasCompletedWelcome ?? false,
     watchedThresholdPercent:
@@ -123,6 +127,11 @@ export async function writeUserState(state: UserState, userId: string) {
       userId,
       "hideMemberOnly",
       JSON.stringify(!!state.hideMemberOnly)
+    );
+    configStmt.run(
+      userId,
+      "hideShorts",
+      JSON.stringify(state.hideShorts ?? true)
     );
     configStmt.run(
       userId,
