@@ -39,6 +39,15 @@ COPY --from=builder /app/public ./public
 # Copy lib folder (needed for CLI commands)
 COPY --from=builder /app/lib ./lib
 
+# lib/cli.js runs unbundled by plain `node` (it's outside Next's route graph,
+# so webpack/output-file-tracing never sees it) - its only non-builtin,
+# non-native dependency is bcryptjs, which Next's standalone output omits
+# because every *bundled* route that uses it gets bcryptjs's code inlined
+# directly into the compiled route bundle instead of requiring it from
+# node_modules at runtime. Copy it in explicitly so the unbundled CLI can
+# still resolve it.
+COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+
 # Copy CLI script (keep standalone server.js from Next build). Kept under
 # bin/ here too so cli.js's "../lib/cli.js" import resolves the same way it
 # does in the source tree.
