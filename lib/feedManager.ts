@@ -45,12 +45,23 @@ class FeedManager {
   private hasCachedData = false;
   private durationPollTimer: ReturnType<typeof setTimeout> | null = null;
   private durationPollsWithoutProgress = 0;
+  // This is a module-level singleton, so it outlives any one user's session -
+  // it has to know whose data it's holding, or switching accounts in the
+  // same tab (or the same browser reusing localStorage on reload) flashes
+  // the previous user's cached videos before the real fetch overwrites them.
+  private currentUserId: string | null = null;
 
   private constructor() {}
 
+  private cacheKey(): string | null {
+    return this.currentUserId ? `${CACHE_KEY}.${this.currentUserId}` : null;
+  }
+
   private loadCache(): FeedData | null {
+    const key = this.cacheKey();
+    if (!key) return null;
     try {
-      const cached = localStorage.getItem(CACHE_KEY);
+      const cached = localStorage.getItem(key);
       if (cached) {
         const data = JSON.parse(cached);
         // Return cached data with loading: false so it displays immediately
@@ -63,9 +74,11 @@ class FeedManager {
   }
 
   private saveCache() {
+    const key = this.cacheKey();
+    if (!key) return;
     try {
       localStorage.setItem(
-        CACHE_KEY,
+        key,
         JSON.stringify({
           videos: this.data.videos,
         })
@@ -73,6 +86,32 @@ class FeedManager {
     } catch (e) {
       console.error("Failed to save cache:", e);
     }
+  }
+
+  /**
+   * Tell the manager which user it's serving. Call this before subscribe()
+   * whenever the logged-in user is (or might be) different from last time -
+   * a no-op if it's the same user as already set, otherwise drops all
+   * in-memory and cached feed state so the next subscribe() can't hand back
+   * a stale previous user's videos even for an instant.
+   */
+  setUser(userId: string | null) {
+    if (userId === this.currentUserId) return;
+
+    this.currentUserId = userId;
+    this.cancelDurationPoll();
+    this.durationPollsWithoutProgress = 0;
+    this.initialized = false;
+    this.initPromise = null;
+    this.hasCachedData = false;
+    this.data = {
+      videos: [],
+      loading: false,
+      fetching: false,
+      error: null,
+      currentChannelTitle: null,
+    };
+    this.notify();
   }
 
   static getInstance(): FeedManager {
