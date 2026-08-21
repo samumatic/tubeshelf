@@ -220,4 +220,35 @@ describe("parseLockupViewModel", () => {
       "https://i.ytimg.com/vi/abc123/hqdefault.jpg"
     );
   });
+
+  it("returns null instead of a fabricated 'now' date when no row has a date", () => {
+    // Regression test: a live production fetch turned up a batch of real,
+    // months-old videos whose metadataRows came back with no parseable
+    // views/date text at all (empty rows, or rows with unrelated text).
+    // The old fallback wrote today's date into the permanent cache for
+    // them - wrong, and it stuck until a later fetch happened to parse
+    // that same video correctly. Skipping the entry entirely is safer:
+    // it just doesn't update on this fetch instead of updating wrong.
+    const lockup = baseLockup({
+      metadata: {
+        lockupMetadataViewModel: {
+          title: { content: "A video with no readable date" },
+          metadata: {
+            contentMetadataViewModel: {
+              metadataRows: [],
+            },
+          },
+        },
+      },
+    });
+
+    const video = parseLockupViewModel(
+      lockup,
+      "UCchannel",
+      "Some Channel",
+      referenceNowMs
+    );
+
+    expect(video).toBeNull();
+  });
 });
