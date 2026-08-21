@@ -384,7 +384,7 @@ export function parseLockupViewModel(
       metadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows ||
       [];
     let viewCount: number | undefined;
-    let publishedAt = new Date(referenceNowMs).toISOString();
+    let publishedAt: string | undefined;
     for (const row of metadataRows) {
       for (const part of row.metadataParts || []) {
         const text = part.text?.content || "";
@@ -395,6 +395,17 @@ export function parseLockupViewModel(
         }
       }
     }
+
+    // Every real video card carries a date row. When none of this entry's
+    // rows matched, that's a signal the entry itself is malformed (seen in
+    // practice: a batch of otherwise-valid-looking video entries near the
+    // end of a page whose metadataRows come back empty, likely a transient
+    // YouTube response quirk) rather than a real video with no date to
+    // report. Previously this fell back to "now", which wrote a permanent,
+    // wrong "just published" date into the cache for real, older videos.
+    // Skipping it here is safe: it just means this entry doesn't update on
+    // this particular fetch, and picks up its real date on a later one.
+    if (!publishedAt) return null;
 
     const thumbnails =
       lockup.contentImage?.thumbnailViewModel?.image?.sources || [];
