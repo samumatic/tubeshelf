@@ -69,6 +69,8 @@ export function AdminSystem() {
   const [feedSettings, setFeedSettings] =
     useState<FeedSettings>(defaultFeedSettings);
   const [savingFeedSettings, setSavingFeedSettings] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [confirmClearCache, setConfirmClearCache] = useState(false);
   const [hasOIDCProvider, setHasOIDCProvider] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [message, setMessage] = useState<{
@@ -226,6 +228,38 @@ export function AdminSystem() {
       setMessage({ type: "error", message: "An error occurred while saving" });
     } finally {
       setSavingFeedSettings(false);
+    }
+  };
+
+  const handleClearVideoCache = async () => {
+    setClearingCache(true);
+    try {
+      setMessage(null);
+      const response = await fetch("/api/admin/clear-video-cache", {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({
+          type: "error",
+          message: data.error || "Failed to clear video cache",
+        });
+        return;
+      }
+
+      setMessage({
+        type: "success",
+        message: `Cleared ${data.videosCleared} cached video(s). Every subscribed channel will refetch on the next feed load.`,
+      });
+      setTimeout(() => setMessage(null), 4000);
+    } catch (error) {
+      console.error("Failed to clear video cache:", error);
+      setMessage({ type: "error", message: "An error occurred while clearing the cache" });
+    } finally {
+      setClearingCache(false);
+      setConfirmClearCache(false);
     }
   };
 
@@ -472,6 +506,46 @@ export function AdminSystem() {
         <p className="text-xs text-muted-foreground mt-3">
           Out-of-range values are clamped when saved.
         </p>
+
+        <div className="mt-6 pt-6 border-t border-border">
+          <label className="block text-sm font-medium mb-1">
+            Clear video cache
+          </label>
+          <p className="text-xs text-muted-foreground mb-3">
+            Wipes every cached video and forces every subscribed channel to
+            refetch from scratch on the next feed load. Use this if videos are
+            stuck showing wrong durations or dates. Subscriptions, watch
+            history, and watch later are not affected.
+          </p>
+          {confirmClearCache ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-destructive font-medium">
+                Clear the entire video cache?
+              </span>
+              <button
+                onClick={handleClearVideoCache}
+                disabled={clearingCache}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground disabled:opacity-50"
+              >
+                {clearingCache ? "Clearing..." : "Confirm"}
+              </button>
+              <button
+                onClick={() => setConfirmClearCache(false)}
+                disabled={clearingCache}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-muted hover:bg-muted/80 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClearCache(true)}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-muted hover:bg-muted/80"
+            >
+              Clear video cache
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

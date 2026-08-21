@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDurationText,
   formatVideoDuration,
-  formatViewingTime,
   parseDurationText,
-  sumViewingTime,
 } from "./duration";
 
 describe("parseDurationText", () => {
@@ -71,70 +69,5 @@ describe("formatVideoDuration", () => {
     expect(formatVideoDuration(0)).toBeNull();
     expect(formatVideoDuration(-10)).toBeNull();
     expect(formatVideoDuration(NaN)).toBeNull();
-  });
-});
-
-describe("formatViewingTime", () => {
-  it("shows minutes only for short totals", () => {
-    expect(formatViewingTime(14 * 60)).toBe("14m");
-  });
-
-  it("drops a zero days part but keeps zero in the middle", () => {
-    expect(formatViewingTime(7 * 3600 + 14 * 60)).toBe("7h 14m");
-    // 2 days, 0 hours, 14 minutes - the zero hour must stay for readability.
-    expect(formatViewingTime(2 * 86400 + 14 * 60)).toBe("2d 0h 14m");
-  });
-
-  it("shows all three units when all are non-zero", () => {
-    expect(formatViewingTime(15 * 86400 + 7 * 3600 + 14 * 60)).toBe(
-      "15d 7h 14m"
-    );
-  });
-
-  it("rounds the total up once at the end, not per video", () => {
-    // 90 seconds should round up to 2m, not down to 1m.
-    expect(formatViewingTime(90)).toBe("2m");
-  });
-
-  it("treats zero or negative totals as 0m", () => {
-    expect(formatViewingTime(0)).toBe("0m");
-    expect(formatViewingTime(-100)).toBe("0m");
-  });
-});
-
-describe("sumViewingTime", () => {
-  it("sums known durations and reports complete when all are known", () => {
-    const result = sumViewingTime([
-      { durationSeconds: 60 },
-      { durationSeconds: 120 },
-    ]);
-    expect(result).toEqual({ seconds: 180, complete: true });
-  });
-
-  it("marks incomplete when any duration is missing, zero, or invalid", () => {
-    expect(
-      sumViewingTime([{ durationSeconds: 60 }, { durationSeconds: null }])
-        .complete
-    ).toBe(false);
-    expect(
-      sumViewingTime([{ durationSeconds: 60 }, {}]).complete
-    ).toBe(false);
-    expect(
-      sumViewingTime([{ durationSeconds: 60 }, { durationSeconds: 0 }])
-        .complete
-    ).toBe(false);
-  });
-
-  it("still sums the videos it does know about when some are missing", () => {
-    const result = sumViewingTime([
-      { durationSeconds: 60 },
-      { durationSeconds: undefined },
-      { durationSeconds: 120 },
-    ]);
-    expect(result).toEqual({ seconds: 180, complete: false });
-  });
-
-  it("returns zero for an empty list", () => {
-    expect(sumViewingTime([])).toEqual({ seconds: 0, complete: true });
   });
 });

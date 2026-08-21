@@ -38,7 +38,6 @@ import {
   readLocalFilterPreferences,
   writeLocalFilterPreferences,
 } from "@/lib/localFilterPreferences";
-import { formatViewingTime, sumViewingTime } from "@/lib/duration";
 import { useAuth } from "@/hooks/useAuth";
 import { VideoCard } from "@/components/VideoCard";
 import { VideoCardSkeleton } from "@/components/VideoCardSkeleton";
@@ -125,6 +124,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [hideWatched, setHideWatched] = useState(false);
   const [hideMemberOnly, setHideMemberOnly] = useState(false);
+  const [hideShorts, setHideShorts] = useState(true);
   const [videoRetentionDays, setVideoRetentionDays] = useState<number | null>(
     null
   );
@@ -497,23 +497,6 @@ export default function Home() {
     setHighlightedVideoIndex(null);
   }, [filteredVideos]);
 
-  // Total length of everything currently listed. Durations are backfilled per
-  // video, so while some are still unknown the total is a lower bound and is
-  // prefixed with ">".
-  const viewingTime = useMemo(() => {
-    const { seconds, complete } = sumViewingTime(filteredVideos);
-    if (seconds <= 0) return null;
-
-    const formatted = formatViewingTime(seconds);
-
-    return {
-      label: complete ? formatted : `>${formatted}`,
-      title: complete
-        ? undefined
-        : "Some video lengths are still being looked up, so the real total is higher.",
-    };
-  }, [filteredVideos]);
-
   useEffect(() => {
     const handleScroll = () => {
       setShowScrollTop(window.scrollY > 400);
@@ -595,6 +578,11 @@ export default function Home() {
             ? localFilters.hideMemberOnly
             : data.hideMemberOnly || false
         );
+        setHideShorts(
+          typeof localFilters.hideShorts === "boolean"
+            ? localFilters.hideShorts
+            : data.hideShorts ?? true
+        );
         setFilterPrefsHydrated(true);
         setVideoRetentionDays(
           typeof data.videoRetentionDays === "number"
@@ -643,6 +631,23 @@ export default function Home() {
     } catch (e) {
       // Revert on error
       setHideMemberOnly(previousValue);
+      showToast("Failed to save setting", "error");
+    }
+  };
+
+  // Toggle and persist hideShorts
+  const toggleHideShortsPersist = async (checked: boolean) => {
+    const previousValue = hideShorts;
+
+    // Optimistic update
+    setHideShorts(checked);
+
+    // Background persist
+    try {
+      await persistUserState({ hideShorts: checked });
+    } catch (e) {
+      // Revert on error
+      setHideShorts(previousValue);
       showToast("Failed to save setting", "error");
     }
   };
@@ -771,6 +776,13 @@ export default function Home() {
     if (hideMemberOnlyParam === "true") {
       setHideMemberOnly(true);
     }
+
+    // hideShorts defaults to true, so unlike the other filter params only the
+    // non-default case (shorts explicitly shown) needs to appear in the URL.
+    const hideShortsParam = searchParams.get("hideShorts");
+    if (hideShortsParam === "false") {
+      setHideShorts(false);
+    }
   }, [searchParams]);
 
   // Update URL when state changes
@@ -801,6 +813,10 @@ export default function Home() {
       params.set("hideMemberOnly", "true");
     }
 
+    if (!hideShorts) {
+      params.set("hideShorts", "false");
+    }
+
     const newUrl = params.toString() ? `?${params.toString()}` : "/";
     router.replace(newUrl, { scroll: false });
   }, [
@@ -810,6 +826,7 @@ export default function Home() {
     filterListId,
     hideWatched,
     hideMemberOnly,
+    hideShorts,
     router,
   ]);
 
@@ -931,8 +948,12 @@ export default function Home() {
   // browser starts with them already applied.
   useEffect(() => {
     if (!user || !filterPrefsHydrated) return;
-    writeLocalFilterPreferences(user.id, { hideWatched, hideMemberOnly });
-  }, [hideWatched, hideMemberOnly, user, filterPrefsHydrated]);
+    writeLocalFilterPreferences(user.id, {
+      hideWatched,
+      hideMemberOnly,
+      hideShorts,
+    });
+  }, [hideWatched, hideMemberOnly, hideShorts, user, filterPrefsHydrated]);
 
   // Persist hideWatched to database
   useEffect(() => {
@@ -945,6 +966,12 @@ export default function Home() {
     if (!user || !filterPrefsHydrated) return;
     persistUserState({ hideMemberOnly });
   }, [hideMemberOnly, user, filterPrefsHydrated]);
+
+  // Persist hideShorts to database
+  useEffect(() => {
+    if (!user || !filterPrefsHydrated) return;
+    persistUserState({ hideShorts });
+  }, [hideShorts, user, filterPrefsHydrated]);
 
   // Persist filterListId to database
   useEffect(() => {
@@ -985,6 +1012,7 @@ export default function Home() {
         subscriptionLists,
         hideWatched,
         hideMemberOnly,
+        hideShorts,
         watchedVideos,
         settings,
       });
@@ -997,6 +1025,7 @@ export default function Home() {
     videos,
     hideWatched,
     hideMemberOnly,
+    hideShorts,
     watchedVideos,
     settings?.defaultSortOrder,
     filterListId,
@@ -1016,6 +1045,7 @@ export default function Home() {
       watchedVideos: string[];
       hideWatched: boolean;
       hideMemberOnly: boolean;
+      hideShorts: boolean;
       filterListId: string;
       watchLater: WatchLaterItem[];
       hasCompletedWelcome: boolean;
@@ -1939,14 +1969,6 @@ export default function Home() {
                 </span>
                 <span>•</span>
                 <span>{filteredVideos.length} videos</span>
-                {viewingTime && (
-                  <>
-                    <span>•</span>
-                    <span title={viewingTime.title}>
-                      {viewingTime.label} viewing time
-                    </span>
-                  </>
-                )}
               </div>
               {error && (
                 <p className="text-sm text-destructive mt-2">{error}</p>
@@ -2106,6 +2128,18 @@ export default function Home() {
                                     onCheckedChange={
                                       toggleHideMemberOnlyPersist
                                     }
+                                  />
+                                </div>
+                              </label>
+
+                              <label className="flex items-center justify-between px-3 py-2.5 rounded-md hover:bg-primary/5 transition-all cursor-pointer group">
+                                <div className="text-sm font-medium text-foreground">
+                                  Hide Shorts
+                                </div>
+                                <div className="flex-shrink-0 ml-3">
+                                  <Switch
+                                    checked={hideShorts}
+                                    onCheckedChange={toggleHideShortsPersist}
                                   />
                                 </div>
                               </label>

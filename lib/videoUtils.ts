@@ -23,6 +23,20 @@ export function videoListsMatch(arr1?: Video[], arr2?: Video[]): boolean {
   return true;
 }
 
+// YouTube's own Shorts length cap (raised from 60s to 3 minutes in 2024).
+// There's no other reliable per-video signal available from a channel-page
+// scrape - the "Videos" tab and RSS feed both mix Shorts in with everything
+// else with no type marker - so duration is the best proxy available.
+const SHORTS_MAX_DURATION_SECONDS = 180;
+
+export function isShortVideo(video: Video): boolean {
+  return (
+    typeof video.durationSeconds === "number" &&
+    video.durationSeconds > 0 &&
+    video.durationSeconds <= SHORTS_MAX_DURATION_SECONDS
+  );
+}
+
 /**
  * Filter and sort videos based on various criteria
  */
@@ -34,6 +48,7 @@ export function filterAndSortVideos(
     subscriptionLists: SubscriptionList[];
     hideWatched: boolean;
     hideMemberOnly: boolean;
+    hideShorts: boolean;
     watchedVideos: Set<string>;
     settings: AppSettings | null;
   }
@@ -44,6 +59,7 @@ export function filterAndSortVideos(
     subscriptionLists,
     hideWatched,
     hideMemberOnly,
+    hideShorts,
     watchedVideos,
     settings,
   } = options;
@@ -83,6 +99,13 @@ export function filterAndSortVideos(
   // Filter out member-only videos if requested
   if (hideMemberOnly) {
     vids = vids.filter((v) => !v.isMemberOnly);
+  }
+
+  // Filter out Shorts if requested. A video with unknown duration is kept
+  // rather than hidden speculatively - it's usually just waiting on its
+  // duration backfill, not necessarily a Short.
+  if (hideShorts) {
+    vids = vids.filter((v) => !isShortVideo(v));
   }
 
   // Sort by date (newest first by default, oldest first if setting is "oldest")
