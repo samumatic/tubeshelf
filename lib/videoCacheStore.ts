@@ -550,3 +550,45 @@ export function clearVideoCache(): {
 
   return tx();
 }
+
+/**
+ * Same as clearVideoCache, but scoped to a specific set of channels - the
+ * per-user version, for a user who wants their own subscriptions' cached
+ * data refreshed without needing (or wanting) admin access to wipe the
+ * whole instance.
+ *
+ * The video cache is shared across every user on the instance (there's no
+ * per-user copy of a channel's videos), so this does affect anyone else
+ * subscribed to the same channels, not just the calling user - same as any
+ * other fetch/refresh already does.
+ */
+export function clearVideoCacheForChannels(channelIds: string[]): {
+  videosCleared: number;
+  channelsReset: number;
+} {
+  const unique = Array.from(new Set(channelIds.filter(Boolean)));
+  if (unique.length === 0) return { videosCleared: 0, channelsReset: 0 };
+
+  const db = getDb();
+
+  const tx = db.transaction(() => {
+    let videosCleared = 0;
+    let channelsReset = 0;
+
+    for (const part of chunk(unique, SQLITE_MAX_VARIABLES)) {
+      const placeholders = part.map(() => "?").join(", ");
+      videosCleared += db
+        .prepare(`DELETE FROM videos WHERE channel_id IN (${placeholders})`)
+        .run(...part).changes;
+      channelsReset += db
+        .prepare(
+          `DELETE FROM channel_fetch_state WHERE channel_id IN (${placeholders})`
+        )
+        .run(...part).changes;
+    }
+
+    return { videosCleared, channelsReset };
+  });
+
+  return tx();
+}

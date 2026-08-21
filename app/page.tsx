@@ -1166,6 +1166,16 @@ export default function Home() {
     }
   };
 
+  const handleClearVideoCache = async () => {
+    const res = await fetch("/api/danger/clear-video-cache", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to clear video cache");
+    await refreshData(true);
+  };
+
   const handleDeleteAccount = async () => {
     const res = await fetch("/api/danger/delete-account", {
       method: "POST",
@@ -2430,6 +2440,7 @@ export default function Home() {
                   onDeleteSubscriptions={handleDeleteAllSubscriptions}
                   onClearWatchHistory={handleClearWatchHistory}
                   onResetSettings={handleResetAllSettings}
+                  onClearVideoCache={handleClearVideoCache}
                   onDeleteAccount={handleDeleteAccount}
                   subscriptionLists={subscriptionLists}
                   currentListId={currentListId}
