@@ -842,6 +842,11 @@ export default function Home() {
       return;
     }
 
+    // feedManager is a module-level singleton that outlives any one user's
+    // session - tell it who's logged in now so it drops another user's
+    // cached videos instead of flashing them before the real fetch lands.
+    feedManager.setUser(user.id);
+
     // Subscribe to feed manager (skip auto-init, we'll initialize manually based on welcome state)
     const unsubscribe = feedManager.subscribe(
       (feedData) => {
@@ -1866,6 +1871,7 @@ export default function Home() {
                       <button
                         onClick={() => {
                           setShowUserMenu(false);
+                          feedManager.setUser(null);
                           logout();
                         }}
                         className="w-full px-4 py-2.5 text-left text-sm hover:bg-destructive/10 text-destructive transition-colors cursor-pointer flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-destructive/50 focus:ring-inset"
