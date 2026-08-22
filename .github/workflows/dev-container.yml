@@ -56,13 +56,24 @@ jobs:
   cleanup-old-dev-images:
     needs: build-dev
     runs-on: ubuntu-latest
-    # `if:` can't reference `secrets` directly - route it through `env:`
-    # first, which can.
-    env:
-      HAS_CLEANUP_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN != '' }}
-    if: ${{ env.HAS_CLEANUP_TOKEN == 'true' }}
     steps:
+      # Neither a job-level `if:` nor that job's own `env:` can reference
+      # `secrets` directly (both are rejected at parse time - GitHub Actions
+      # resolves job-level if: before env: is even set up). A step's `run:`
+      # script can read secrets fine, though, so check there and gate the
+      # next step on this step's *output* instead.
+      - name: Check for cleanup token
+        id: check-token
+        run: |
+          if [ -n "${{ secrets.GHCR_CLEANUP_TOKEN }}" ]; then
+            echo "has-token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GHCR_CLEANUP_TOKEN secret not set - skipping old dev image cleanup. Create a PAT with delete:packages + read:packages scopes and add it as that repo secret to enable this."
+          fi
+
       - name: Delete old dev-* image versions
+        if: steps.check-token.outputs.has-token == 'true'
         uses: actions/delete-package-versions@v5
         with:
           package-name: ${{ github.event.repository.name }}
