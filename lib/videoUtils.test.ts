@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterAndSortVideos, isShortVideo } from "./videoUtils";
-import type { Video } from "./mockData";
+import type { Video } from "./apiClient";
 
 function video(overrides: Partial<Video> = {}): Video {
   return {

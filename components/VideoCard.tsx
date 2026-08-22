@@ -11,6 +11,7 @@ import {
 import { Button } from "./ui/button";
 import { getProxiedImageUrl } from "@/lib/videoUtils";
 import { formatDurationText } from "@/lib/duration";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 function formatViewCount(views: number): string {
   if (views >= 1000000) {
@@ -159,20 +160,7 @@ export function VideoCard({
   };
 
   // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-
-    if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [showMenu]);
+  useClickOutside(menuRef, showMenu, () => setShowMenu(false));
 
   {
     /* Inline action row (used in Watch Later page) */

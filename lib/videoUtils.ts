@@ -1,4 +1,4 @@
-import type { Video } from "./mockData";
+import type { Video } from "./apiClient";
 import type { AppSettings } from "./settingsStore";
 import type { SubscriptionList } from "./subscriptionListStore";
 
