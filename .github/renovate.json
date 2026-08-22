@@ -5,10 +5,10 @@
   "dependencyDashboardTitle": "Renovate Dashboard",
   "packageRules": [
     {
-      "description": "Automerge minor/patch/pin/digest updates directly on branch",
+      "description": "Automerge minor/patch/pin/digest updates via PR once CI passes. main now requires a PR + passing status checks (branch protection), so a direct branch push (the previous automergeType) would just be rejected - this still ends up hands-off, but with an actual CI gate and a paper trail instead of a silent direct push.",
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
-      "automergeType": "branch"
+      "automergeType": "pr"
     },
     {
       "description": "Keep majors in PRs (no automerge)",
