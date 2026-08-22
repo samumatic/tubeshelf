@@ -36,7 +36,6 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ github.event.inputs.tag }}
-            ${{ env.IMAGE }}:dev-${{ github.sha }}
           provenance: false
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
