@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireAdmin } from "@/lib/apiAuth";
 import {
   createOIDCProvider,
   deleteOIDCProvider,
@@ -17,20 +17,16 @@ function sanitizeProvider(provider: any) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const providers = getOIDCProviders().map(sanitizeProvider);
   return NextResponse.json({ providers });
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const body = await req.json().catch(() => null);
 
@@ -72,10 +68,8 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const body = await req.json().catch(() => null);
   const id = typeof body?.id === "string" ? body.id.trim() : "";
@@ -133,10 +127,8 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") || "oidc";

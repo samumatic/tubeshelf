@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { fetchVideoComments, type CommentSort } from "@/lib/videoComments";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
 
     const searchParams = request.nextUrl.searchParams;
     const videoId = (searchParams.get("videoId") || "").trim();

@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireAdmin } from "@/lib/apiAuth";
 import { clearVideoCache } from "@/lib/videoCacheStore";
 
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const result = clearVideoCache();
   return NextResponse.json({ success: true, ...result });

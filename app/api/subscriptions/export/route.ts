@@ -1,5 +1,6 @@
+import { NextResponse } from "next/server";
 import { readLists } from "@/lib/subscriptionListStore";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 
 function asOpml(items: Array<{ title: string; channelId: string; url: string }>) {
   const outlines = items
@@ -18,13 +19,8 @@ function asOpml(items: Array<{ title: string; channelId: string; url: string }>)
 }
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "content-type": "application/json" },
-    });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const { searchParams } = new URL(req.url);
   const format = (searchParams.get("format") || "opml").toLowerCase();

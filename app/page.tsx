@@ -1138,6 +1138,17 @@ export default function Home() {
     }
   };
 
+  // Updates one setting in local state immediately (so the UI reflects the
+  // change without waiting on the round-trip) and persists it in the
+  // background via handleSaveSettings.
+  const updateSetting = <K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K]
+  ) => {
+    setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+    void handleSaveSettings({ [key]: value } as Partial<AppSettings>);
+  };
+
   const handleDeleteAllSubscriptions = async (listId?: string) => {
     const res = await fetch("/api/subscription-lists/subscriptions", {
       method: "DELETE",
@@ -2543,31 +2554,19 @@ export default function Home() {
           }
           sponsorBlockEnabled={settings?.sponsorBlockEnabled ?? true}
           onSponsorBlockEnabledChange={(enabled) => {
-            setSettings((prev) =>
-              prev ? { ...prev, sponsorBlockEnabled: enabled } : prev
-            );
-            void handleSaveSettings({ sponsorBlockEnabled: enabled });
+            updateSetting("sponsorBlockEnabled", enabled);
           }}
           debugOverlayEnabled={settings?.playerDebugEnabled ?? false}
           onDebugOverlayEnabledChange={(enabled) => {
-            setSettings((prev) =>
-              prev ? { ...prev, playerDebugEnabled: enabled } : prev
-            );
-            void handleSaveSettings({ playerDebugEnabled: enabled });
+            updateSetting("playerDebugEnabled", enabled);
           }}
           captionsEnabled={settings?.captionsEnabled ?? false}
           onCaptionsEnabledChange={(enabled) => {
-            setSettings((prev) =>
-              prev ? { ...prev, captionsEnabled: enabled } : prev
-            );
-            void handleSaveSettings({ captionsEnabled: enabled });
+            updateSetting("captionsEnabled", enabled);
           }}
           onDefaultResolutionChange={(res) => {
             setPlayerQuality(res);
-            setSettings((prev) =>
-              prev ? { ...prev, defaultPlayerResolution: res } : prev
-            );
-            void handleSaveSettings({ defaultPlayerResolution: res });
+            updateSetting("defaultPlayerResolution", res);
           }}
           onProgress={handlePlayerProgress}
           initialProgress={initialProgress}

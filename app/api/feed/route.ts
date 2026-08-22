@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchChannelFeed } from "@/lib/videoFetcher";
 import { readLists, writeLists } from "@/lib/subscriptionListStore";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import {
   CachedVideo,
   ChannelFetchState,
@@ -172,10 +172,8 @@ function getStaleChannels(
 }
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   try {
     return await handleFeedRequest(req, user);

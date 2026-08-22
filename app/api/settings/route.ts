@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readSettings, writeSettings, type AppSettings } from "@/lib/settingsStore";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 
 const USER_WRITABLE_SETTINGS_KEYS = [
   "defaultSortOrder",
@@ -59,19 +59,15 @@ function sanitizeUserSettingsUpdates(input: unknown): Partial<AppSettings> {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   const settings = await readSettings();
   return NextResponse.json(settings);
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   try {
     const body = await req.json();
     const updates = sanitizeUserSettingsUpdates(body);

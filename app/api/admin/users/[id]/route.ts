@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireAdmin } from "@/lib/apiAuth";
 import {
   getUserById,
   updateUserAdminStatus,
@@ -12,10 +12,8 @@ interface Params {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser || !currentUser.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const currentUser = await requireAdmin();
+  if (currentUser instanceof NextResponse) return currentUser;
 
   const { id } = await params;
   const target = getUserById(id);
@@ -58,10 +56,8 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser || !currentUser.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const currentUser = await requireAdmin();
+  if (currentUser instanceof NextResponse) return currentUser;
 
   const { id } = await params;
   const target = getUserById(id);
