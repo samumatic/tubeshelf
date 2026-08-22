@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { resolveChannelId, fetchChannelFeed } from "@/lib/videoFetcher";
 import {
   addSubscriptionToList,
@@ -30,20 +30,16 @@ function dedupeSubscriptionsByChannel(
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   const listsData = await readLists(user.id);
   const subs = dedupeSubscriptionsByChannel(listsData.lists);
   return NextResponse.json(subs);
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   const body = await req.json().catch(() => null);
   const input = body?.input as string | undefined;
   if (!input || typeof input !== "string") {
@@ -87,10 +83,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id") || url.searchParams.get("channelId");

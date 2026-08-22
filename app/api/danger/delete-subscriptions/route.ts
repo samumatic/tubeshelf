@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { clearAllSubscriptions } from "@/lib/subscriptionListStore";
 
 export async function POST() {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
 
     await clearAllSubscriptions(user.id);
     return NextResponse.json({

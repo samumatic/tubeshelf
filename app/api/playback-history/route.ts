@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import {
   readPlaybackHistory,
   readVideoProgress,
@@ -28,10 +28,8 @@ function isClientAbortError(error: unknown) {
 export async function GET(request: NextRequest) {
   try {
     // Check if user is authenticated
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser(request);
+    if (user instanceof NextResponse) return user;
 
     const searchParams = request.nextUrl.searchParams;
     const videoId = searchParams.get("videoId");
@@ -62,10 +60,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Check if user is authenticated
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser(request);
+    if (user instanceof NextResponse) return user;
 
     const session: PlaybackSession = await request.json();
     await savePlaybackSession(session, user.id);
@@ -89,10 +85,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser(request);
+    if (user instanceof NextResponse) return user;
 
     const body = await request.json().catch(() => null);
     const videoId =
@@ -119,10 +113,8 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Check if user is authenticated
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser(request);
+    if (user instanceof NextResponse) return user;
 
     const searchParams = request.nextUrl.searchParams;
     const videoId = searchParams.get("videoId");

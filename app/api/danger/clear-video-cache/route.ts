@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { readLists } from "@/lib/subscriptionListStore";
 import { clearVideoCacheForChannels } from "@/lib/videoCacheStore";
 
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const { lists } = await readLists(user.id);
   const channelIds = Array.from(

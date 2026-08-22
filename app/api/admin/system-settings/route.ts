@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireAdmin } from "@/lib/apiAuth";
 import {
   clampNumericSetting,
   numericSettingLimits,
@@ -26,20 +26,16 @@ function serialize(settings: AppSettings) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const settings = await readSettings();
   return NextResponse.json(serialize(settings));
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user || !user.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const user = await requireAdmin();
+  if (user instanceof NextResponse) return user;
 
   const body = await req.json().catch(() => null);
   const updates: Partial<AppSettings> = {};

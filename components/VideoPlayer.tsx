@@ -272,6 +272,46 @@ interface ReplyThreadState {
   initialToken?: string;
 }
 
+function SettingsToggleRow({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="text-sm text-white">{label}</div>
+        <div className="text-[11px] text-gray-400">{description}</div>
+      </div>
+      <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
+        {([
+          { label: "On", value: true },
+          { label: "Off", value: false },
+        ] as const).map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              value === option.value
+                ? "bg-white text-black"
+                : "text-gray-300 hover:bg-white/10"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const VideoPlayerComponent = ({
   videoId,
   videoTitle,
@@ -2514,95 +2554,32 @@ const VideoPlayerComponent = ({
                       </div>
 
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm text-white">SponsorBlock</div>
-                            <div className="text-[11px] text-gray-400">
-                              Auto-skip community segments
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
-                            {([
-                              { label: "On", value: true },
-                              { label: "Off", value: false },
-                            ] as const).map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => {
-                                  void onSponsorBlockEnabledChange?.(option.value);
-                                }}
-                                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                                  sponsorBlockEnabled === option.value
-                                    ? "bg-white text-black"
-                                    : "text-gray-300 hover:bg-white/10"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <SettingsToggleRow
+                          label="SponsorBlock"
+                          description="Auto-skip community segments"
+                          value={sponsorBlockEnabled}
+                          onChange={(value) => {
+                            void onSponsorBlockEnabledChange?.(value);
+                          }}
+                        />
 
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm text-white">Debug Overlay</div>
-                            <div className="text-[11px] text-gray-400">
-                              Show quality/speed/volume diagnostics
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
-                            {([
-                              { label: "On", value: true },
-                              { label: "Off", value: false },
-                            ] as const).map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => {
-                                  void onDebugOverlayEnabledChange?.(option.value);
-                                }}
-                                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                                  debugOverlayEnabled === option.value
-                                    ? "bg-white text-black"
-                                    : "text-gray-300 hover:bg-white/10"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <SettingsToggleRow
+                          label="Debug Overlay"
+                          description="Show quality/speed/volume diagnostics"
+                          value={debugOverlayEnabled}
+                          onChange={(value) => {
+                            void onDebugOverlayEnabledChange?.(value);
+                          }}
+                        />
 
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm text-white">Captions</div>
-                            <div className="text-[11px] text-gray-400">
-                              Show YouTube captions/subtitles
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
-                            {([
-                              { label: "On", value: true },
-                              { label: "Off", value: false },
-                            ] as const).map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => {
-                                  void onCaptionsEnabledChange?.(option.value);
-                                }}
-                                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                                  captionsEnabled === option.value
-                                    ? "bg-white text-black"
-                                    : "text-gray-300 hover:bg-white/10"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <SettingsToggleRow
+                          label="Captions"
+                          description="Show YouTube captions/subtitles"
+                          value={captionsEnabled}
+                          onChange={(value) => {
+                            void onCaptionsEnabledChange?.(value);
+                          }}
+                        />
                       </div>
                     </div>
                   </div>

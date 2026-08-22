@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { getUserByEmail, updateUser } from "@/lib/users";
 
 function isValidEmail(email: string): boolean {
@@ -7,10 +7,8 @@ function isValidEmail(email: string): boolean {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   return NextResponse.json({
     id: user.id,
@@ -22,10 +20,8 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   if (user.authType === "oidc") {
     return NextResponse.json(

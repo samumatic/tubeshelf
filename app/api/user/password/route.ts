@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { APIError } from "better-auth";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { appendSetCookieHeaders, getAuth } from "@/lib/betterAuth";
 import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function PUT(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const userLimit = checkRateLimit({
     bucket: "user-password-change",

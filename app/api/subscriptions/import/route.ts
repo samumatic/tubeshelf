@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/currentUser";
+import { requireUser } from "@/lib/apiAuth";
 import { resolveChannelId, fetchChannelFeed } from "@/lib/videoFetcher";
 import { addSubscriptionToList } from "@/lib/subscriptionListStore";
 
@@ -57,10 +57,8 @@ function parseCandidates(payload: string): string[] {
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const { searchParams } = new URL(req.url);
   const listId =
