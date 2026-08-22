@@ -56,7 +56,11 @@ jobs:
   cleanup-old-dev-images:
     needs: build-dev
     runs-on: ubuntu-latest
-    if: ${{ secrets.GHCR_CLEANUP_TOKEN != '' }}
+    # `if:` can't reference `secrets` directly - route it through `env:`
+    # first, which can.
+    env:
+      HAS_CLEANUP_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN != '' }}
+    if: ${{ env.HAS_CLEANUP_TOKEN == 'true' }}
     steps:
       - name: Delete old dev-* image versions
         uses: actions/delete-package-versions@v5
