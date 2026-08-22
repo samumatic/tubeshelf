@@ -38,3 +38,31 @@ jobs:
             ${{ env.IMAGE }}:${{ github.event.inputs.tag }}
             ${{ env.IMAGE }}:dev-${{ github.sha }}
           provenance: false
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  # Every dev build tags a new, permanent dev-<sha> version, which otherwise
+  # accumulates in the GHCR Packages tab forever and buries real release
+  # tags. Keep only the most recent handful; version tags (v1.2.3, 1.2.3),
+  # latest, and the mutable dev tag are never touched regardless of age.
+  #
+  # ghcr.io packages under a personal account (not an org) can't be deleted
+  # with the default GITHUB_TOKEN - GitHub requires a personal access token
+  # with the delete:packages and read:packages scopes for that. Create one
+  # at https://github.com/settings/tokens, add it as a repo secret named
+  # GHCR_CLEANUP_TOKEN, and this job will pick it up automatically. Until
+  # that secret exists, this job is skipped (not failed) so a normal dev
+  # build still succeeds.
+  cleanup-old-dev-images:
+    needs: build-dev
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GHCR_CLEANUP_TOKEN != '' }}
+    steps:
+      - name: Delete old dev-* image versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: "^(v?\\d+\\.\\d+\\.\\d+|latest|dev)$"
+          token: ${{ secrets.GHCR_CLEANUP_TOKEN }}
