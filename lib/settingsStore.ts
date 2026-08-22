@@ -78,6 +78,7 @@ export async function writeSettings(
     "defaultPlayerResolution",
     "sponsorBlockEnabled",
     "playerDebugEnabled",
+    "captionsEnabled",
     "fetchMethod",
     "oidcOnly",
     "publicRegistration",

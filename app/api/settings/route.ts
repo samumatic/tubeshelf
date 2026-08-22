@@ -9,6 +9,7 @@ const USER_WRITABLE_SETTINGS_KEYS = [
   "defaultPlayerResolution",
   "sponsorBlockEnabled",
   "playerDebugEnabled",
+  "captionsEnabled",
   "fetchMethod",
 ] as const satisfies ReadonlyArray<keyof AppSettings>;
 
@@ -44,6 +45,10 @@ function sanitizeUserSettingsUpdates(input: unknown): Partial<AppSettings> {
 
   if (typeof raw.playerDebugEnabled === "boolean") {
     updates.playerDebugEnabled = raw.playerDebugEnabled;
+  }
+
+  if (typeof raw.captionsEnabled === "boolean") {
+    updates.captionsEnabled = raw.captionsEnabled;
   }
 
   if (raw.fetchMethod === "standard" || raw.fetchMethod === "rss") {
