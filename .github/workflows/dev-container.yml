@@ -46,10 +46,12 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
 
-  # Every dev build tags a new, permanent dev-<sha> version, which otherwise
-  # accumulates in the GHCR Packages tab forever and buries real release
-  # tags. Keep only the most recent handful; version tags (v1.2.3, 1.2.3),
-  # latest, and the mutable dev tag are never touched regardless of age.
+  # Every dev build pushes a new image under the single, mutable dev tag, so
+  # the *previous* build's version becomes untagged (not deleted) the moment
+  # a newer one takes the dev tag - those untagged versions otherwise pile up
+  # in the GHCR Packages tab forever. Keep just the current build and the one
+  # before it; version tags (v1.2.3, 1.2.3) and latest are never touched
+  # regardless of age.
   #
   # ghcr.io packages under a personal account (not an org) can't be deleted
   # with the default GITHUB_TOKEN - GitHub requires a personal access token
@@ -83,6 +85,6 @@ jobs:
         with:
           package-name: ${{ github.event.repository.name }}
           package-type: container
-          min-versions-to-keep: 5
+          min-versions-to-keep: 2
           ignore-versions: "^(v?\\d+\\.\\d+\\.\\d+|latest|dev)$"
           token: ${{ secrets.GHCR_CLEANUP_TOKEN }}
