@@ -50,8 +50,22 @@ jobs:
   # the *previous* build's version becomes untagged (not deleted) the moment
   # a newer one takes the dev tag - those untagged versions otherwise pile up
   # in the GHCR Packages tab forever. Keep just the current build and the one
-  # before it; version tags (v1.2.3, 1.2.3) and latest are never touched
-  # regardless of age.
+  # before it.
+  #
+  # IMPORTANT, learned the hard way: for package-type: container, the
+  # GitHub API's version "name" field is the image *digest*
+  # (sha256:...), never a tag - so an ignore-versions regex matched
+  # against tag-looking strings (dev, latest, v1.2.3) NEVER matches
+  # anything for containers and provides no protection at all. The first
+  # version of this workflow relied on exactly that regex and, because it
+  # was silently a no-op, ended up deleting every version tag in the
+  # registry (v1.0.0 through v1.4.0, latest) - purely oldest-by-creation-
+  # date, since nothing was actually being excluded from consideration.
+  # `delete-only-untagged-versions: true` is the real fix: it filters on
+  # metadata.container.tags.length, which the action *does* populate
+  # correctly for containers, so anything still carrying any tag - a
+  # release, latest, or the current dev - can never be selected no matter
+  # how old it is.
   #
   # ghcr.io packages under a personal account (not an org) can't be deleted
   # with the default GITHUB_TOKEN - GitHub requires a personal access token
@@ -79,12 +93,20 @@ jobs:
             echo "::notice::GHCR_CLEANUP_TOKEN secret not set - skipping old dev image cleanup. Create a PAT with delete:packages + read:packages scopes and add it as that repo secret to enable this."
           fi
 
-      - name: Delete old dev-* image versions
+      # Untagged versions aren't docker-pullable by anyone without already
+      # knowing their digest, so there's no reason to keep any of them
+      # around - delete-only-untagged-versions scopes deletion to exactly
+      # that set, and min-versions-to-keep: 0 means none are kept. Every
+      # tagged version (a release, latest, or the current dev build) is
+      # never in this set at all, so it's never a candidate no matter how
+      # old it is - this is what ignore-versions was meant to guarantee but
+      # silently didn't, for the reason explained above.
+      - name: Delete untagged image versions
         if: steps.check-token.outputs.has-token == 'true'
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
           package-name: ${{ github.event.repository.name }}
           package-type: container
-          min-versions-to-keep: 2
-          ignore-versions: "^(v?\\d+\\.\\d+\\.\\d+|latest|dev)$"
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: true
           token: ${{ secrets.GHCR_CLEANUP_TOKEN }}
