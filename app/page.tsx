@@ -77,7 +77,7 @@ import {
   resetAllSettings,
   Video,
   Subscription,
-} from "@/lib/mockData";
+} from "@/lib/apiClient";
 import type { AppSettings } from "@/lib/settingsStore";
 import { WATCHED_THRESHOLD_DEFAULT } from "@/lib/settingsSchema";
 import type {

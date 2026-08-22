@@ -4,6 +4,7 @@ import React, { useState, useContext, useEffect, useRef } from "react";
 import { AlertTriangle, HelpCircle, Palette, Zap } from "lucide-react";
 import { Button } from "./ui/button";
 import { ThemeContext } from "./ThemeProvider";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import {
   RETENTION_OPTIONS,
   WATCHED_THRESHOLD_DEFAULT,
@@ -92,24 +93,10 @@ export function SettingsPanel({
     };
   }, [local, settings, onSave]);
 
-  useEffect(() => {
-    // Close tooltip when clicking outside
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        tooltipRef.current &&
-        !tooltipRef.current.contains(event.target as Node)
-      ) {
-        setShowFeedLoadingHelp(false);
-      }
-    };
-
-    if (showFeedLoadingHelp) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [showFeedLoadingHelp]);
+  // Close tooltip when clicking outside
+  useClickOutside(tooltipRef, showFeedLoadingHelp, () =>
+    setShowFeedLoadingHelp(false)
+  );
 
   useEffect(() => {
     fetch("/api/version")

@@ -3,7 +3,7 @@
  * Ensures only one data fetch happens regardless of component instances
  */
 
-import { Video } from "./mockData";
+import { Video } from "./apiClient";
 import { videoListsMatch } from "./videoUtils";
 
 type FeedData = {
