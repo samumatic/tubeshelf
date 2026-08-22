@@ -12,6 +12,14 @@ export interface AppSettings {
   defaultPlayerResolution: "360p" | "480p" | "720p" | "1080p";
   sponsorBlockEnabled: boolean;
   playerDebugEnabled: boolean;
+  /**
+   * Whether the built-in player shows YouTube captions. Off by default: some
+   * viewers have "always show captions" set in their own YouTube/Google
+   * account, which overrides the embed's cc_load_policy=0 and forces
+   * captions on regardless - this setting is enforced at runtime (via the
+   * player's captions API) specifically to override that back off.
+   */
+  captionsEnabled: boolean;
   fetchMethod: "standard" | "rss";
   oidcOnly: boolean;
   publicRegistration: boolean;
@@ -36,6 +44,7 @@ export const defaultSettings: AppSettings = {
   defaultPlayerResolution: "1080p",
   sponsorBlockEnabled: true,
   playerDebugEnabled: false,
+  captionsEnabled: false,
   fetchMethod: "standard",
   oidcOnly: false,
   publicRegistration: false,

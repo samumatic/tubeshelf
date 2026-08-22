@@ -2555,6 +2555,13 @@ export default function Home() {
             );
             void handleSaveSettings({ playerDebugEnabled: enabled });
           }}
+          captionsEnabled={settings?.captionsEnabled ?? false}
+          onCaptionsEnabledChange={(enabled) => {
+            setSettings((prev) =>
+              prev ? { ...prev, captionsEnabled: enabled } : prev
+            );
+            void handleSaveSettings({ captionsEnabled: enabled });
+          }}
           onDefaultResolutionChange={(res) => {
             setPlayerQuality(res);
             setSettings((prev) =>

@@ -18,6 +18,8 @@ import {
   VolumeX,
   Eye,
   EyeOff,
+  Captions,
+  CaptionsOff,
 } from "lucide-react";
 import { getProxiedImageUrl } from "@/lib/videoUtils";
 
@@ -75,6 +77,10 @@ type PlayerActionHud =
   | {
       kind: "watched";
       watched: boolean;
+    }
+  | {
+      kind: "captions";
+      enabled: boolean;
     };
 
 type PlayerDebugSnapshot = {
@@ -115,6 +121,7 @@ type PlyrPlayer = {
     getAvailableQualityLevels?: () => string[];
     setPlaybackQuality?: (quality: string) => void;
     setPlaybackQualityRange?: (...qualities: string[]) => void;
+    getIframe?: () => HTMLIFrameElement | null;
   };
   fullscreen?: {
     enabled: boolean;
@@ -232,6 +239,8 @@ interface VideoPlayerProps {
   onToggleWatched?: () => void;
   debugOverlayEnabled?: boolean;
   onDebugOverlayEnabledChange?: (enabled: boolean) => void | Promise<void>;
+  captionsEnabled?: boolean;
+  onCaptionsEnabledChange?: (enabled: boolean) => void | Promise<void>;
   onDefaultResolutionChange?: (
     resolution: "360p" | "480p" | "720p" | "1080p"
   ) => void | Promise<void>;
@@ -283,6 +292,8 @@ const VideoPlayerComponent = ({
   onToggleWatched,
   debugOverlayEnabled = false,
   onDebugOverlayEnabledChange,
+  captionsEnabled = false,
+  onCaptionsEnabledChange,
   onDefaultResolutionChange,
   onProgress,
   initialProgress = 0,
@@ -346,6 +357,7 @@ const VideoPlayerComponent = ({
   const sponsorSeekThumbColorRef = useRef("#ff0000");
   const sponsorBlockEnabledRef = useRef(sponsorBlockEnabled);
   const debugOverlayEnabledRef = useRef(debugOverlayEnabled);
+  const captionsEnabledRef = useRef(captionsEnabled);
   const [playerActionHud, setPlayerActionHud] = useState<PlayerActionHud | null>(
     null
   );
@@ -434,6 +446,17 @@ const VideoPlayerComponent = ({
   useEffect(() => {
     sponsorBlockEnabledRef.current = sponsorBlockEnabled;
   }, [sponsorBlockEnabled]);
+
+  useEffect(() => {
+    captionsEnabledRef.current = captionsEnabled;
+    // Re-applies whenever the setting changes for any reason (the settings
+    // menu toggle, or the initial value on mount) - the player-ready handler
+    // covers the case of a brand new video/iframe.
+    if (playerReadyRef.current) {
+      setYouTubeCaptions(captionsEnabled);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captionsEnabled]);
 
   useEffect(() => {
     debugOverlayEnabledRef.current = debugOverlayEnabled;
@@ -945,6 +968,9 @@ const VideoPlayerComponent = ({
         if (hud.kind === "watched" && current.kind === "watched") {
           return current.watched === hud.watched ? null : current;
         }
+        if (hud.kind === "captions" && current.kind === "captions") {
+          return current.enabled === hud.enabled ? null : current;
+        }
         return current;
       });
       playerActionHudTimerRef.current = null;
@@ -976,6 +1002,43 @@ const VideoPlayerComponent = ({
     const rate = Number(player.speed || 1);
     if (!Number.isFinite(rate)) return;
     showPlayerActionHud({ kind: "speed", rate }, 1000);
+  };
+
+  const showCaptionsActionHud = (enabled: boolean) => {
+    showPlayerActionHud({ kind: "captions", enabled }, 900);
+  };
+
+  /**
+   * Plyr's own toggleCaptions()/captions config is built for its native
+   * HTML5 <track>-based captions and is a no-op for the YouTube provider -
+   * confirmed live, it does nothing here. YouTube's IFrame API has no public
+   * JS method for this either; the only thing that actually works is this
+   * postMessage command straight to the embed. It's also the only way to
+   * override a viewer's own YouTube/Google account "always show captions"
+   * preference, which forces captions on regardless of the embed's own
+   * cc_load_policy=0 - that's the bug this exists to fix.
+   */
+  const setYouTubeCaptions = (enabled: boolean, player?: PlyrPlayer | null) => {
+    const targetPlayer = player || playerRef.current;
+    const iframe = targetPlayer?.embed?.getIframe?.();
+    if (!iframe?.contentWindow) return;
+
+    const track = enabled
+      ? { languageCode: (navigator.language || "en").split("-")[0] }
+      : {};
+
+    try {
+      iframe.contentWindow.postMessage(
+        JSON.stringify({
+          event: "command",
+          func: "setOption",
+          args: ["captions", "track", track],
+        }),
+        "*"
+      );
+    } catch (err) {
+      console.error("Error setting YouTube captions:", err);
+    }
   };
 
   const clearSponsorSkipNoticeTimer = () => {
@@ -1654,6 +1717,18 @@ const VideoPlayerComponent = ({
         playerRef.current = localPlayer;
         playerReadyRef.current = true;
         setPlayerReady(true);
+        // Enforces the captions setting for this video. This is the actual
+        // fix for captions getting stuck on: the embed's own cc_load_policy=0
+        // doesn't override a viewer's "always show captions" YouTube/Google
+        // account preference, so without this, some viewers get captions
+        // forced on for every video with no in-player way to turn them off.
+        // YouTube's captions module isn't always ready the instant "ready"
+        // fires, so this also retries once shortly after.
+        setYouTubeCaptions(captionsEnabledRef.current, localPlayer);
+        window.setTimeout(() => {
+          if (disposed) return;
+          setYouTubeCaptions(captionsEnabledRef.current, localPlayer);
+        }, 750);
         if (
           localPlayer &&
           Number.isFinite(localPlayer.duration) &&
@@ -2208,11 +2283,17 @@ const VideoPlayerComponent = ({
             }
             break;
 
-          case "c":
-            // Toggle captions
+          case "c": {
+            // player.toggleCaptions() is Plyr's native-<track> captions API
+            // and is a no-op for the YouTube provider - toggle our own
+            // tracked state and drive the embed directly instead.
             e.preventDefault();
-            player.toggleCaptions();
+            const nextCaptionsEnabled = !captionsEnabledRef.current;
+            setYouTubeCaptions(nextCaptionsEnabled, player);
+            showCaptionsActionHud(nextCaptionsEnabled);
+            void onCaptionsEnabledChange?.(nextCaptionsEnabled);
             break;
+          }
 
           case "w":
             // Same shortcut the feed grid uses for the highlighted card.
@@ -2483,6 +2564,36 @@ const VideoPlayerComponent = ({
                                 }}
                                 className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                                   debugOverlayEnabled === option.value
+                                    ? "bg-white text-black"
+                                    : "text-gray-300 hover:bg-white/10"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm text-white">Captions</div>
+                            <div className="text-[11px] text-gray-400">
+                              Show YouTube captions/subtitles
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
+                            {([
+                              { label: "On", value: true },
+                              { label: "Off", value: false },
+                            ] as const).map((option) => (
+                              <button
+                                key={option.label}
+                                type="button"
+                                onClick={() => {
+                                  void onCaptionsEnabledChange?.(option.value);
+                                }}
+                                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                                  captionsEnabled === option.value
                                     ? "bg-white text-black"
                                     : "text-gray-300 hover:bg-white/10"
                                 }`}
@@ -2811,6 +2922,23 @@ const VideoPlayerComponent = ({
                           {playerActionHud.watched
                             ? "Marked as watched"
                             : "Marked as unwatched"}
+                        </div>
+                      </div>
+                    </div>
+                  ) : playerActionHud.kind === "captions" ? (
+                    <div className="absolute left-1/2 bottom-20 -translate-x-1/2">
+                      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/70 px-3 py-2 text-white shadow-xl backdrop-blur-sm">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/5">
+                          {playerActionHud.enabled ? (
+                            <Captions className="w-4 h-4" />
+                          ) : (
+                            <CaptionsOff className="w-4 h-4" />
+                          )}
+                        </span>
+                        <div className="text-sm font-medium">
+                          {playerActionHud.enabled
+                            ? "Captions on"
+                            : "Captions off"}
                         </div>
                       </div>
                     </div>
@@ -3345,6 +3473,7 @@ export const VideoPlayer = memo(
       prevProps.defaultResolution === nextProps.defaultResolution &&
       prevProps.sponsorBlockEnabled === nextProps.sponsorBlockEnabled &&
       prevProps.debugOverlayEnabled === nextProps.debugOverlayEnabled &&
+      prevProps.captionsEnabled === nextProps.captionsEnabled &&
       prevProps.initialProgress === nextProps.initialProgress &&
       prevProps.watched === nextProps.watched &&
       prevProps.watchedThresholdPercent === nextProps.watchedThresholdPercent
