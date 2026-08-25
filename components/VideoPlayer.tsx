@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, memo } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   ExternalLink,
@@ -126,6 +127,9 @@ type PlyrPlayer = {
   fullscreen?: {
     enabled: boolean;
     toggle: () => void;
+  };
+  elements?: {
+    controls: HTMLElement | null;
   };
   togglePlay: (toggle?: boolean) => boolean;
   toggleCaptions: (toggle?: boolean) => void;
@@ -352,6 +356,9 @@ const VideoPlayerComponent = ({
   const [playerDuration, setPlayerDuration] = useState(0);
   const shortcutsRef = useRef<HTMLDivElement>(null);
   const playerSettingsMenuRef = useRef<HTMLDivElement>(null);
+  const [controlsPortalTarget, setControlsPortalTarget] =
+    useState<HTMLDivElement | null>(null);
+  const controlsPortalTargetRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [hasRequestedComments, setHasRequestedComments] = useState(false);
@@ -1081,6 +1088,13 @@ const VideoPlayerComponent = ({
     }
   };
 
+  const toggleCaptions = () => {
+    const nextCaptionsEnabled = !captionsEnabledRef.current;
+    setYouTubeCaptions(nextCaptionsEnabled, playerRef.current);
+    showCaptionsActionHud(nextCaptionsEnabled);
+    void onCaptionsEnabledChange?.(nextCaptionsEnabled);
+  };
+
   const clearSponsorSkipNoticeTimer = () => {
     if (sponsorNoticeTimerRef.current) {
       window.clearTimeout(sponsorNoticeTimerRef.current);
@@ -1744,6 +1758,22 @@ const VideoPlayerComponent = ({
         seekTime: 10,
         tooltips: { controls: true, seek: true },
         fullscreen: { enabled: true, fallback: true, iosNative: true },
+        // Plyr's own "captions" button is a no-op for the YouTube provider
+        // (see toggleCaptions below), and "settings" only offers Plyr's
+        // fixed quality/speed submenu with no way to add our own options -
+        // both are dropped here in favor of our own controls, portaled
+        // directly into Plyr's control bar (elements.controls) once ready.
+        controls: [
+          "play-large",
+          "play",
+          "progress",
+          "current-time",
+          "mute",
+          "volume",
+          "pip",
+          "airplay",
+          "fullscreen",
+        ],
         youtube: {
           rel: 0,
           iv_load_policy: 3,
@@ -1757,6 +1787,31 @@ const VideoPlayerComponent = ({
         playerRef.current = localPlayer;
         playerReadyRef.current = true;
         setPlayerReady(true);
+
+        // Insert a marker for our own controls (captions + settings) into
+        // Plyr's real control bar, in the same slot the native captions/
+        // settings buttons would have occupied (just before pip/airplay/
+        // fullscreen). Being a real child of elements.controls means Plyr's
+        // own mouseenter/focusin/idle-timer logic - which it binds directly
+        // to that element - picks our buttons up automatically, with no
+        // custom show/hide syncing needed on our side.
+        const controlsEl = localPlayer?.elements?.controls;
+        if (controlsEl && !controlsEl.contains(controlsPortalTargetRef.current)) {
+          const marker = document.createElement("div");
+          marker.className = "plyr__controls__item flex items-center gap-1";
+          const anchor =
+            controlsEl.querySelector('[data-plyr="pip"]') ||
+            controlsEl.querySelector('[data-plyr="airplay"]') ||
+            controlsEl.querySelector('[data-plyr="fullscreen"]');
+          if (anchor?.parentElement) {
+            anchor.parentElement.insertBefore(marker, anchor);
+          } else {
+            controlsEl.appendChild(marker);
+          }
+          controlsPortalTargetRef.current = marker;
+          setControlsPortalTarget(marker);
+        }
+
         // Enforces the captions setting for this video. This is the actual
         // fix for captions getting stuck on: the embed's own cc_load_policy=0
         // doesn't override a viewer's "always show captions" YouTube/Google
@@ -1914,6 +1969,8 @@ const VideoPlayerComponent = ({
       setPlayerReady(false);
       playerReadyRef.current = false;
       setPlayerDuration(0);
+      controlsPortalTargetRef.current = null;
+      setControlsPortalTarget(null);
       const player = localPlayer || playerRef.current;
       if (playerRef.current === player) {
         playerRef.current = null;
@@ -2323,17 +2380,13 @@ const VideoPlayerComponent = ({
             }
             break;
 
-          case "c": {
+          case "c":
             // player.toggleCaptions() is Plyr's native-<track> captions API
             // and is a no-op for the YouTube provider - toggle our own
             // tracked state and drive the embed directly instead.
             e.preventDefault();
-            const nextCaptionsEnabled = !captionsEnabledRef.current;
-            setYouTubeCaptions(nextCaptionsEnabled, player);
-            showCaptionsActionHud(nextCaptionsEnabled);
-            void onCaptionsEnabledChange?.(nextCaptionsEnabled);
+            toggleCaptions();
             break;
-          }
 
           case "w":
             // Same shortcut the feed grid uses for the highlighted card.
@@ -2499,93 +2552,6 @@ const VideoPlayerComponent = ({
 
             {/* Actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Player Settings */}
-              <div className="relative" ref={playerSettingsMenuRef}>
-                <button
-                  onClick={() => {
-                    setShowPlayerSettingsMenu((prev) => !prev);
-                    setShowShortcuts(false);
-                  }}
-                  className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-                  title="Player settings"
-                  aria-label="Player settings"
-                  aria-expanded={showPlayerSettingsMenu}
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-
-                {showPlayerSettingsMenu && (
-                  <div className="absolute right-0 mt-2 w-[320px] max-w-[calc(100vw-2rem)] rounded-lg border border-white/10 bg-gray-900/95 shadow-2xl z-50 overflow-hidden backdrop-blur-md">
-                    <div className="px-4 py-3 border-b border-white/10">
-                      <h3 className="text-sm font-semibold text-white">
-                        Player Settings
-                      </h3>
-                      <p className="mt-1 text-xs text-gray-400">
-                        Saved for the built-in player
-                      </p>
-                    </div>
-
-                    <div className="p-4 space-y-4">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                          Default Resolution
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {(["720p", "1080p"] as const).map((res) => (
-                            <button
-                              key={res}
-                              type="button"
-                              onClick={() => {
-                                void onDefaultResolutionChange?.(res);
-                              }}
-                              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                                defaultResolution === res
-                                  ? "bg-red-600 text-white"
-                                  : "bg-white/5 text-gray-200 hover:bg-white/10"
-                              }`}
-                            >
-                              {res}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="mt-2 text-[11px] text-gray-500">
-                          YouTube may override this based on bandwidth/device.
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <SettingsToggleRow
-                          label="SponsorBlock"
-                          description="Auto-skip community segments"
-                          value={sponsorBlockEnabled}
-                          onChange={(value) => {
-                            void onSponsorBlockEnabledChange?.(value);
-                          }}
-                        />
-
-                        <SettingsToggleRow
-                          label="Debug Overlay"
-                          description="Show quality/speed/volume diagnostics"
-                          value={debugOverlayEnabled}
-                          onChange={(value) => {
-                            void onDebugOverlayEnabledChange?.(value);
-                          }}
-                        />
-
-                        <SettingsToggleRow
-                          label="Captions"
-                          description="Show YouTube captions/subtitles"
-                          value={captionsEnabled}
-                          onChange={(value) => {
-                            void onCaptionsEnabledChange?.(value);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Keyboard Shortcuts */}
               <div className="relative" ref={shortcutsRef}>
                 <button
@@ -2856,6 +2822,107 @@ const VideoPlayerComponent = ({
                   } as React.CSSProperties
                 }
               />
+              {controlsPortalTarget &&
+                createPortal(
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleCaptions}
+                      className="plyr__control"
+                      aria-label={
+                        captionsEnabled ? "Disable captions" : "Enable captions"
+                      }
+                      aria-pressed={captionsEnabled}
+                      title={
+                        captionsEnabled
+                          ? "Disable captions (c)"
+                          : "Enable captions (c)"
+                      }
+                    >
+                      {captionsEnabled ? <Captions /> : <CaptionsOff />}
+                    </button>
+
+                    <div className="relative" ref={playerSettingsMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPlayerSettingsMenu((prev) => !prev);
+                          setShowShortcuts(false);
+                        }}
+                        className="plyr__control"
+                        aria-label="Player settings"
+                        aria-expanded={showPlayerSettingsMenu}
+                        title="Player settings"
+                      >
+                        <Settings />
+                      </button>
+
+                      {showPlayerSettingsMenu && (
+                        <div className="absolute right-0 bottom-full mb-2 w-[320px] max-w-[calc(100vw-2rem)] rounded-lg border border-white/10 bg-gray-900/95 shadow-2xl z-50 overflow-hidden backdrop-blur-md">
+                          <div className="px-4 py-3 border-b border-white/10">
+                            <h3 className="text-sm font-semibold text-white">
+                              Player Settings
+                            </h3>
+                            <p className="mt-1 text-xs text-gray-400">
+                              Saved for the built-in player
+                            </p>
+                          </div>
+
+                          <div className="p-4 space-y-4">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                                Default Resolution
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(["720p", "1080p"] as const).map((res) => (
+                                  <button
+                                    key={res}
+                                    type="button"
+                                    onClick={() => {
+                                      void onDefaultResolutionChange?.(res);
+                                    }}
+                                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                                      defaultResolution === res
+                                        ? "bg-red-600 text-white"
+                                        : "bg-white/5 text-gray-200 hover:bg-white/10"
+                                    }`}
+                                  >
+                                    {res}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="mt-2 text-[11px] text-gray-500">
+                                YouTube may override this based on
+                                bandwidth/device.
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <SettingsToggleRow
+                                label="SponsorBlock"
+                                description="Auto-skip community segments"
+                                value={sponsorBlockEnabled}
+                                onChange={(value) => {
+                                  void onSponsorBlockEnabledChange?.(value);
+                                }}
+                              />
+
+                              <SettingsToggleRow
+                                label="Debug Overlay"
+                                description="Show quality/speed/volume diagnostics"
+                                value={debugOverlayEnabled}
+                                onChange={(value) => {
+                                  void onDebugOverlayEnabledChange?.(value);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>,
+                  controlsPortalTarget
+                )}
               {playerActionHud && (
                 <div className="pointer-events-none absolute inset-0 z-[25]">
                   {playerActionHud.kind === "seek" ? (
