@@ -2832,7 +2832,11 @@ const VideoPlayerComponent = ({
                           : "Enable captions (c)"
                       }
                     >
-                      {captionsEnabled ? <Captions /> : <CaptionsOff />}
+                      {captionsEnabled ? (
+                        <Captions style={{ fill: "none" }} />
+                      ) : (
+                        <CaptionsOff style={{ fill: "none" }} />
+                      )}
                     </button>
 
                     <div className="relative" ref={playerSettingsMenuRef}>
@@ -2847,7 +2851,7 @@ const VideoPlayerComponent = ({
                         aria-expanded={showPlayerSettingsMenu}
                         title="Player settings"
                       >
-                        <Settings />
+                        <Settings style={{ fill: "none" }} />
                       </button>
 
                       {showPlayerSettingsMenu && (
