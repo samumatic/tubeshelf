@@ -278,41 +278,34 @@ interface ReplyThreadState {
 
 function SettingsToggleRow({
   label,
-  description,
   value,
   onChange,
 }: {
   label: string;
-  description: string;
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <div className="text-sm text-white">{label}</div>
-        <div className="text-[11px] text-gray-400">{description}</div>
-      </div>
-      <div className="flex items-center gap-1 rounded-md bg-white/5 p-1">
-        {([
-          { label: "On", value: true },
-          { label: "Off", value: false },
-        ] as const).map((option) => (
-          <button
-            key={option.label}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              value === option.value
-                ? "bg-white text-black"
-                : "text-gray-300 hover:bg-white/10"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      onClick={() => onChange(!value)}
+      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-white/10"
+    >
+      <span className="text-[13px] text-white">{label}</span>
+      <span
+        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+          value ? "bg-red-600" : "bg-white/20"
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+            value ? "translate-x-[18px]" : "translate-x-[3px]"
+          }`}
+        />
+      </span>
+    </button>
   );
 }
 
@@ -2858,65 +2851,46 @@ const VideoPlayerComponent = ({
                       </button>
 
                       {showPlayerSettingsMenu && (
-                        <div className="absolute right-0 bottom-full mb-2 w-[320px] max-w-[calc(100vw-2rem)] rounded-lg border border-white/10 bg-gray-900/95 shadow-2xl z-50 overflow-hidden backdrop-blur-md">
-                          <div className="px-4 py-3 border-b border-white/10">
-                            <h3 className="text-sm font-semibold text-white">
-                              Player Settings
-                            </h3>
-                            <p className="mt-1 text-xs text-gray-400">
-                              Saved for the built-in player
-                            </p>
-                          </div>
-
-                          <div className="p-4 space-y-4">
-                            <div>
-                              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                                Default Resolution
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                {(["720p", "1080p"] as const).map((res) => (
-                                  <button
-                                    key={res}
-                                    type="button"
-                                    onClick={() => {
-                                      void onDefaultResolutionChange?.(res);
-                                    }}
-                                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                                      defaultResolution === res
-                                        ? "bg-red-600 text-white"
-                                        : "bg-white/5 text-gray-200 hover:bg-white/10"
-                                    }`}
-                                  >
-                                    {res}
-                                  </button>
-                                ))}
-                              </div>
-                              <p className="mt-2 text-[11px] text-gray-500">
-                                YouTube may override this based on
-                                bandwidth/device.
-                              </p>
-                            </div>
-
-                            <div className="space-y-2">
-                              <SettingsToggleRow
-                                label="SponsorBlock"
-                                description="Auto-skip community segments"
-                                value={sponsorBlockEnabled}
-                                onChange={(value) => {
-                                  void onSponsorBlockEnabledChange?.(value);
-                                }}
-                              />
-
-                              <SettingsToggleRow
-                                label="Debug Overlay"
-                                description="Show quality/speed/volume diagnostics"
-                                value={debugOverlayEnabled}
-                                onChange={(value) => {
-                                  void onDebugOverlayEnabledChange?.(value);
-                                }}
-                              />
+                        <div className="absolute right-0 bottom-full mb-2 w-64 max-w-[calc(100vw-2rem)] rounded-lg bg-[#0f0f0f]/95 shadow-2xl z-50 overflow-hidden backdrop-blur-md py-1">
+                          <div className="flex items-center justify-between gap-3 px-3 py-2">
+                            <span className="text-[13px] text-white">
+                              Resolution
+                            </span>
+                            <div className="flex items-center gap-0.5 rounded-full bg-white/10 p-0.5">
+                              {(["720p", "1080p"] as const).map((res) => (
+                                <button
+                                  key={res}
+                                  type="button"
+                                  onClick={() => {
+                                    void onDefaultResolutionChange?.(res);
+                                  }}
+                                  className={`rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                                    defaultResolution === res
+                                      ? "bg-red-600 text-white"
+                                      : "text-gray-300 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {res}
+                                </button>
+                              ))}
                             </div>
                           </div>
+
+                          <SettingsToggleRow
+                            label="SponsorBlock"
+                            value={sponsorBlockEnabled}
+                            onChange={(value) => {
+                              void onSponsorBlockEnabledChange?.(value);
+                            }}
+                          />
+
+                          <SettingsToggleRow
+                            label="Debug Overlay"
+                            value={debugOverlayEnabled}
+                            onChange={(value) => {
+                              void onDebugOverlayEnabledChange?.(value);
+                            }}
+                          />
                         </div>
                       )}
                     </div>
