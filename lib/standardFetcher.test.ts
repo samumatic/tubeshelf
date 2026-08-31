@@ -29,9 +29,12 @@ describe("parseRelativeTime", () => {
     );
   });
 
-  it("falls back to the reference time for unparseable text", () => {
-    expect(parseRelativeTime("Premiered", now)).toBe(new Date(now).toISOString());
-    expect(parseRelativeTime("", now)).toBe(new Date(now).toISOString());
+  it("returns undefined for unparseable text instead of faking 'now'", () => {
+    // A prior version of this fell back to the reference time here, which
+    // wrote a permanent, wrong "just published" date into the cache for
+    // real, older videos whenever YouTube's text didn't match.
+    expect(parseRelativeTime("Premiered", now)).toBeUndefined();
+    expect(parseRelativeTime("", now)).toBeUndefined();
   });
 });
 

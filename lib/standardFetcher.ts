@@ -108,54 +108,19 @@ function parseVideoRenderer(
       }
     }
 
-    // Parse published date
+    // Parse published date. Every real video card carries one; when the
+    // text is missing or doesn't match the expected "N units ago" shape,
+    // that's a signal this entry is malformed rather than a video with no
+    // date to report (mirrors parseLockupViewModel below). Skipping it here
+    // is safe - it just means this entry doesn't update on this particular
+    // fetch, and picks up its real date on a later one. This previously
+    // defaulted to "now", which wrote a permanent, wrong "just published"
+    // date into the cache for real, older videos.
     const publishedText = renderer.publishedTimeText?.simpleText || "";
-    let publishedAt = new Date().toISOString();
-
-    // Try to parse relative time like "2 hours ago", "3 days ago"
-    if (publishedText) {
-      const now = new Date(referenceNowMs);
-      const timeMatch = publishedText.match(
-        /(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i
-      );
-      if (timeMatch) {
-        const value = parseInt(timeMatch[1]);
-        const unit = timeMatch[2].toLowerCase();
-
-        switch (unit) {
-          case "second":
-            now.setSeconds(now.getSeconds() - value);
-            now.setMilliseconds(0);
-            break;
-          case "minute":
-            now.setMinutes(now.getMinutes() - value);
-            now.setSeconds(0, 0);
-            break;
-          case "hour":
-            now.setHours(now.getHours() - value);
-            // YouTube only exposes hour precision here; avoid fake minute/second order.
-            now.setMinutes(0, 0, 0);
-            break;
-          case "day":
-            now.setDate(now.getDate() - value);
-            now.setHours(0, 0, 0, 0);
-            break;
-          case "week":
-            now.setDate(now.getDate() - value * 7);
-            now.setHours(0, 0, 0, 0);
-            break;
-          case "month":
-            now.setMonth(now.getMonth() - value);
-            now.setHours(0, 0, 0, 0);
-            break;
-          case "year":
-            now.setFullYear(now.getFullYear() - value);
-            now.setHours(0, 0, 0, 0);
-            break;
-        }
-        publishedAt = now.toISOString();
-      }
-    }
+    const publishedAt = publishedText
+      ? parseRelativeTime(publishedText, referenceNowMs)
+      : undefined;
+    if (!publishedAt) return null;
 
     // Parse view count
     let viewCount: number | undefined;
@@ -284,12 +249,18 @@ function parseVideoRenderer(
  * timestamp. Shared between the legacy videoRenderer parser and the current
  * lockupViewModel one, since YouTube expresses both the same way.
  */
-export function parseRelativeTime(text: string, referenceNowMs: number): string {
+export function parseRelativeTime(
+  text: string,
+  referenceNowMs: number
+): string | undefined {
   const now = new Date(referenceNowMs);
   const timeMatch = text.match(
     /(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i
   );
-  if (!timeMatch) return now.toISOString();
+  // Unparseable text ("Premiered", a scheduled-stream label, etc.) is not a
+  // real "published now" - returning undefined here lets the caller skip the
+  // entry rather than writing a fake "just published" date into the cache.
+  if (!timeMatch) return undefined;
 
   const value = parseInt(timeMatch[1]);
   const unit = timeMatch[2].toLowerCase();
