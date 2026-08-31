@@ -22,6 +22,14 @@ const CACHE_KEY = "tubeshelf_feed_cache";
 const DURATION_POLL_INTERVAL_MS = 5000;
 /** Consecutive fruitless polls before giving up on the remaining videos. */
 const DURATION_POLL_MAX_STAGNANT = 2;
+/**
+ * How long to wait before re-checking a cache-first load against the server.
+ * A non-forced /api/feed request can trigger a per-channel refresh on the
+ * server that runs in the background and isn't reflected in that request's
+ * own (already-sent) response - see app/api/feed/route.ts. This gives that
+ * refresh time to land before checking once for it.
+ */
+const STALE_CACHE_RECHECK_DELAY_MS = 6000;
 
 export class AuthExpiredError extends Error {
   constructor(message = "Session expired. Please sign in again.") {
@@ -45,6 +53,7 @@ class FeedManager {
   private hasCachedData = false;
   private durationPollTimer: ReturnType<typeof setTimeout> | null = null;
   private durationPollsWithoutProgress = 0;
+  private staleCacheRecheckTimer: ReturnType<typeof setTimeout> | null = null;
   // This is a module-level singleton, so it outlives any one user's session -
   // it has to know whose data it's holding, or switching accounts in the
   // same tab (or the same browser reusing localStorage on reload) flashes
@@ -100,6 +109,7 @@ class FeedManager {
 
     this.currentUserId = userId;
     this.cancelDurationPoll();
+    this.cancelStaleCacheRecheck();
     this.durationPollsWithoutProgress = 0;
     this.initialized = false;
     this.initPromise = null;
@@ -194,6 +204,42 @@ class FeedManager {
     }
   }
 
+  private cancelStaleCacheRecheck() {
+    if (this.staleCacheRecheckTimer) {
+      clearTimeout(this.staleCacheRecheckTimer);
+      this.staleCacheRecheckTimer = null;
+    }
+  }
+
+  /**
+   * A cache-first load (e.g. right after the tab was unloaded and reloaded,
+   * long enough for a channel to go stale) can hand back data a background
+   * refresh is about to replace, with no way for the client to know when
+   * that lands. This does one follow-up fetch shortly after such a load to
+   * pick up the result, instead of leaving the user stuck looking at stale
+   * data until they refresh by hand.
+   */
+  private scheduleStaleCacheRecheck() {
+    this.cancelStaleCacheRecheck();
+    this.staleCacheRecheckTimer = setTimeout(() => {
+      this.staleCacheRecheckTimer = null;
+      this.recheckAfterCacheFirstLoad().catch(() => undefined);
+    }, STALE_CACHE_RECHECK_DELAY_MS);
+  }
+
+  private async recheckAfterCacheFirstLoad() {
+    const response = await fetch("/api/feed?refresh=false");
+    if (!response.ok) return;
+
+    const json = await response.json();
+    const videos = this.mapItems(json.items || []);
+
+    if (!videoListsMatch(this.data.videos, videos)) {
+      this.updateData({ videos });
+      this.saveCache();
+    }
+  }
+
   /**
    * Video lengths are resolved on the server a batch at a time, after the feed
    * response has already been sent. Poll while any are still missing so the
@@ -258,6 +304,7 @@ class FeedManager {
       try {
         // A fetch is about to supply fresher data than any pending poll would.
         this.cancelDurationPoll();
+        this.cancelStaleCacheRecheck();
 
         // Show fetching state to indicate background refresh
         // Show loading only if we don't have cached data
@@ -325,6 +372,12 @@ class FeedManager {
             // Lengths are backfilled after this response was built, so watch
             // for the ones that are still missing.
             this.scheduleDurationPoll();
+            // A non-forced request can have just triggered a background
+            // per-channel refresh server-side without waiting for it - check
+            // back for that once. A forced refresh already waited for it.
+            if (!forceRefresh) {
+              this.scheduleStaleCacheRecheck();
+            }
             return;
           } catch (err) {
             if (err instanceof AuthExpiredError) {
