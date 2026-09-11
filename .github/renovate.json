@@ -4,6 +4,12 @@
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate Dashboard",
   "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "description": "Renovate's vulnerability-alert PRs (native GitHub alerts + osvVulnerabilityAlerts above) only target direct dependencies it extracts from package.json - a vulnerable transitive dependency (e.g. js-yaml/@humanfs/node pulled in by eslint) doesn't get its own remediation PR even when the parent's already-declared semver range permits the patched version. This does a periodic full lockfile refresh instead, which picks those up automatically since npm just re-resolves within existing ranges.",
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["before 4am on monday"]
+  },
   "packageRules": [
     {
       "description": "Automerge minor/patch/pin/digest updates via PR once CI passes. main now requires a PR + passing status checks (branch protection), so a direct branch push (the previous automergeType) would just be rejected - this still ends up hands-off, but with an actual CI gate and a paper trail instead of a silent direct push.",
