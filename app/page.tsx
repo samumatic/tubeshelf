@@ -1996,6 +1996,20 @@ export default function Home() {
                 </span>
                 <span>•</span>
                 <span>{filteredVideos.length} videos</span>
+                {searchQuery.trim() && (
+                  <>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground hover:bg-muted/70"
+                      title="Clear search filter"
+                    >
+                      Filtered by &ldquo;{searchQuery.trim()}&rdquo;
+                      <X className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
               </div>
               {error && (
                 <p className="text-sm text-destructive mt-2">{error}</p>
