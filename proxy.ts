@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { needsSetup } from "@/lib/setup";
+import { extractApiKey, isApiKeyAllowedPath } from "@/lib/apiKeyHeaders";
 
 // Paths that are always public
 const publicPaths = [
@@ -37,6 +38,19 @@ export function proxy(request: NextRequest) {
   const isPublic = publicPaths.some((path) => pathname.startsWith(path));
 
   if (isPublic) {
+    return NextResponse.next();
+  }
+
+  // API-key requests carry no session cookie. Let them through to the
+  // routes keys are scoped to (which validate the key via getCurrentUser)
+  // and refuse everything else here.
+  if (extractApiKey(request.headers)) {
+    if (!isApiKeyAllowedPath(pathname)) {
+      return NextResponse.json(
+        { error: "API keys can only access subscription endpoints" },
+        { status: 403 }
+      );
+    }
     return NextResponse.next();
   }
 

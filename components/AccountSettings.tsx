@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, Mail, Lock, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { ApiKeysCard } from "@/components/ApiKeysCard";
 
 interface AccountSettingsProps {
   onClose?: () => void;
@@ -160,6 +161,8 @@ export function AccountSettings({
             OIDC provider&apos;s account settings.
           </p>
         </div>
+
+        <ApiKeysCard onShowToast={onShowToast} />
       </div>
     );
   }
@@ -376,6 +379,8 @@ export function AccountSettings({
           </button>
         </form>
       </div>
+
+      <ApiKeysCard onShowToast={onShowToast} />
     </div>
   );
 }

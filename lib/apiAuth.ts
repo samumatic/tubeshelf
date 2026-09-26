@@ -26,3 +26,23 @@ export async function requireAdmin(
   }
   return user;
 }
+
+/**
+ * Same as {@link requireUser}, but rejects API-key auth. For routes that
+ * manage credentials or the account itself.
+ */
+export async function requireSessionUser(
+  request?: Request
+): Promise<CurrentUser | NextResponse> {
+  const user = await getCurrentUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (user.viaApiKey) {
+    return NextResponse.json(
+      { error: "This action requires signing in; API keys can't be used" },
+      { status: 403 }
+    );
+  }
+  return user;
+}
