@@ -5,8 +5,40 @@ import {
   mapBetterAuthUser,
   type AppAuthUser,
 } from "./betterAuth";
+import { extractApiKey } from "./apiKeyHeaders";
+import { resolveApiKeyUser } from "./apiKeyStore";
 
-export interface CurrentUser extends AppAuthUser {}
+export interface CurrentUser extends AppAuthUser {
+  /** True when the request authenticated with an API key, not a session. */
+  viaApiKey?: boolean;
+}
+
+/**
+ * Resolves an API key the request presents. Returns undefined when it
+ * presents none (fall through to session auth) and null when the key is
+ * unknown - an explicit credential that fails must not fall back to cookies.
+ *
+ * API-key users are never admins, regardless of the account's role: keys are
+ * meant for syncing subscriptions, not for administering the instance.
+ */
+function userFromApiKey(headerBag: Headers): CurrentUser | null | undefined {
+  const rawKey = extractApiKey(headerBag);
+  if (!rawKey) return undefined;
+
+  const keyUser = resolveApiKeyUser(rawKey);
+  if (!keyUser) return null;
+
+  return {
+    id: keyUser.id,
+    email: keyUser.email,
+    name: keyUser.name,
+    isAdmin: false,
+    isDefaultAdmin: false,
+    oidcProvider: keyUser.oidcProvider,
+    authType: keyUser.oidcProvider ? "oidc" : "local",
+    viaApiKey: true,
+  };
+}
 
 function firstHeaderValue(value: string | null): string {
   if (!value) return "";
@@ -25,12 +57,18 @@ export async function getCurrentUser(
   request?: Request
 ): Promise<CurrentUser | null> {
   if (request) {
+    const apiKeyUser = userFromApiKey(request.headers);
+    if (apiKeyUser !== undefined) return apiKeyUser;
+
     const session = await getSessionFromRequest(request);
     return mapBetterAuthUser(session?.user);
   }
 
   const headerStore = await headers();
   const headerBag = new Headers(headerStore);
+
+  const apiKeyUser = userFromApiKey(headerBag);
+  if (apiKeyUser !== undefined) return apiKeyUser;
 
   if (!headerBag.get("cookie")) {
     const cookieStore = await cookies();
