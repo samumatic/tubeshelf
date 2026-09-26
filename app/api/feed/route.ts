@@ -17,6 +17,7 @@ import {
 import { backfillDurations } from "@/lib/durationBackfill";
 import { readSettings, type AppSettings } from "@/lib/settingsStore";
 import { readUserState } from "@/lib/userStateStore";
+import { YOUTUBE_CONSENT_COOKIE } from "@/lib/youtubeConsent";
 
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -193,6 +194,9 @@ async function handleFeedRequest(
   const url = new URL(req.url);
   const idsParam = url.searchParams.get("ids");
   const forceRefresh = url.searchParams.get("refresh") === "true";
+  // Set by the client's own follow-up polls, which aren't a user action and
+  // must not trigger channel fetches from YouTube.
+  const cacheOnly = !forceRefresh && url.searchParams.get("cacheOnly") === "true";
   const requestId = Math.random().toString(36).substring(7);
 
   const [settings, userState] = await Promise.all([
@@ -233,18 +237,22 @@ async function handleFeedRequest(
   const neverFetched = channelIds.filter(
     (id) => !fetchStates.get(id)?.lastFetchedAt
   );
-  const staleChannels = forceRefresh
+  const staleChannels = cacheOnly
+    ? []
+    : forceRefresh
     ? channelIds
     : getStaleChannels(channelIds, fetchStates, settings);
   // Wait for the fetch when the client asked for it, when there is nothing to
   // show yet, or when a freshly added subscription has never been fetched.
-  const blocking = forceRefresh || cachedCount === 0 || neverFetched.length > 0;
+  const blocking =
+    !cacheOnly &&
+    (forceRefresh || cachedCount === 0 || neverFetched.length > 0);
 
   console.log(
     `[Feed] Request ${requestId}: ${channelIds.length} channels, ` +
       `${cachedCount} cached videos, ${staleChannels.length} stale, ` +
       `retention=${retentionDays === 0 ? "forever" : `${retentionDays}d`}, ` +
-      `mode=${blocking ? "blocking" : "cache-first"}`
+      `mode=${cacheOnly ? "cache-only" : blocking ? "blocking" : "cache-first"}`
   );
 
   if (staleChannels.length > 0) {
@@ -291,7 +299,8 @@ async function handleFeedRequest(
     `[Feed] Request ${requestId} completed - returning ${items.length} items`
   );
 
-  if (!idsParam && items.length > 0) {
+  // Avatar backfill fetches channel pages too, so it only runs on user loads.
+  if (!cacheOnly && !idsParam && items.length > 0) {
     updateSubscriptionMetadataAsync(items, user.id).catch((err) =>
       console.warn("[Feed] Failed to update subscription metadata:", err)
     );
@@ -382,7 +391,7 @@ async function fetchChannelAvatarDirect(
     "user-agent":
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "accept-language": "en-US,en;q=0.8",
-    cookie: "CONSENT=YES+1",
+    cookie: YOUTUBE_CONSENT_COOKIE,
   };
 
   try {

@@ -18,6 +18,7 @@ import {
   markDurationAttemptFailed,
   saveVideoDuration,
 } from "./videoCacheStore";
+import { YOUTUBE_CONSENT_COOKIE } from "./youtubeConsent";
 
 /** Videos resolved per feed request, so a cold start stays a background trickle. */
 const BATCH_LIMIT = 50;
@@ -122,7 +123,7 @@ async function fetchViaWatchPage(videoId: string): Promise<VideoDetails | null> 
         headers: {
           "user-agent": USER_AGENT,
           "accept-language": "en-US,en;q=0.8",
-          cookie: "CONSENT=YES+1",
+          cookie: YOUTUBE_CONSENT_COOKIE,
         },
       }
     );

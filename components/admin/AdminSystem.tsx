@@ -43,13 +43,13 @@ const FEED_SETTING_FIELDS: Array<{
   },
   {
     key: "feedRefreshMinutes",
-    label: "Refresh channels every (minutes)",
-    hint: "Minimum age before a channel is fetched again",
+    label: "Channel refresh age (minutes)",
+    hint: "On page load, channels older than this are fetched again",
   },
   {
     key: "feedErrorRetryMinutes",
     label: "Retry failed channels after (minutes)",
-    hint: "Shorter retry for channels whose last fetch failed",
+    hint: "On page load, failed channels older than this are retried",
   },
 ];
 

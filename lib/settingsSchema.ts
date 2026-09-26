@@ -49,11 +49,13 @@ export const defaultSettings: AppSettings = {
   oidcOnly: false,
   publicRegistration: false,
   videoRetentionDays: 270, // 9 months
-  feedConcurrency: 8,
+  // Kept low: YouTube starts serving consent/bot-check pages instead of
+  // channel data to IPs that poll it in bursts.
+  feedConcurrency: 3,
   feedChannelTimeoutSeconds: 15,
   feedRequestTimeoutSeconds: 60,
-  feedRefreshMinutes: 15,
-  feedErrorRetryMinutes: 5,
+  feedRefreshMinutes: 30,
+  feedErrorRetryMinutes: 30,
 };
 
 /** Allowed range for every numeric setting, used by the admin API and readers. */
