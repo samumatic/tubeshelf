@@ -228,7 +228,7 @@ class FeedManager {
   }
 
   private async recheckAfterCacheFirstLoad() {
-    const response = await fetch("/api/feed?refresh=false");
+    const response = await fetch("/api/feed?cacheOnly=true");
     if (!response.ok) return;
 
     const json = await response.json();
@@ -266,7 +266,7 @@ class FeedManager {
   private async pollDurations() {
     const known = this.countKnownDurations(this.data.videos);
 
-    const response = await fetch("/api/feed?refresh=false");
+    const response = await fetch("/api/feed?cacheOnly=true");
     if (!response.ok) {
       // Treat a failed poll like a no-progress one: keep retrying (a single
       // transient error shouldn't permanently stop durations from filling

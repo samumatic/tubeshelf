@@ -10,6 +10,8 @@
  * and includes duration data natively.
  */
 
+import { YOUTUBE_CONSENT_COOKIE } from "./youtubeConsent";
+
 export interface StandardVideo {
   id: string;
   title: string;
@@ -254,8 +256,9 @@ export function parseRelativeTime(
   referenceNowMs: number
 ): string | undefined {
   const now = new Date(referenceNowMs);
+  // Accepts both "5 days ago" and the abbreviated "5d ago" / "1mo ago" form.
   const timeMatch = text.match(
-    /(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i
+    /(\d+)\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|wks?|w|months?|mos?|years?|yrs?|y)\s+ago/i
   );
   // Unparseable text ("Premiered", a scheduled-stream label, etc.) is not a
   // real "published now" - returning undefined here lets the caller skip the
@@ -263,7 +266,12 @@ export function parseRelativeTime(
   if (!timeMatch) return undefined;
 
   const value = parseInt(timeMatch[1]);
-  const unit = timeMatch[2].toLowerCase();
+  const token = timeMatch[2].toLowerCase();
+  const unit = token.startsWith("mo")
+    ? "month"
+    : ({ s: "second", m: "minute", h: "hour", d: "day", w: "week", y: "year" } as const)[
+        token[0] as "s" | "m" | "h" | "d" | "w" | "y"
+      ];
 
   switch (unit) {
     case "second":
@@ -304,19 +312,17 @@ export function parseRelativeTime(
  * legacy videoRenderer parser and the current lockupViewModel one.
  */
 export function parseViewCount(text: string): number | undefined {
-  const viewMatch = text.match(/([\d,\.]+)\s*[KMB]?\s*views?/i);
-  if (!viewMatch) return undefined;
+  // "46.9K views", or just "943K" in the current channel-page layout.
+  const match = text
+    .trim()
+    .match(/^([\d,.]+)\s*([KMB])?(?:\s*(?:views?|watching))?$/i);
+  if (!match) return undefined;
 
-  let views = viewMatch[1].replace(/,/g, "");
-  const multiplierMatch = text.match(/([\d,\.]+)\s*([KMB])\s*views?/i);
-  if (multiplierMatch) {
-    const base = parseFloat(multiplierMatch[1]);
-    const multiplier = multiplierMatch[2];
-    if (multiplier === "K") views = String(base * 1000);
-    else if (multiplier === "M") views = String(base * 1000000);
-    else if (multiplier === "B") views = String(base * 1000000000);
-  }
-  return parseInt(views);
+  const base = parseFloat(match[1].replace(/,/g, ""));
+  const multiplier = { K: 1e3, M: 1e6, B: 1e9 }[
+    (match[2] || "").toUpperCase() as "K" | "M" | "B"
+  ];
+  return Math.round(base * (multiplier ?? 1));
 }
 
 /**
@@ -350,7 +356,10 @@ export function parseLockupViewModel(
     // views/time row down to index 1 - so every row has to be checked, not
     // just the first.
     const metadataRows: Array<{
-      metadataParts?: Array<{ text?: { content?: string } }>;
+      metadataParts?: Array<{
+        text?: { content?: string };
+        accessibilityLabel?: string;
+      }>;
     }> =
       metadataViewModel?.metadata?.contentMetadataViewModel?.metadataRows ||
       [];
@@ -358,11 +367,16 @@ export function parseLockupViewModel(
     let publishedAt: string | undefined;
     for (const row of metadataRows) {
       for (const part of row.metadataParts || []) {
+        // The visible text is abbreviated ("943K", "5d ago"); the
+        // accessibility label keeps the unambiguous long form.
         const text = part.text?.content || "";
-        if (/views?$/i.test(text) || /watching$/i.test(text)) {
+        const label = part.accessibilityLabel || "";
+        if (/(views?|watching)$/i.test(label) || /(views?|watching)$/i.test(text)) {
           viewCount = parseViewCount(text);
-        } else if (/ago$/i.test(text)) {
-          publishedAt = parseRelativeTime(text, referenceNowMs);
+        } else if (/ago$/i.test(label) || /ago$/i.test(text)) {
+          publishedAt =
+            parseRelativeTime(label, referenceNowMs) ??
+            parseRelativeTime(text, referenceNowMs);
         }
       }
     }
@@ -447,7 +461,7 @@ export async function fetchChannelVideos(
     "Accept-Language": "en-US,en;q=0.9",
     Accept:
       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    Cookie: "CONSENT=YES+1",
+    Cookie: YOUTUBE_CONSENT_COOKIE,
   };
 
   try {
@@ -558,6 +572,13 @@ export async function fetchChannelVideos(
     ]
       .filter((v): v is StandardVideo => v !== null)
       .slice(0, limit);
+
+    const entryCount = lockupViewModels.length + videoRenderers.length;
+    if (entryCount > 0 && videos.length === 0) {
+      console.warn(
+        `[StandardFetcher] Parsed 0 of ${entryCount} entries for ${channelId} - YouTube's page format may have changed`
+      );
+    }
 
     const { debug: dbg } = await import("@/lib/logger");
     dbg(

@@ -29,6 +29,13 @@ describe("parseRelativeTime", () => {
     );
   });
 
+  it("parses the abbreviated form", () => {
+    expect(parseRelativeTime("5d ago", now)).toBe("2026-08-15T00:00:00.000Z");
+    expect(parseRelativeTime("3h ago", now)).toBe("2026-08-20T09:00:00.000Z");
+    expect(parseRelativeTime("1mo ago", now)).toBe("2026-07-20T00:00:00.000Z");
+    expect(parseRelativeTime("30m ago", now)).toBe("2026-08-20T11:30:00.000Z");
+  });
+
   it("returns undefined for unparseable text instead of faking 'now'", () => {
     // A prior version of this fell back to the reference time here, which
     // wrote a permanent, wrong "just published" date into the cache for
@@ -47,6 +54,11 @@ describe("parseViewCount", () => {
     expect(parseViewCount("46.9K views")).toBe(46900);
     expect(parseViewCount("1.7M views")).toBe(1700000);
     expect(parseViewCount("2B views")).toBe(2000000000);
+  });
+
+  it("parses a bare abbreviated count with no 'views' suffix", () => {
+    expect(parseViewCount("943K")).toBe(943000);
+    expect(parseViewCount("1.2M")).toBe(1200000);
   });
 
   it("returns undefined for text with no view count", () => {
@@ -157,6 +169,46 @@ describe("parseLockupViewModel", () => {
     expect(video?.publishedAt).toBe("2026-07-20T00:00:00.000Z");
     // Before the fix this fell through to "now" instead of the real date.
     expect(video?.publishedAt).not.toBe(new Date(referenceNowMs).toISOString());
+  });
+
+  it("parses the abbreviated metadata row layout", () => {
+    // Channel pages switched to "943K" / "5d ago" as visible text, with the
+    // long form only in accessibilityLabel.
+    const lockup = baseLockup({
+      metadata: {
+        lockupMetadataViewModel: {
+          title: { content: "An abbreviated-row video" },
+          metadata: {
+            contentMetadataViewModel: {
+              metadataRows: [
+                {
+                  metadataParts: [
+                    {
+                      text: { content: "943K" },
+                      accessibilityLabel: "943 thousand views",
+                    },
+                    {
+                      text: { content: "5d ago" },
+                      accessibilityLabel: "5 days ago",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    const video = parseLockupViewModel(
+      lockup,
+      "UCchannel",
+      "Some Channel",
+      referenceNowMs
+    );
+
+    expect(video?.viewCount).toBe(943000);
+    expect(video?.publishedAt).toBe("2026-08-15T00:00:00.000Z");
   });
 
   it("detects a members-only badge alongside the duration badge", () => {

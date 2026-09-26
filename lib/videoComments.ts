@@ -1,4 +1,5 @@
 import { warn } from "@/lib/logger";
+import { YOUTUBE_CONSENT_COOKIE } from "@/lib/youtubeConsent";
 
 export type CommentSort = "top" | "new";
 
@@ -36,7 +37,7 @@ const WATCH_HEADERS: HeadersInit = {
   "user-agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "accept-language": "en-US,en;q=0.8",
-  cookie: "CONSENT=YES+1",
+  cookie: YOUTUBE_CONSENT_COOKIE,
 };
 
 const CONTINUATION_HEADERS_BASE: HeadersInit = {
