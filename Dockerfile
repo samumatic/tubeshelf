@@ -80,3 +80,10 @@ CMD ["node", "server.js"]
 
 # Set the NODE_ENV environment variable to production
 ENV NODE_ENV=production
+
+# Only the dev-container workflow sets these; release images leave them empty
+# so the app reports the plain package.json version (see lib/version.ts).
+ARG BUILD_CHANNEL=""
+ARG BUILD_COMMIT=""
+ENV TUBESHELF_BUILD_CHANNEL=$BUILD_CHANNEL \
+    TUBESHELF_BUILD_COMMIT=$BUILD_COMMIT

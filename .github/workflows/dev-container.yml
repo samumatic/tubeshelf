@@ -43,6 +43,9 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ github.event.inputs.tag }}
           provenance: false
+          build-args: |
+            BUILD_CHANNEL=${{ github.event.inputs.tag }}
+            BUILD_COMMIT=${{ github.sha }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
 
