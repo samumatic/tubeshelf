@@ -336,6 +336,51 @@ function normalizeListName(raw: string): string {
 }
 
 /**
+ * Inside a transaction: makes sure the default list exists and returns a
+ * function mapping a group name to its list id - the default list for an
+ * empty or "Default" name, an existing list matched case-insensitively, or a
+ * newly created list (recorded in createdLists).
+ */
+function createListResolver(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  defaultListId: string,
+  createdLists: string[]
+): (rawName: string) => string {
+  // ensureDefaultList only creates it for users with no lists at all, so
+  // make sure it exists before ungrouped channels are filed into it.
+  db.prepare(
+    "INSERT OR IGNORE INTO subscription_lists (id, name, user_id, created_at) VALUES (?, ?, ?, ?)"
+  ).run(defaultListId, "Default", userId, new Date().toISOString());
+
+  const lists = db
+    .prepare("SELECT id, name FROM subscription_lists WHERE user_id = ?")
+    .all(userId) as Array<{ id: string; name: string }>;
+
+  const listIdByName = new Map<string, string>();
+  for (const list of lists) {
+    if (list.id === defaultListId) continue;
+    const key = list.name.toLowerCase();
+    if (!listIdByName.has(key)) listIdByName.set(key, list.id);
+  }
+
+  const insertList = db.prepare(
+    "INSERT INTO subscription_lists (id, name, user_id, created_at) VALUES (?, ?, ?, ?)"
+  );
+  return (rawName: string): string => {
+    const name = normalizeListName(rawName);
+    if (!name || name.toLowerCase() === "default") return defaultListId;
+    const existing = listIdByName.get(name.toLowerCase());
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    insertList.run(id, name, userId, new Date().toISOString());
+    listIdByName.set(name.toLowerCase(), id);
+    createdLists.push(name);
+    return id;
+  };
+}
+
+/**
  * Makes the user's lists match a complete subscription snapshot from another
  * tool (SubRelay's channel groups map to TubeShelf lists):
  *
@@ -367,37 +412,7 @@ export async function syncListsFromSnapshot(
   };
 
   const tx = db.transaction(() => {
-    // ensureDefaultList only creates it for users with no lists at all, so
-    // make sure it exists before ungrouped channels are filed into it.
-    db.prepare(
-      "INSERT OR IGNORE INTO subscription_lists (id, name, user_id, created_at) VALUES (?, ?, ?, ?)"
-    ).run(defaultListId, "Default", userId, new Date().toISOString());
-
-    const lists = db
-      .prepare("SELECT id, name FROM subscription_lists WHERE user_id = ?")
-      .all(userId) as Array<{ id: string; name: string }>;
-
-    const listIdByName = new Map<string, string>();
-    for (const list of lists) {
-      if (list.id === defaultListId) continue;
-      const key = list.name.toLowerCase();
-      if (!listIdByName.has(key)) listIdByName.set(key, list.id);
-    }
-
-    const insertList = db.prepare(
-      "INSERT INTO subscription_lists (id, name, user_id, created_at) VALUES (?, ?, ?, ?)"
-    );
-    const listIdFor = (rawName: string): string => {
-      const name = normalizeListName(rawName);
-      if (!name || name.toLowerCase() === "default") return defaultListId;
-      const existing = listIdByName.get(name.toLowerCase());
-      if (existing) return existing;
-      const id = crypto.randomUUID();
-      insertList.run(id, name, userId, new Date().toISOString());
-      listIdByName.set(name.toLowerCase(), id);
-      result.createdLists.push(name);
-      return id;
-    };
+    const listIdFor = createListResolver(db, userId, defaultListId, result.createdLists);
 
     // Desired list memberships per channel.
     const desired = new Map<string, { title: string; listIds: Set<string> }>();
@@ -462,3 +477,85 @@ export async function syncListsFromSnapshot(
   tx();
   return result;
 }
+
+export interface SnapshotMergeResult {
+  createdLists: string[];
+  /** Channels that weren't in any list before. */
+  addedChannels: number;
+  /** New (list, channel) memberships, including those of added channels. */
+  addedMemberships: number;
+}
+
+/**
+ * Additively merges a snapshot from another tool into the user's lists:
+ * every channel is added to each list named in its groups (created as
+ * needed), and a channel that is in no list yet and has no groups goes to the
+ * default list. Nothing is ever removed.
+ */
+export async function mergeListsFromSnapshot(
+  userId: string,
+  snapshot: SnapshotChannel[]
+): Promise<SnapshotMergeResult> {
+  await ensureMigration();
+  await ensureDefaultList(userId);
+
+  const db = getDb();
+  const defaultListId = `default-${userId}`;
+  const result: SnapshotMergeResult = {
+    createdLists: [],
+    addedChannels: 0,
+    addedMemberships: 0,
+  };
+
+  const tx = db.transaction(() => {
+    const listIdFor = createListResolver(db, userId, defaultListId, result.createdLists);
+
+    const known = new Set(
+      (
+        db
+          .prepare(
+            `SELECT DISTINCT s.channel_id AS channelId
+             FROM subscriptions s JOIN subscription_lists l ON l.id = s.list_id
+             WHERE l.user_id = ?`
+          )
+          .all(userId) as Array<{ channelId: string }>
+      ).map((row) => row.channelId)
+    );
+
+    const insert = db.prepare(
+      `INSERT OR IGNORE INTO subscriptions (id, list_id, channel_id, title, url, thumbnail, added_at, last_uploaded_at)
+       VALUES (?, ?, ?, ?, ?, NULL, ?, NULL)`
+    );
+    const now = new Date().toISOString();
+
+    for (const channel of snapshot) {
+      const listIds = new Set(channel.groups.map(listIdFor));
+      const isNew = !known.has(channel.channelId);
+      if (listIds.size === 0 && isNew) listIds.add(defaultListId);
+
+      let insertedAny = false;
+      for (const listId of listIds) {
+        const changes = insert.run(
+          channel.channelId,
+          listId,
+          channel.channelId,
+          channel.title || channel.channelId,
+          `https://www.youtube.com/channel/${channel.channelId}`,
+          now
+        ).changes;
+        if (changes > 0) {
+          result.addedMemberships += 1;
+          insertedAny = true;
+        }
+      }
+      if (isNew && insertedAny) {
+        result.addedChannels += 1;
+        known.add(channel.channelId);
+      }
+    }
+  });
+
+  tx();
+  return result;
+}
+

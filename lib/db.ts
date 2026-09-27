@@ -341,6 +341,22 @@ function initializeSchema() {
     ON api_keys(user_id);
   `);
 
+  // Per-user "Sync with SubRelay" settings. Its own table rather than
+  // user_config, because saving user state rewrites every user_config row.
+  // The SubRelay API key is stored as-is: TubeShelf has to send it.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subrelay_sync (
+      user_id TEXT PRIMARY KEY,
+      url TEXT NOT NULL DEFAULT '',
+      api_key TEXT NOT NULL DEFAULT '',
+      sync_watched INTEGER NOT NULL DEFAULT 1,
+      last_sync_at TEXT,
+      last_status TEXT,
+      last_message TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
   // OIDC providers configuration
   db.exec(`
     CREATE TABLE IF NOT EXISTS oidc_providers (

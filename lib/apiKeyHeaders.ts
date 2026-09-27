@@ -4,14 +4,15 @@
 export const API_KEY_PREFIX = "tsk_";
 
 /**
- * API routes an API key may call. Keys are for syncing subscriptions from
- * other tools (e.g. SubRelay), so they deliberately can't reach account,
- * settings, admin, or danger-zone routes - including key management itself,
- * so a leaked key can't mint more keys.
+ * API routes an API key may call. Keys are for syncing subscriptions and
+ * watched videos with other tools (e.g. SubRelay), so they deliberately
+ * can't reach account, settings, admin, or danger-zone routes - including key
+ * management itself, so a leaked key can't mint more keys.
  */
 export const API_KEY_ALLOWED_PATHS = [
   "/api/subscriptions",
   "/api/subscription-lists",
+  "/api/watched",
 ];
 
 /**
