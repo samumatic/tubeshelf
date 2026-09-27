@@ -31,6 +31,12 @@ const DURATION_POLL_MAX_STAGNANT = 2;
  */
 const STALE_CACHE_RECHECK_DELAY_MS = 6000;
 
+/**
+ * Fired on window after every successful feed pull (not the cache-only
+ * follow-up polls). The page uses it to sync watched state with SubRelay.
+ */
+export const FEED_PULLED_EVENT = "tubeshelf:feed-pulled";
+
 export class AuthExpiredError extends Error {
   constructor(message = "Session expired. Please sign in again.") {
     super(message);
@@ -369,6 +375,9 @@ class FeedManager {
 
             this.initialized = true;
             this.saveCache();
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent(FEED_PULLED_EVENT));
+            }
             // Lengths are backfilled after this response was built, so watch
             // for the ones that are still missing.
             this.scheduleDurationPoll();

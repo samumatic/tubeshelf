@@ -10,6 +10,9 @@ interface SubRelaySyncSettings {
   lastSyncAt: string | null;
   lastStatus: "success" | "partial" | "error" | null;
   lastMessage: string | null;
+  lastWatchedSyncAt: string | null;
+  lastWatchedStatus: "success" | "partial" | "error" | null;
+  lastWatchedMessage: string | null;
 }
 
 interface SubRelaySyncCardProps {
@@ -172,7 +175,10 @@ export function SubRelaySyncCard({ onShowToast }: SubRelaySyncCardProps) {
         <label className="flex items-center justify-between gap-4 text-sm">
           <span>
             <strong className="block">Sync watched videos</strong>
-            <span className="text-muted-foreground">Share which videos you&apos;ve watched with SubRelay.</span>
+            <span className="text-muted-foreground">
+              Every feed refresh also syncs which videos you&apos;ve watched with SubRelay, both
+              ways. Only the watched state is shared, and failed syncs catch up automatically.
+            </span>
           </span>
           <input
             type="checkbox"
@@ -202,10 +208,26 @@ export function SubRelaySyncCard({ onShowToast }: SubRelaySyncCardProps) {
           </button>
         </div>
 
+        {settings?.syncWatched && settings.lastWatchedSyncAt && (
+          <div className="text-sm border-t border-border pt-4">
+            <p>
+              Last watched sync {new Date(settings.lastWatchedSyncAt).toLocaleString()}:{" "}
+              <strong className={STATUS_STYLES[settings.lastWatchedStatus ?? ""] ?? ""}>
+                {settings.lastWatchedStatus === "partial"
+                  ? "completed with warnings"
+                  : settings.lastWatchedStatus}
+              </strong>
+            </p>
+            {settings.lastWatchedMessage && (
+              <p className="text-muted-foreground mt-1">{settings.lastWatchedMessage}</p>
+            )}
+          </div>
+        )}
+
         {settings?.lastSyncAt && (
           <div className="text-sm border-t border-border pt-4">
             <p>
-              Last sync {new Date(settings.lastSyncAt).toLocaleString()}:{" "}
+              Last full sync {new Date(settings.lastSyncAt).toLocaleString()}:{" "}
               <strong className={STATUS_STYLES[settings.lastStatus ?? ""] ?? ""}>
                 {settings.lastStatus === "partial" ? "completed with warnings" : settings.lastStatus}
               </strong>

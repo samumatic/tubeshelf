@@ -32,7 +32,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import ClientOnly from "@/components/ClientOnly";
-import { AuthExpiredError, feedManager } from "@/lib/feedManager";
+import { AuthExpiredError, FEED_PULLED_EVENT, feedManager } from "@/lib/feedManager";
 import {
   clearLocalFilterPreferences,
   readLocalFilterPreferences,
@@ -1052,6 +1052,40 @@ export default function Home() {
     const handleSynced = () => subRelaySyncedRef.current();
     window.addEventListener(SUBRELAY_SYNCED_EVENT, handleSynced);
     return () => window.removeEventListener(SUBRELAY_SYNCED_EVENT, handleSynced);
+  }, []);
+
+  // Every feed pull also syncs watched state with SubRelay, both ways (the
+  // server throttles and never fails this request over a sync problem).
+  // Videos it newly marked watched are merged into this page's set, so the
+  // next save doesn't write a list that's missing them.
+  useEffect(() => {
+    let inFlight = false;
+    const handleFeedPulled = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch("/api/subrelay-sync/watched", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const newIds: string[] = Array.isArray(data?.newVideoIds)
+          ? data.newVideoIds.filter((id: unknown): id is string => typeof id === "string")
+          : [];
+        if (newIds.length === 0) return;
+        const merged = new Set(watchedVideosRef.current);
+        for (const id of newIds) merged.add(id);
+        watchedVideosRef.current = merged;
+        setWatchedVideos(merged);
+      } catch {
+        // Best-effort: the next feed pull tries again.
+      } finally {
+        inFlight = false;
+      }
+    };
+    window.addEventListener(FEED_PULLED_EVENT, handleFeedPulled);
+    return () => window.removeEventListener(FEED_PULLED_EVENT, handleFeedPulled);
   }, []);
 
   // Keep player default quality synced with saved settings (best-effort for YouTube iframe).
