@@ -108,19 +108,36 @@ export async function writeUserState(state: UserState, userId: string) {
   db.exec("BEGIN TRANSACTION");
 
   try {
-    // Update watched videos
-    db.prepare("DELETE FROM watched_videos WHERE user_id = ?").run(userId);
-    const watchedStmt = db.prepare(
-      "INSERT INTO watched_videos (video_id, user_id, watched_at) VALUES (?, ?, ?)"
+    // Update watched videos. The client's list is authoritative, but apply it
+    // as a diff: rewriting every row would reset each video's watched_at to
+    // "now" on every save.
+    const desiredWatched = new Set(state.watchedVideos ?? []);
+    const currentWatched = db
+      .prepare("SELECT video_id FROM watched_videos WHERE user_id = ?")
+      .all(userId)
+      .map((row: any) => row.video_id as string);
+    const deleteWatchedStmt = db.prepare(
+      "DELETE FROM watched_videos WHERE user_id = ? AND video_id = ?"
     );
-    for (const videoId of state.watchedVideos ?? []) {
-      watchedStmt.run(videoId, userId, new Date().toISOString());
+    for (const videoId of currentWatched) {
+      if (!desiredWatched.has(videoId)) {
+        deleteWatchedStmt.run(userId, videoId);
+      }
+    }
+    const insertWatchedStmt = db.prepare(
+      "INSERT OR IGNORE INTO watched_videos (video_id, user_id, watched_at) VALUES (?, ?, ?)"
+    );
+    const now = new Date().toISOString();
+    for (const videoId of desiredWatched) {
+      insertWatchedStmt.run(videoId, userId, now);
     }
 
-    // Update user config
-    db.prepare("DELETE FROM user_config WHERE user_id = ?").run(userId);
+    // Update user config. Upsert only the keys this state owns - other
+    // features keep their own rows here (e.g. "subscriptionTags"), and
+    // deleting everything first would wipe them on every save.
     const configStmt = db.prepare(
-      "INSERT INTO user_config (user_id, key, value) VALUES (?, ?, ?)"
+      `INSERT INTO user_config (user_id, key, value) VALUES (?, ?, ?)
+       ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`
     );
     configStmt.run(userId, "hideWatched", JSON.stringify(!!state.hideWatched));
     configStmt.run(
