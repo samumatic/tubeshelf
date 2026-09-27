@@ -353,9 +353,22 @@ function initializeSchema() {
       last_sync_at TEXT,
       last_status TEXT,
       last_message TEXT,
+      last_watched_sync_at TEXT,
+      last_watched_status TEXT,
+      last_watched_message TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  // Watched-state sync (run on every feed refresh) tracks its own outcome.
+  const subrelaySyncColumns = new Set(
+    (db.pragma("table_info(subrelay_sync)") as Array<{ name: string }>).map((col) => col.name),
+  );
+  for (const column of ["last_watched_sync_at", "last_watched_status", "last_watched_message"]) {
+    if (!subrelaySyncColumns.has(column)) {
+      db.exec(`ALTER TABLE subrelay_sync ADD COLUMN ${column} TEXT;`);
+    }
+  }
 
   // OIDC providers configuration
   db.exec(`
