@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, Mail, Lock, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiKeysCard } from "@/components/ApiKeysCard";
+import { SubRelaySyncCard } from "@/components/SubRelaySyncCard";
 
 interface AccountSettingsProps {
   onClose?: () => void;
@@ -162,6 +163,7 @@ export function AccountSettings({
           </p>
         </div>
 
+        <SubRelaySyncCard onShowToast={onShowToast} />
         <ApiKeysCard onShowToast={onShowToast} />
       </div>
     );
@@ -380,6 +382,7 @@ export function AccountSettings({
         </form>
       </div>
 
+      <SubRelaySyncCard onShowToast={onShowToast} />
       <ApiKeysCard onShowToast={onShowToast} />
     </div>
   );
