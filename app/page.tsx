@@ -85,6 +85,7 @@ import type {
   SubscriptionListsData,
 } from "@/lib/subscriptionListStore";
 import type { Page, FeedTab, WatchLaterItem } from "@/lib/pageTypes";
+import { SUBRELAY_SYNCED_EVENT } from "@/components/SubRelaySyncCard";
 import {
   videoListsMatch,
   filterAndSortVideos,
@@ -1036,6 +1037,22 @@ export default function Home() {
     filterListId,
     subscriptionLists,
   ]);
+
+  // A SubRelay sync (Account Settings) can add subscriptions and watched
+  // videos server-side. Reload both, so this page doesn't keep - and later
+  // write back - a stale watched list.
+  const subRelaySyncedRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    subRelaySyncedRef.current = () => {
+      loadUserState();
+      refreshData();
+    };
+  });
+  useEffect(() => {
+    const handleSynced = () => subRelaySyncedRef.current();
+    window.addEventListener(SUBRELAY_SYNCED_EVENT, handleSynced);
+    return () => window.removeEventListener(SUBRELAY_SYNCED_EVENT, handleSynced);
+  }, []);
 
   // Keep player default quality synced with saved settings (best-effort for YouTube iframe).
   useEffect(() => {
