@@ -70,6 +70,9 @@ class FeedManager {
   // same tab (or the same browser reusing localStorage on reload) flashes
   // the previous user's cached videos before the real fetch overwrites them.
   private currentUserId: string | null = null;
+  // Bumped on every user switch so async work started for the previous user
+  // can tell it is stale and must not touch the new user's state or cache.
+  private generation = 0;
 
   private constructor() {}
 
@@ -119,6 +122,7 @@ class FeedManager {
     if (userId === this.currentUserId) return;
 
     this.currentUserId = userId;
+    this.generation++;
     this.cancelDurationPoll();
     this.cancelStaleCacheRecheck();
     this.durationPollsWithoutProgress = 0;
@@ -239,10 +243,12 @@ class FeedManager {
   }
 
   private async recheckAfterCacheFirstLoad(followupsLeft: number) {
+    const generation = this.generation;
     const response = await fetch("/api/feed?cacheOnly=true");
-    if (!response.ok) return;
+    if (generation !== this.generation || !response.ok) return;
 
     const json = await response.json();
+    if (generation !== this.generation) return;
     const videos = this.mapItems(json.items || []);
 
     if (!videoListsMatch(this.data.videos, videos)) {
@@ -279,9 +285,11 @@ class FeedManager {
   }
 
   private async pollDurations() {
+    const generation = this.generation;
     const known = this.countKnownDurations(this.data.videos);
 
     const response = await fetch("/api/feed?cacheOnly=true");
+    if (generation !== this.generation) return;
     if (!response.ok) {
       // Treat a failed poll like a no-progress one: keep retrying (a single
       // transient error shouldn't permanently stop durations from filling
@@ -293,6 +301,7 @@ class FeedManager {
     }
 
     const json = await response.json();
+    if (generation !== this.generation) return;
     const videos = this.mapItems(json.items || []);
 
     if (this.countKnownDurations(videos) > known) {
@@ -312,8 +321,19 @@ class FeedManager {
     }
 
     if (this.initPromise) {
-      return this.initPromise;
+      if (!forceRefresh) return this.initPromise;
+
+      // A non-forced load is already in flight; a forced refresh must still
+      // run after it instead of being dropped.
+      const generation = this.generation;
+      await this.initPromise.catch(() => undefined);
+      if (generation !== this.generation) return;
+      this.initialized = false;
+      return this.initialize(true);
     }
+
+    const generation = this.generation;
+    const isStale = () => generation !== this.generation;
 
     this.initPromise = (async () => {
       try {
@@ -344,6 +364,7 @@ class FeedManager {
                 }/${maxRetries}) after ${delay}ms...`
               );
               await new Promise((resolve) => setTimeout(resolve, delay));
+              if (isStale()) return;
             }
 
             const response = await fetch(
@@ -358,6 +379,7 @@ class FeedManager {
             }
 
             const json = await response.json();
+            if (isStale()) return;
             const videos = this.mapItems(json.items || []);
 
             // Only update if data actually changed (prevents visual flicker when cache matches fresh data)
@@ -397,6 +419,7 @@ class FeedManager {
             }
             return;
           } catch (err) {
+            if (isStale()) return;
             if (err instanceof AuthExpiredError) {
               this.initialized = false;
               this.updateData({
@@ -427,7 +450,7 @@ class FeedManager {
           }
         }
       } finally {
-        this.initPromise = null;
+        if (!isStale()) this.initPromise = null;
       }
     })();
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAndSortVideos, isShortVideo } from "./videoUtils";
+import { filterAndSortVideos, isShortVideo, videoListsMatch } from "./videoUtils";
 import type { Video } from "./apiClient";
 
 function video(overrides: Partial<Video> = {}): Video {
@@ -83,5 +83,22 @@ describe("filterAndSortVideos - hideShorts", () => {
     });
 
     expect(result.map((v) => v.id)).toEqual(["unknown"]);
+  });
+});
+
+describe("videoListsMatch", () => {
+  it("matches identical lists", () => {
+    expect(videoListsMatch([video()], [video()])).toBe(true);
+  });
+
+  it.each([
+    ["isMemberOnly", { isMemberOnly: true }],
+    ["title", { title: "Renamed" }],
+    ["thumbnail", { thumbnail: "https://i.ytimg.com/vi/v1/new.jpg" }],
+    ["uploadedAt", { uploadedAt: "2026-08-02T00:00:00.000Z" }],
+    ["views", { views: 5 }],
+    ["durationSeconds", { durationSeconds: 90 }],
+  ])("detects a %s change", (_name, change) => {
+    expect(videoListsMatch([video()], [video(change)])).toBe(false);
   });
 });
