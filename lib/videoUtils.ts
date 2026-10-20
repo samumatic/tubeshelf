@@ -16,7 +16,15 @@ export function videoListsMatch(arr1?: Video[], arr2?: Video[]): boolean {
   if (arr1.length !== arr2.length) return false;
 
   const signature = (v: Video) =>
-    `${v.id}:${v.durationSeconds ?? ""}:${v.views ?? ""}`;
+    JSON.stringify([
+      v.id,
+      v.durationSeconds ?? "",
+      v.views ?? "",
+      v.isMemberOnly ?? false,
+      v.title,
+      v.thumbnail,
+      v.uploadedAt,
+    ]);
   const s = new Set(arr1.map(signature));
 
   for (const v of arr2) if (!s.has(signature(v))) return false;
