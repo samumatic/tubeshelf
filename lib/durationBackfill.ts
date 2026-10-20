@@ -46,6 +46,7 @@ const USER_AGENT =
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 export interface VideoDetails {
+  /** 0 when the response was fine but the video has no length yet (live/upcoming). */
   seconds: number;
   viewCount?: number;
 }
@@ -102,7 +103,9 @@ async function fetchViaInnerTube(videoId: string): Promise<VideoDetails | null> 
       videoDetails?: { lengthSeconds?: string; viewCount?: string };
     };
 
-    const seconds = toPositiveInt(data.videoDetails?.lengthSeconds);
+    const rawLength = data.videoDetails?.lengthSeconds;
+    if (rawLength !== undefined && Number(rawLength) === 0) return { seconds: 0 };
+    const seconds = toPositiveInt(rawLength);
     if (seconds === undefined) return null;
 
     return { seconds, viewCount: toPositiveInt(data.videoDetails?.viewCount) };
@@ -131,7 +134,9 @@ async function fetchViaWatchPage(videoId: string): Promise<VideoDetails | null> 
     if (!res.ok) return null;
 
     const html = await res.text();
-    const seconds = toPositiveInt(html.match(/"lengthSeconds":"(\d+)"/)?.[1]);
+    const rawLength = html.match(/"lengthSeconds":"(\d+)"/)?.[1];
+    if (rawLength !== undefined && Number(rawLength) === 0) return { seconds: 0 };
+    const seconds = toPositiveInt(rawLength);
     if (seconds === undefined) return null;
 
     return {
@@ -170,6 +175,9 @@ export async function backfillDurations(
       const videoId = queue.shift()!;
       try {
         const details = await fetchVideoDetails(videoId);
+        if (details && details.seconds === 0) {
+          continue;
+        }
         if (details) {
           saveVideoDuration(videoId, details.seconds, details.viewCount);
           resolved++;

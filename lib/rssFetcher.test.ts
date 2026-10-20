@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { getChannelRssUrl } from "./rssFetcher";
+import {
+  decodeXmlEntities,
+  getChannelRssUrl,
+  parseRSSXML,
+} from "./rssFetcher";
+
+describe("decodeXmlEntities", () => {
+  it("decodes named, decimal and hex entities", () => {
+    expect(
+      decodeXmlEntities("Tom &amp; Jerry &lt;3 &gt; &quot;x&quot; &apos;y&apos;")
+    ).toBe("Tom & Jerry <3 > \"x\" 'y'");
+    expect(decodeXmlEntities("it&#39;s &#x41;")).toBe("it's A");
+  });
+
+  it("leaves unknown entities untouched", () => {
+    expect(decodeXmlEntities("&nbsp; &#99999999999;")).toBe(
+      "&nbsp; &#99999999999;"
+    );
+  });
+});
+
+describe("parseRSSXML", () => {
+  it("decodes entities in titles and author", () => {
+    const xml = `<feed><yt:channelId>UC1</yt:channelId><title>A &amp; B</title>
+<entry><yt:videoId>v1</yt:videoId><title>It&#39;s &lt;fun&gt;</title><author><name>C &amp; D</name></author></entry></feed>`;
+    const feed = parseRSSXML(xml);
+    expect(feed.feed?.title).toBe("A & B");
+    expect(feed.feed?.entry?.[0].title).toBe("It's <fun>");
+    expect(feed.feed?.entry?.[0].author).toBe("C & D");
+  });
+});
 
 describe("getChannelRssUrl", () => {
   it("uses channel_id, not the synthetic UU/UULF uploads-playlist id", () => {

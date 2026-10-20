@@ -471,15 +471,10 @@ export async function fetchChannelVideos(
     const { debug } = await import("@/lib/logger");
     debug(`[StandardFetcher] Fetching videos for channel ${channelId}`);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
     const response = await fetch(`${url}?hl=en&gl=US`, {
       headers,
-      signal: controller.signal,
+      signal: AbortSignal.timeout(15000), // also bounds the body read
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       // Explicitly log 404s so the container logs contain channel diagnostics
@@ -575,8 +570,8 @@ export async function fetchChannelVideos(
 
     const entryCount = lockupViewModels.length + videoRenderers.length;
     if (entryCount > 0 && videos.length === 0) {
-      console.warn(
-        `[StandardFetcher] Parsed 0 of ${entryCount} entries for ${channelId} - YouTube's page format may have changed`
+      throw new Error(
+        `Parsed 0 of ${entryCount} entries - YouTube's page format may have changed`
       );
     }
 

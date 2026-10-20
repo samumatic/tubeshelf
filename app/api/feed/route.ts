@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchChannelFeed } from "@/lib/videoFetcher";
-import { readLists, writeLists } from "@/lib/subscriptionListStore";
+import { readLists, updateSubscriptionMetadata } from "@/lib/subscriptionListStore";
 import { requireUser } from "@/lib/apiAuth";
 import {
   CachedVideo,
@@ -20,6 +20,9 @@ import { readUserState } from "@/lib/userStateStore";
 import { YOUTUBE_CONSENT_COOKIE } from "@/lib/youtubeConsent";
 
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+const AVATAR_FETCH_CONCURRENCY = 4;
+const MAX_IDS_PARAM = 200;
+const CHANNEL_ID_PATTERN = /^UC[\w-]{22}$/;
 
 // One in-flight fetch per channel, shared across users and requests.
 const inFlightChannels = new Map<string, Promise<void>>();
@@ -215,7 +218,8 @@ async function handleFeedRequest(
     channelIds = idsParam
       .split(",")
       .map((id) => id.trim())
-      .filter(Boolean);
+      .filter((id) => CHANNEL_ID_PATTERN.test(id))
+      .slice(0, MAX_IDS_PARAM);
   } else {
     const listsData = await readLists(user.id);
     listsData.lists.forEach((list) => {
@@ -340,15 +344,25 @@ async function updateSubscriptionMetadataAsync(
   }
 
   const listsData = await readLists(userId);
+  const updates = new Map<
+    string,
+    { channelId: string; lastUploadedAt?: string; thumbnail?: string }
+  >();
   const missingAvatars = new Set<string>();
-  let updated = false;
+  const touch = (channelId: string) => {
+    let entry = updates.get(channelId);
+    if (!entry) {
+      entry = { channelId };
+      updates.set(channelId, entry);
+    }
+    return entry;
+  };
 
   listsData.lists.forEach((list) => {
     list.subscriptions.forEach((sub) => {
       const uploadedAt = latestUpload.get(sub.channelId);
       if (uploadedAt && sub.lastUploadedAt !== uploadedAt) {
-        sub.lastUploadedAt = uploadedAt;
-        updated = true;
+        touch(sub.channelId).lastUploadedAt = uploadedAt;
       }
       if (!sub.thumbnail) {
         missingAvatars.add(sub.channelId);
@@ -356,28 +370,24 @@ async function updateSubscriptionMetadataAsync(
     });
   });
 
-  if (missingAvatars.size > 0) {
-    const avatars = new Map<string, string>();
-    await Promise.all(
-      Array.from(missingAvatars).map(async (channelId) => {
-        const avatar = await fetchChannelAvatarDirect(channelId);
-        if (avatar) avatars.set(channelId, avatar);
-      })
-    );
+  const pending = Array.from(missingAvatars);
+  let next = 0;
+  const avatarWorker = async () => {
+    while (next < pending.length) {
+      const channelId = pending[next++];
+      const avatar = await fetchChannelAvatarDirect(channelId);
+      if (avatar) touch(channelId).thumbnail = avatar;
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(AVATAR_FETCH_CONCURRENCY, pending.length) },
+      avatarWorker
+    )
+  );
 
-    listsData.lists.forEach((list) => {
-      list.subscriptions.forEach((sub) => {
-        const avatar = avatars.get(sub.channelId);
-        if (avatar && sub.thumbnail !== avatar) {
-          sub.thumbnail = avatar;
-          updated = true;
-        }
-      });
-    });
-  }
-
-  if (updated) {
-    await writeLists(listsData, userId);
+  if (updates.size > 0) {
+    await updateSubscriptionMetadata(userId, Array.from(updates.values()));
   }
 }
 

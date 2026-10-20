@@ -173,7 +173,7 @@ export async function updateList(
 
 export async function deleteList(id: string, userId: string) {
   await ensureMigration();
-  if (id === "default") {
+  if (id === "default" || id === `default-${userId}`) {
     throw new Error("Cannot delete default list");
   }
 
@@ -261,6 +261,38 @@ export async function clearListSubscriptions(listId: string, userId: string) {
   db.prepare("DELETE FROM subscriptions WHERE list_id = ?").run(listId);
 }
 
+export interface SubscriptionMetadataUpdate {
+  channelId: string;
+  lastUploadedAt?: string;
+  thumbnail?: string;
+}
+
+export async function updateSubscriptionMetadata(
+  userId: string,
+  updates: SubscriptionMetadataUpdate[]
+) {
+  await ensureMigration();
+  const db = getDb();
+
+  const setUploaded = db.prepare(
+    "UPDATE subscriptions SET last_uploaded_at = ? WHERE channel_id = ? AND list_id IN (SELECT id FROM subscription_lists WHERE user_id = ?)"
+  );
+  const setThumbnail = db.prepare(
+    "UPDATE subscriptions SET thumbnail = ? WHERE channel_id = ? AND list_id IN (SELECT id FROM subscription_lists WHERE user_id = ?)"
+  );
+
+  db.transaction(() => {
+    for (const update of updates) {
+      if (update.lastUploadedAt) {
+        setUploaded.run(update.lastUploadedAt, update.channelId, userId);
+      }
+      if (update.thumbnail) {
+        setThumbnail.run(update.thumbnail, update.channelId, userId);
+      }
+    }
+  })();
+}
+
 export async function clearAllSubscriptions(userId: string) {
   await ensureMigration();
   const db = getDb();
@@ -277,6 +309,8 @@ export async function moveSubscription(
   userId: string
 ) {
   await ensureMigration();
+  if (fromListId === toListId) return;
+
   const db = getDb();
 
   // Verify ownership of both lists

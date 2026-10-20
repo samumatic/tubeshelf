@@ -143,6 +143,7 @@ async function resolveHandleToChannelId(
     const res = await fetch(`${pageUrl}?hl=en&gl=US`, {
       cache: "no-store",
       headers,
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.warn("[ChannelResolver] Handle resolution: Page fetch failed", {

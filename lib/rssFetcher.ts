@@ -8,6 +8,28 @@
 
 import { FeedVideo, ChannelMeta, FetchResult } from "./videoFetcher";
 
+const RSS_FETCH_TIMEOUT_MS = 15_000;
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+export function decodeXmlEntities(text: string): string {
+  return text.replace(/&(?:#(\d+)|#x([0-9a-fA-F]+)|(\w+));/g, (match, dec, hex, name) => {
+    if (name) return NAMED_ENTITIES[name] ?? match;
+    const code = dec ? parseInt(dec, 10) : parseInt(hex, 16);
+    try {
+      return String.fromCodePoint(code);
+    } catch {
+      return match;
+    }
+  });
+}
+
 // YouTube RSS Feed URL patterns
 export const getChannelRssUrl = (channelId: string): string => {
   // YouTube no longer serves the synthetic "UU"/"UULF" uploads-playlist IDs
@@ -48,7 +70,7 @@ interface RSSFeed {
 /**
  * Parse RSS XML response from YouTube
  */
-function parseRSSXML(xmlText: string): RSSFeed {
+export function parseRSSXML(xmlText: string): RSSFeed {
   // Simple XML parser for YouTube RSS feeds
   // YouTube RSS is relatively simple and consistent
   const feed: RSSFeed = { feed: { entry: [] } };
@@ -62,7 +84,7 @@ function parseRSSXML(xmlText: string): RSSFeed {
   // Extract title
   const titleMatch = xmlText.match(/<title(?:\s[^>]*)?>([^<]+)<\/title>/);
   if (titleMatch && feed.feed) {
-    feed.feed.title = titleMatch[1];
+    feed.feed.title = decodeXmlEntities(titleMatch[1]);
   }
 
   // Extract logo/thumbnail
@@ -80,7 +102,7 @@ function parseRSSXML(xmlText: string): RSSFeed {
 
     // Extract title
     const titleM = entryXml.match(/<title(?:\s[^>]*)?>([^<]+)<\/title>/);
-    if (titleM) entry.title = titleM[1];
+    if (titleM) entry.title = decodeXmlEntities(titleM[1]);
 
     // Extract video ID
     const videoIdM = entryXml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
@@ -96,7 +118,7 @@ function parseRSSXML(xmlText: string): RSSFeed {
 
     // Extract author
     const authorM = entryXml.match(/<author>\s*<name>([^<]+)<\/name>/);
-    if (authorM) entry.author = authorM[1];
+    if (authorM) entry.author = decodeXmlEntities(authorM[1]);
 
     // Extract thumbnail URL
     const thumbM = entryXml.match(/<media:thumbnail\s+url='([^']+)'/);
@@ -147,6 +169,7 @@ export async function fetchChannelFeedRss(
         Accept: "application/xml, text/xml, application/atom+xml, */*",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(RSS_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -272,6 +295,7 @@ export async function fetchUserFeedRss(handle: string): Promise<FetchResult> {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
+      signal: AbortSignal.timeout(RSS_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {

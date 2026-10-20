@@ -99,6 +99,13 @@ export async function PATCH(req: Request) {
     );
   }
 
+  if (fromListId === toListId) {
+    return NextResponse.json(
+      { error: "Source and target lists must differ" },
+      { status: 400 }
+    );
+  }
+
   await moveSubscription(fromListId, toListId, channelId, user.id);
   const lists = await readLists(user.id);
   return NextResponse.json(lists);

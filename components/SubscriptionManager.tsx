@@ -13,6 +13,9 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
+const isDefaultListId = (id: string) =>
+  id === "default" || id.startsWith("default-");
+
 interface Subscription {
   id: string;
   channelId: string;
@@ -285,7 +288,7 @@ export function SubscriptionManager({
                 >
                   {[...lists]
                     .sort((a, b) =>
-                      a.id === "default" ? -1 : b.id === "default" ? 1 : 0
+                      isDefaultListId(a.id) ? -1 : isDefaultListId(b.id) ? 1 : 0
                     )
                     .map((list) => (
                       <option key={list.id} value={list.id}>
@@ -308,10 +311,10 @@ export function SubscriptionManager({
                 onClick={() =>
                   handleDeleteList(displayedList?.id || currentListId)
                 }
-                disabled={!displayedList || displayedList.id === "default"}
+                disabled={!displayedList || isDefaultListId(displayedList.id)}
                 className="p-2 hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors text-destructive"
                 title={
-                  displayedList?.id === "default"
+                  displayedList && isDefaultListId(displayedList.id)
                     ? "Cannot delete default list"
                     : "Delete current list"
                 }
