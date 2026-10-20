@@ -266,13 +266,14 @@ function initializeSchema() {
   // Watch later
   db.exec(`
     CREATE TABLE IF NOT EXISTS watch_later (
-      id TEXT PRIMARY KEY,
+      id TEXT NOT NULL,
       video_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       channel TEXT NOT NULL,
       thumbnail TEXT NOT NULL,
       added_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, id),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     
@@ -562,6 +563,36 @@ function runMigrations() {
       } catch (error) {
         console.error("[Migration] Error migrating playback_history:", error);
       }
+    }
+
+    // Migration: watch_later ids are client-generated (wl-<videoId>), so the
+    // primary key must be per-user or two users saving the same video collide.
+    const watchLaterPk = (db.pragma("table_info(watch_later)") as Array<any>)
+      .filter((col: any) => col.pk > 0)
+      .map((col: any) => col.name);
+    if (watchLaterPk.length === 1 && watchLaterPk[0] === "id") {
+      console.log("[Migration] Making watch_later primary key per-user");
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE watch_later_new (
+            id TEXT NOT NULL,
+            video_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            channel TEXT NOT NULL,
+            thumbnail TEXT NOT NULL,
+            added_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          );
+          INSERT INTO watch_later_new (id, video_id, user_id, title, channel, thumbnail, added_at)
+            SELECT id, video_id, user_id, title, channel, thumbnail, added_at FROM watch_later;
+          DROP TABLE watch_later;
+          ALTER TABLE watch_later_new RENAME TO watch_later;
+          CREATE INDEX IF NOT EXISTS idx_watch_later_user_id ON watch_later(user_id);
+          CREATE INDEX IF NOT EXISTS idx_watch_later_added_at ON watch_later(added_at DESC);
+        `);
+      })();
     }
 
     // Migration: Mark welcome wizard as completed for all users

@@ -277,9 +277,9 @@ function toGenericOAuthConfig(
       "groups",
     ],
     redirectURI: redirectUriForProvider(baseUrl, provider),
-    // Keep sign-up behavior compatible with the current implementation (OIDC auto-provisions users).
-    disableImplicitSignUp: false,
-    disableSignUp: false,
+    // Unknown users may only be created when the provider auto-provisions.
+    disableImplicitSignUp: !provider.autoProvision,
+    disableSignUp: !provider.autoProvision,
     mapProfileToUser: async (profile) => {
       const oidcSubject =
         typeof profile.sub === "string"
