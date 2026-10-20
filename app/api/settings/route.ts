@@ -10,10 +10,24 @@ const USER_WRITABLE_SETTINGS_KEYS = [
   "sponsorBlockEnabled",
   "playerDebugEnabled",
   "captionsEnabled",
-  "fetchMethod",
 ] as const satisfies ReadonlyArray<keyof AppSettings>;
 
-function sanitizeUserSettingsUpdates(input: unknown): Partial<AppSettings> {
+const ADMIN_ONLY_SETTINGS_KEYS = [
+  "fetchMethod",
+  "oidcOnly",
+  "publicRegistration",
+  "videoRetentionDays",
+  "feedConcurrency",
+  "feedChannelTimeoutSeconds",
+  "feedRequestTimeoutSeconds",
+  "feedRefreshMinutes",
+  "feedErrorRetryMinutes",
+] as const satisfies ReadonlyArray<keyof AppSettings>;
+
+function sanitizeUserSettingsUpdates(
+  input: unknown,
+  isAdmin: boolean
+): Partial<AppSettings> {
   if (!input || typeof input !== "object") return {};
   const raw = input as Record<string, unknown>;
   const updates: Partial<AppSettings> = {};
@@ -51,7 +65,7 @@ function sanitizeUserSettingsUpdates(input: unknown): Partial<AppSettings> {
     updates.captionsEnabled = raw.captionsEnabled;
   }
 
-  if (raw.fetchMethod === "standard" || raw.fetchMethod === "rss") {
+  if (isAdmin && (raw.fetchMethod === "standard" || raw.fetchMethod === "rss")) {
     updates.fetchMethod = raw.fetchMethod;
   }
 
@@ -70,10 +84,18 @@ export async function POST(req: Request) {
   if (user instanceof NextResponse) return user;
   try {
     const body = await req.json();
-    const updates = sanitizeUserSettingsUpdates(body);
     const requestedKeys =
       body && typeof body === "object" ? Object.keys(body as Record<string, unknown>) : [];
-    const acceptedKeys = USER_WRITABLE_SETTINGS_KEYS.filter((key) => key in updates);
+    if (!user.isAdmin && ADMIN_ONLY_SETTINGS_KEYS.some((key) => requestedKeys.includes(key))) {
+      return NextResponse.json(
+        { error: "Only admins can change this setting" },
+        { status: 403 }
+      );
+    }
+    const updates = sanitizeUserSettingsUpdates(body, user.isAdmin);
+    const acceptedKeys = [...USER_WRITABLE_SETTINGS_KEYS, "fetchMethod" as const].filter(
+      (key) => key in updates
+    );
 
     if (requestedKeys.length === 0) {
       return NextResponse.json({ error: "No settings provided" }, { status: 400 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/apiAuth";
+import { readSettings } from "@/lib/settingsStore";
 import {
   createOIDCProvider,
   deleteOIDCProvider,
@@ -16,11 +17,21 @@ function sanitizeProvider(provider: any) {
   };
 }
 
+// With oidcOnly on, removing the last working provider leaves nobody able to sign in.
+async function wouldLockOutLogin(id: string): Promise<boolean> {
+  const settings = await readSettings();
+  if (!settings.oidcOnly) return false;
+  return !getOIDCProviders().some((p) => p.id !== id);
+}
+
+const LOCKOUT_MESSAGE =
+  "Can't remove or disable the last enabled OIDC provider while OIDC-only login is on. Turn off OIDC-only first.";
+
 export async function GET() {
   const user = await requireAdmin();
   if (user instanceof NextResponse) return user;
 
-  const providers = getOIDCProviders().map(sanitizeProvider);
+  const providers = getOIDCProviders({ includeDisabled: true }).map(sanitizeProvider);
   return NextResponse.json({ providers });
 }
 
@@ -78,7 +89,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Provider id is required" }, { status: 400 });
   }
 
-  const existing = getOIDCProvider(id);
+  const existing = getOIDCProvider(id, { includeDisabled: true });
   if (!existing) {
     return NextResponse.json({ error: "Provider not found" }, { status: 404 });
   }
@@ -120,8 +131,12 @@ export async function PATCH(req: Request) {
     updates.clientSecret = body.clientSecret;
   }
 
+  if (updates.enabled === false && (await wouldLockOutLogin(id))) {
+    return NextResponse.json({ error: LOCKOUT_MESSAGE }, { status: 400 });
+  }
+
   updateOIDCProvider(id, updates);
-  const updated = getOIDCProvider(id);
+  const updated = getOIDCProvider(id, { includeDisabled: true });
 
   return NextResponse.json({ provider: sanitizeProvider(updated) });
 }
@@ -132,6 +147,10 @@ export async function DELETE(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id") || "oidc";
+
+  if (await wouldLockOutLogin(id)) {
+    return NextResponse.json({ error: LOCKOUT_MESSAGE }, { status: 400 });
+  }
 
   deleteOIDCProvider(id);
   return NextResponse.json({ success: true });
