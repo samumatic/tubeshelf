@@ -5,7 +5,6 @@ import { requireUser } from "@/lib/apiAuth";
 import {
   CachedVideo,
   ChannelFetchState,
-  countCachedVideos,
   effectiveRetentionDays,
   getCachedVideos,
   getChannelFetchStates,
@@ -15,6 +14,7 @@ import {
   upsertVideos,
 } from "@/lib/videoCacheStore";
 import { backfillDurations } from "@/lib/durationBackfill";
+import { decideFeedMode, waitWithinBudget } from "@/lib/feedPolicy";
 import { readSettings, type AppSettings } from "@/lib/settingsStore";
 import { readUserState } from "@/lib/userStateStore";
 import { YOUTUBE_CONSENT_COOKIE } from "@/lib/youtubeConsent";
@@ -236,52 +236,45 @@ async function handleFeedRequest(
     return NextResponse.json({ items: [] });
   }
 
-  const cachedCount = countCachedVideos(channelIds);
+  let items = getCachedVideos(channelIds, retentionDays);
   const fetchStates = getChannelFetchStates(channelIds);
-  const neverFetched = channelIds.filter(
-    (id) => !fetchStates.get(id)?.lastFetchedAt
-  );
   const staleChannels = cacheOnly
     ? []
     : forceRefresh
     ? channelIds
     : getStaleChannels(channelIds, fetchStates, settings);
-  // Wait for the fetch when the client asked for it, when there is nothing to
-  // show yet, or when a freshly added subscription has never been fetched.
-  const blocking =
-    !cacheOnly &&
-    (forceRefresh || cachedCount === 0 || neverFetched.length > 0);
+  const decision = decideFeedMode({
+    cacheOnly,
+    forceRefresh,
+    usableCachedCount: items.length,
+    staleCount: staleChannels.length,
+    requestTimeoutSeconds: settings.feedRequestTimeoutSeconds,
+  });
 
   console.log(
     `[Feed] Request ${requestId}: ${channelIds.length} channels, ` +
-      `${cachedCount} cached videos, ${staleChannels.length} stale, ` +
+      `${items.length} cached videos, ${staleChannels.length} stale, ` +
       `retention=${retentionDays === 0 ? "forever" : `${retentionDays}d`}, ` +
-      `mode=${cacheOnly ? "cache-only" : blocking ? "blocking" : "cache-first"}`
+      `mode=${decision.mode}`
   );
 
-  if (staleChannels.length > 0) {
-    const refresh = refreshChannels(staleChannels, settings);
+  if (decision.refresh) {
+    // refreshChannel never rejects; this only guards against the unexpected.
+    const refresh = refreshChannels(staleChannels, settings).catch((err) =>
+      console.warn("[Feed] Background refresh failed:", err)
+    );
 
-    if (blocking) {
-      try {
-        // Partial results are already persisted per channel, so a slow refresh
-        // degrades to "serve what we have" instead of returning nothing.
-        await withTimeout(
-          refresh,
-          settings.feedRequestTimeoutSeconds * 1000,
-          "Feed refresh"
-        );
-      } catch (err) {
-        console.warn(
-          `[Feed] Request ${requestId}: ${
-            err instanceof Error ? err.message : String(err)
-          }, serving cached videos while the refresh continues`
+    // Only an empty cache waits, and only briefly. Partial results are
+    // persisted per channel, so whatever landed in that window is served.
+    if (decision.waitMs > 0) {
+      const finished = await waitWithinBudget(refresh, decision.waitMs);
+      if (!finished) {
+        console.log(
+          `[Feed] Request ${requestId}: refresh still running after ` +
+            `${decision.waitMs}ms, serving what is cached so far`
         );
       }
-    } else {
-      refresh.catch((err) =>
-        console.warn("[Feed] Background refresh failed:", err)
-      );
+      items = getCachedVideos(channelIds, retentionDays);
     }
   }
 
@@ -295,9 +288,13 @@ async function handleFeedRequest(
 
   scheduleDurationBackfill(channelIds, settings);
 
-  const items = getCachedVideos(channelIds, retentionDays).sort(
-    compareFeedItems
-  );
+  items.sort(compareFeedItems);
+
+  // Lets the client tell whether newer videos may still be on their way.
+  const sync = {
+    stale: getStaleChannels(channelIds, fetchStates, settings).length,
+    inFlight: channelIds.filter((id) => inFlightChannels.has(id)).length,
+  };
 
   console.log(
     `[Feed] Request ${requestId} completed - returning ${items.length} items`
@@ -312,18 +309,23 @@ async function handleFeedRequest(
 
   if (Date.now() - lastPruneAt > PRUNE_INTERVAL_MS) {
     lastPruneAt = Date.now();
-    try {
-      // Deletes only what no subscriber of the channel still wants to keep.
-      const pruned = pruneVideos(settings.videoRetentionDays);
-      if (pruned > 0) {
-        console.log(`[Feed] Pruned ${pruned} videos past their retention window`);
+    // Pruning is a synchronous SQLite write; keep it off the response path.
+    setImmediate(() => {
+      try {
+        // Deletes only what no subscriber of the channel still wants to keep.
+        const pruned = pruneVideos(settings.videoRetentionDays);
+        if (pruned > 0) {
+          console.log(
+            `[Feed] Pruned ${pruned} videos past their retention window`
+          );
+        }
+      } catch (err) {
+        console.warn("[Feed] Prune failed:", err);
       }
-    } catch (err) {
-      console.warn("[Feed] Prune failed:", err);
-    }
+    });
   }
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, sync });
 }
 
 /**

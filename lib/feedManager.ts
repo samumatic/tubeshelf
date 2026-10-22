@@ -30,6 +30,11 @@ const DURATION_POLL_MAX_STAGNANT = 2;
  * refresh time to land before checking once for it.
  */
 const STALE_CACHE_RECHECK_DELAY_MS = 6000;
+/**
+ * Extra rechecks while the server still reports channel fetches in flight
+ * (`sync.inFlight`), so a long refresh still shows up without a reload.
+ */
+const STALE_CACHE_RECHECK_MAX_FOLLOWUPS = 10;
 
 /**
  * Fired on window after every successful feed pull (not the cache-only
@@ -225,15 +230,15 @@ class FeedManager {
    * pick up the result, instead of leaving the user stuck looking at stale
    * data until they refresh by hand.
    */
-  private scheduleStaleCacheRecheck() {
+  private scheduleStaleCacheRecheck(followupsLeft = STALE_CACHE_RECHECK_MAX_FOLLOWUPS) {
     this.cancelStaleCacheRecheck();
     this.staleCacheRecheckTimer = setTimeout(() => {
       this.staleCacheRecheckTimer = null;
-      this.recheckAfterCacheFirstLoad().catch(() => undefined);
+      this.recheckAfterCacheFirstLoad(followupsLeft).catch(() => undefined);
     }, STALE_CACHE_RECHECK_DELAY_MS);
   }
 
-  private async recheckAfterCacheFirstLoad() {
+  private async recheckAfterCacheFirstLoad(followupsLeft: number) {
     const response = await fetch("/api/feed?cacheOnly=true");
     if (!response.ok) return;
 
@@ -243,6 +248,10 @@ class FeedManager {
     if (!videoListsMatch(this.data.videos, videos)) {
       this.updateData({ videos });
       this.saveCache();
+    }
+
+    if ((json.sync?.inFlight ?? 0) > 0 && followupsLeft > 0) {
+      this.scheduleStaleCacheRecheck(followupsLeft - 1);
     }
   }
 
@@ -381,10 +390,9 @@ class FeedManager {
             // Lengths are backfilled after this response was built, so watch
             // for the ones that are still missing.
             this.scheduleDurationPoll();
-            // A non-forced request can have just triggered a background
-            // per-channel refresh server-side without waiting for it - check
-            // back for that once. A forced refresh already waited for it.
-            if (!forceRefresh) {
+            // The server answers from cache and refreshes channels in the
+            // background, forced refresh included - check back for that.
+            if (!forceRefresh || (json.sync?.inFlight ?? 0) > 0) {
               this.scheduleStaleCacheRecheck();
             }
             return;
