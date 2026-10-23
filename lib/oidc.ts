@@ -129,7 +129,9 @@ export interface OIDCConfig {
 }
 
 // OIDC Provider management
-export function getOIDCProviders(): OIDCProvider[] {
+export function getOIDCProviders(
+  opts: { includeDisabled?: boolean } = {}
+): OIDCProvider[] {
   const db = getDb();
   const providers = db
     .prepare(
@@ -150,7 +152,7 @@ export function getOIDCProviders(): OIDCProvider[] {
         enabled, 
         created_at as createdAt 
       FROM oidc_providers 
-      WHERE enabled = 1 
+      WHERE ${opts.includeDisabled ? "1 = 1" : "enabled = 1"} 
         AND client_id IS NOT NULL 
         AND client_id != '' 
         AND client_secret IS NOT NULL 
@@ -175,7 +177,11 @@ export function getPublicOIDCProviders(): Array<{ id: string; name: string }> {
     .all() as Array<{ id: string; name: string }>;
 }
 
-export function getOIDCProvider(id: string): OIDCProvider | null {
+// Disabled providers are only visible to admin management (re-enable/edit).
+export function getOIDCProvider(
+  id: string,
+  opts: { includeDisabled?: boolean } = {}
+): OIDCProvider | null {
   const db = getDb();
   const provider = db
     .prepare(
@@ -196,7 +202,7 @@ export function getOIDCProvider(id: string): OIDCProvider | null {
         enabled, 
         created_at as createdAt 
       FROM oidc_providers 
-      WHERE id = ? AND enabled = 1`
+      WHERE id = ? ${opts.includeDisabled ? "" : "AND enabled = 1"}`
     )
     .get(id) as any | undefined;
 

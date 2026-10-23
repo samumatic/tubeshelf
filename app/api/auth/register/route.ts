@@ -40,6 +40,12 @@ export async function POST(req: Request) {
     }
 
     const settings = await readSettings();
+    if (settings.oidcOnly) {
+      return NextResponse.json(
+        { error: "Password registration is disabled; sign in with SSO" },
+        { status: 403 }
+      );
+    }
     if (!settings.publicRegistration) {
       return NextResponse.json(
         { error: "Public registration is disabled" },
