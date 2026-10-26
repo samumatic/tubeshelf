@@ -191,6 +191,23 @@ export default function Home() {
   const closingPlayerRef = useRef(false);
   const settingsPreloadRef = useRef(false);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  // Latest values for long-lived listeners (hashchange, keydown) that must not
+  // be re-registered on every change.
+  const showPlayerRef = useRef(false);
+  const watchLaterRef = useRef<WatchLaterItem[]>([]);
+  const keyboardHandlersRef = useRef<{
+    addToWatchLater: (video: Video) => void;
+    toggleWatched: (videoId: string) => void;
+    watchVideo: (videoId: string) => void;
+  } | null>(null);
+  // Filters present in the URL at mount; the stored user state must not
+  // overwrite them, or shared/bookmarked filter links lose their filters.
+  const initialUrlFiltersRef = useRef({
+    list: searchParams.get("list"),
+    hideWatched: searchParams.get("hideWatched") === "true",
+    hideMemberOnly: searchParams.get("hideMemberOnly") === "true",
+    hideShorts: searchParams.get("hideShorts") === "false",
+  });
 
   /**
    * Where a video should start when it opens. A position in the first seconds
@@ -243,6 +260,14 @@ export default function Home() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    showPlayerRef.current = showPlayer;
+  }, [showPlayer]);
+
+  useEffect(() => {
+    watchLaterRef.current = watchLater;
+  }, [watchLater]);
+
   // Redirect to login if auth has finished loading and user is not authenticated
   useEffect(() => {
     if (!authLoading && !user && mounted) {
@@ -282,7 +307,7 @@ export default function Home() {
         const videoId = match[1];
         const video = videos.find((v) => v.id === videoId);
 
-        if (video && !showPlayer) {
+        if (video && !showPlayerRef.current) {
           setPlayerVideo({
             videoUrl: video.url,
             videoId: video.id,
@@ -295,7 +320,7 @@ export default function Home() {
           setInitialProgress(resolveResumeSeconds(video.id));
           setShowPlayer(true);
         }
-      } else if (!match && showPlayer) {
+      } else if (!match && showPlayerRef.current) {
         // Hash cleared, close player
         setShowPlayer(false);
         setPlayerVideo(null);
@@ -445,7 +470,7 @@ export default function Home() {
             const video = currentVideos[highlightedVideoIndex];
             if (video) {
               window.open(video.url, "_blank");
-              handleWatchVideo(video.id);
+              keyboardHandlersRef.current?.watchVideo(video.id);
             }
           }
           break;
@@ -455,7 +480,7 @@ export default function Home() {
           if (highlightedVideoIndex !== null) {
             const video = currentVideos[highlightedVideoIndex];
             if (video) {
-              handleToggleWatched(video.id);
+              keyboardHandlersRef.current?.toggleWatched(video.id);
             }
           }
           break;
@@ -465,7 +490,7 @@ export default function Home() {
           if (highlightedVideoIndex !== null) {
             const video = currentVideos[highlightedVideoIndex];
             if (video) {
-              handleAddToWatchLater(video);
+              keyboardHandlersRef.current?.addToWatchLater(video);
             }
           }
           break;
@@ -526,6 +551,13 @@ export default function Home() {
       }
       const listsData = await listsRes.json();
       setSubscriptionLists(listsData.lists || []);
+      // A deleted list can't be filtered on; the persist effect saves the reset.
+      setFilterListId((prevId) =>
+        prevId !== "all" &&
+        !(listsData.lists || []).some((l: any) => l.id === prevId)
+          ? "all"
+          : prevId
+      );
       setCurrentListId((prevId) => {
         const listStillExists = (listsData.lists || []).some(
           (l: any) => l.id === prevId
@@ -569,21 +601,28 @@ export default function Home() {
         const localFilters = user
           ? readLocalFilterPreferences(user.id)
           : {};
-        setHideWatched(
-          typeof localFilters.hideWatched === "boolean"
-            ? localFilters.hideWatched
-            : data.hideWatched || false
-        );
-        setHideMemberOnly(
-          typeof localFilters.hideMemberOnly === "boolean"
-            ? localFilters.hideMemberOnly
-            : data.hideMemberOnly || false
-        );
-        setHideShorts(
-          typeof localFilters.hideShorts === "boolean"
-            ? localFilters.hideShorts
-            : data.hideShorts ?? true
-        );
+        const urlFilters = initialUrlFiltersRef.current;
+        if (!urlFilters.hideWatched) {
+          setHideWatched(
+            typeof localFilters.hideWatched === "boolean"
+              ? localFilters.hideWatched
+              : data.hideWatched || false
+          );
+        }
+        if (!urlFilters.hideMemberOnly) {
+          setHideMemberOnly(
+            typeof localFilters.hideMemberOnly === "boolean"
+              ? localFilters.hideMemberOnly
+              : data.hideMemberOnly || false
+          );
+        }
+        if (!urlFilters.hideShorts) {
+          setHideShorts(
+            typeof localFilters.hideShorts === "boolean"
+              ? localFilters.hideShorts
+              : data.hideShorts ?? true
+          );
+        }
         setFilterPrefsHydrated(true);
         setVideoRetentionDays(
           typeof data.videoRetentionDays === "number"
@@ -595,7 +634,7 @@ export default function Home() {
             ? data.watchedThresholdPercent
             : WATCHED_THRESHOLD_DEFAULT
         );
-        if (typeof data.filterListId === "string") {
+        if (typeof data.filterListId === "string" && !urlFilters.list) {
           setFilterListId(data.filterListId);
         }
         if (Array.isArray(data.watchLater)) {
@@ -981,9 +1020,9 @@ export default function Home() {
 
   // Persist filterListId to database
   useEffect(() => {
-    if (!user) return; // Don't persist before user is authenticated
+    if (!user || !filterPrefsHydrated) return;
     persistUserState({ filterListId });
-  }, [filterListId, user]);
+  }, [filterListId, user, filterPrefsHydrated]);
 
   // Update loading progress visibility when welcome wizard visibility changes
   // This ensures the loading bar hides/shows correctly based on welcome state
@@ -1186,6 +1225,7 @@ export default function Home() {
       // No content filter changes anymore - videoPlayerMode doesn't affect feed
     } catch (err) {
       console.error("Failed to save settings:", err);
+      throw err;
     }
   };
 
@@ -1196,8 +1236,13 @@ export default function Home() {
     key: K,
     value: AppSettings[K]
   ) => {
+    const previousValue = settings?.[key];
     setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
-    void handleSaveSettings({ [key]: value } as Partial<AppSettings>);
+    handleSaveSettings({ [key]: value } as Partial<AppSettings>).catch(() => {
+      setSettings((prev) =>
+        prev ? { ...prev, [key]: previousValue as AppSettings[K] } : prev
+      );
+    });
   };
 
   const handleDeleteAllSubscriptions = async (listId?: string) => {
@@ -1230,6 +1275,7 @@ export default function Home() {
       setHideMemberOnly(false);
     } catch (err) {
       console.error("Failed to reset settings:", err);
+      throw err;
     }
   };
 
@@ -1532,6 +1578,14 @@ export default function Home() {
     });
   };
 
+  useEffect(() => {
+    keyboardHandlersRef.current = {
+      addToWatchLater: handleAddToWatchLater,
+      toggleWatched: handleToggleWatched,
+      watchVideo: handleWatchVideo,
+    };
+  });
+
   const handleRemoveFromWatchLater = (id: string) => {
     const removedItem = watchLater.find((w) => w.id === id);
     const previousWatchLater = watchLater;
@@ -1562,10 +1616,12 @@ export default function Home() {
       return;
     }
 
-    const updated = watchLater.map((w) =>
+    // Several thumbnails can fail in one render, so build on the latest list.
+    const updated = watchLaterRef.current.map((w) =>
       w.id === item.id ? { ...w, thumbnail: fallbackThumbnail } : w
     );
 
+    watchLaterRef.current = updated;
     setWatchLater(updated);
     persistUserState({ watchLater: updated }).catch(() => {
       // If the persist fails, keep UI consistent with in-memory state
@@ -2325,8 +2381,8 @@ export default function Home() {
                                 handleToggleWatched(video.id)
                               }
                               onChannelClick={(channelName) =>
-                                setSearchQuery(
-                                  searchQuery === channelName ? "" : channelName
+                                setSearchQuery((prev) =>
+                                  prev === channelName ? "" : channelName
                                 )
                               }
                               useBuiltInPlayer={
@@ -2607,7 +2663,7 @@ export default function Home() {
           onClose={handleClosePlayer}
           onMarkWatched={() => handleWatchVideo(playerVideo.videoId)}
           onChannelClick={(channelName) =>
-            setSearchQuery(searchQuery === channelName ? "" : channelName)
+            setSearchQuery((prev) => (prev === channelName ? "" : channelName))
           }
           quality={playerQuality}
           defaultResolution={settings?.defaultPlayerResolution ?? "1080p"}
