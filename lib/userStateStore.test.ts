@@ -99,3 +99,21 @@ describe("writeUserState", () => {
     expect(Object.keys(watchedAtById())).toEqual(["dupdupdupdu"]);
   });
 });
+
+describe("watch later", () => {
+  it("lets two users save the same video id", async () => {
+    const item = {
+      id: "wl-abcdefghijk",
+      videoId: "abcdefghijk",
+      title: "t",
+      channel: "c",
+      thumbnail: "x",
+      addedAt: OLD,
+    };
+    const base = await readUserState(USER);
+    await writeUserState({ ...base, watchLater: [item] }, USER);
+    await writeUserState({ ...base, watchLater: [item] }, "u2");
+    expect((await readUserState(USER)).watchLater).toHaveLength(1);
+    expect((await readUserState("u2")).watchLater).toHaveLength(1);
+  });
+});

@@ -39,7 +39,7 @@ const FEED_SETTING_FIELDS: Array<{
   {
     key: "feedRequestTimeoutSeconds",
     label: "Request timeout (seconds)",
-    hint: "Answer from the cache after this long; the refresh keeps running",
+    hint: "With an empty cache, wait at most this long (max 5s) before answering; the refresh keeps running",
   },
   {
     key: "feedRefreshMinutes",
