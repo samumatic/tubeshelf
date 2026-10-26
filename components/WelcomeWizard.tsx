@@ -16,6 +16,7 @@ interface WelcomeWizardProps {
   onComplete: (options: WelcomeOptions) => void;
   onSkip: () => void;
   onImportFile?: (file: File) => Promise<void>;
+  isAdmin: boolean;
 }
 
 export interface WelcomeOptions {
@@ -27,6 +28,7 @@ export function WelcomeWizard({
   onComplete,
   onSkip,
   onImportFile,
+  isAdmin,
 }: WelcomeWizardProps) {
   const { theme } = useContext(ThemeContext);
   const [mounted, setMounted] = useState(false);
@@ -227,6 +229,8 @@ export function WelcomeWizard({
         </div>
       ),
     },
+    ...(isAdmin
+      ? [
     {
       title: "Feed Loading Method",
       description: "Choose your preferred loading speed",
@@ -288,6 +292,8 @@ export function WelcomeWizard({
         </div>
       ),
     },
+        ]
+      : []),
     {
       title: "Ready to Go!",
       description: "All set up and ready to start",
