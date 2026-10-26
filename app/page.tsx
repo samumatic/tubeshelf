@@ -1654,9 +1654,11 @@ export default function Home() {
 
       // Apply wizard settings (fetchMethod)
       try {
-        await updateSettings({
-          fetchMethod: options.fetchMethod,
-        });
+        if (user?.isAdmin) {
+          await updateSettings({
+            fetchMethod: options.fetchMethod,
+          });
+        }
         const freshSettings = await getSettings();
         setSettings(freshSettings);
       } catch (err) {
@@ -2729,6 +2731,7 @@ export default function Home() {
           onComplete={handleWelcomeWizardComplete}
           onSkip={handleWelcomeWizardSkip}
           onImportFile={handleWelcomeWizardImportFile}
+          isAdmin={!!user?.isAdmin}
         />
       )}
 
