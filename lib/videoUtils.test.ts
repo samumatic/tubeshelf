@@ -86,6 +86,40 @@ describe("filterAndSortVideos - hideShorts", () => {
   });
 });
 
+describe("filterAndSortVideos - channel filter", () => {
+  const baseOptions = {
+    searchQuery: "",
+    filterListId: "all",
+    subscriptionLists: [],
+    hideWatched: false,
+    hideMemberOnly: false,
+    hideShorts: false,
+    watchedVideos: new Set<string>(),
+    settings: null,
+  };
+  const videos = [
+    video({ id: "a", channel: "DAVE", channelId: "UCdave" }),
+    video({ id: "b", channel: "Dave2D", channelId: "UCdave2d" }),
+    video({ id: "c", title: "Dave reviews", channelId: "UCother" }),
+  ];
+
+  it("matches only the exact channel, not channels with similar names", () => {
+    const result = filterAndSortVideos(videos, {
+      ...baseOptions,
+      channelId: "UCdave",
+    });
+    expect(result.map((v) => v.id)).toEqual(["a"]);
+  });
+
+  it("text search still matches substrings", () => {
+    const result = filterAndSortVideos(videos, {
+      ...baseOptions,
+      searchQuery: "dave",
+    });
+    expect(result.map((v) => v.id).sort()).toEqual(["a", "b", "c"]);
+  });
+});
+
 describe("videoListsMatch", () => {
   it("matches identical lists", () => {
     expect(videoListsMatch([video()], [video()])).toBe(true);

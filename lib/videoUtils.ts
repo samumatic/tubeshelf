@@ -52,6 +52,8 @@ export function filterAndSortVideos(
   videos: Video[],
   options: {
     searchQuery: string;
+    /** Exact channel filter (channelId), set by clicking a channel name. */
+    channelId?: string | null;
     filterListId: string;
     subscriptionLists: SubscriptionList[];
     hideWatched: boolean;
@@ -63,6 +65,7 @@ export function filterAndSortVideos(
 ): Video[] {
   const {
     searchQuery,
+    channelId,
     filterListId,
     subscriptionLists,
     hideWatched,
@@ -88,6 +91,11 @@ export function filterAndSortVideos(
       vids = [];
     }
     // If subscriptionLists is still empty (loading), skip filtering and show all videos
+  }
+
+  // Filter by exact channel
+  if (channelId) {
+    vids = vids.filter((v) => v.channelId === channelId);
   }
 
   // Filter by search term
