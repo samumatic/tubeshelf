@@ -120,6 +120,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Exact channel filter (channelId), set by clicking a channel name.
+  const [channelFilter, setChannelFilter] = useState<string | null>(null);
   const [filteredVideos, setFilteredVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -383,6 +385,7 @@ export default function Home() {
           if (searchQuery) {
             setSearchQuery("");
           }
+          setChannelFilter(null);
         }
         return;
       }
@@ -501,6 +504,7 @@ export default function Home() {
           if (searchQuery) {
             setSearchQuery("");
           }
+          setChannelFilter(null);
           break;
       }
     };
@@ -802,6 +806,11 @@ export default function Home() {
       setSearchQuery(search);
     }
 
+    const channel = searchParams.get("channel");
+    if (channel) {
+      setChannelFilter(channel);
+    }
+
     const list = searchParams.get("list");
     if (list) {
       setFilterListId(list);
@@ -841,6 +850,10 @@ export default function Home() {
       params.set("search", searchQuery);
     }
 
+    if (channelFilter) {
+      params.set("channel", channelFilter);
+    }
+
     if (filterListId && filterListId !== "all") {
       params.set("list", filterListId);
     }
@@ -863,6 +876,7 @@ export default function Home() {
     currentPage,
     feedTab,
     searchQuery,
+    channelFilter,
     filterListId,
     hideWatched,
     hideMemberOnly,
@@ -1037,14 +1051,15 @@ export default function Home() {
   // Handle Escape key to clear search
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && searchQuery) {
+      if (event.key === "Escape" && (searchQuery || channelFilter)) {
         setSearchQuery("");
+        setChannelFilter(null);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [searchQuery]);
+  }, [searchQuery, channelFilter]);
 
   // Handle search and filter
   useEffect(() => {
@@ -1053,6 +1068,7 @@ export default function Home() {
     const timer = setTimeout(() => {
       const vids = filterAndSortVideos(videos, {
         searchQuery,
+        channelId: channelFilter,
         filterListId,
         subscriptionLists,
         hideWatched,
@@ -1067,6 +1083,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [
     searchQuery,
+    channelFilter,
     videos,
     hideWatched,
     hideMemberOnly,
@@ -2105,6 +2122,21 @@ export default function Home() {
                 </span>
                 <span>•</span>
                 <span>{filteredVideos.length} videos</span>
+                {channelFilter && (
+                  <>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setChannelFilter(null)}
+                      className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground hover:bg-muted/70"
+                      title="Clear channel filter"
+                    >
+                      Channel: {videos.find((v) => v.channelId === channelFilter)
+                        ?.channel ?? channelFilter}
+                      <X className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
                 {searchQuery.trim() && (
                   <>
                     <span>•</span>
@@ -2334,12 +2366,12 @@ export default function Home() {
                       <div className="text-center py-12">
                         <div className="text-5xl mb-4">🎬</div>
                         <h3 className="text-lg font-semibold mb-2">
-                          {searchQuery
+                          {searchQuery || channelFilter
                             ? "No videos found"
                             : "Your feed is empty"}
                         </h3>
                         <p className="text-muted-foreground">
-                          {searchQuery
+                          {searchQuery || channelFilter
                             ? "Try adjusting your search"
                             : "Subscribe to channels to populate your feed with fresh videos"}
                         </p>
@@ -2382,11 +2414,14 @@ export default function Home() {
                               onMarkWatched={() =>
                                 handleToggleWatched(video.id)
                               }
-                              onChannelClick={(channelName) =>
-                                setSearchQuery((prev) =>
-                                  prev === channelName ? "" : channelName
-                                )
-                              }
+                              onChannelClick={() => {
+                                setSearchQuery("");
+                                setChannelFilter((prev) =>
+                                  prev === video.channelId
+                                    ? null
+                                    : video.channelId
+                                );
+                              }}
                               useBuiltInPlayer={
                                 settings?.videoPlayerMode !== "new-tab"
                               }
@@ -2664,9 +2699,16 @@ export default function Home() {
           videoUrl={playerVideo.videoUrl}
           onClose={handleClosePlayer}
           onMarkWatched={() => handleWatchVideo(playerVideo.videoId)}
-          onChannelClick={(channelName) =>
-            setSearchQuery((prev) => (prev === channelName ? "" : channelName))
-          }
+          onChannelClick={(channelName) => {
+            setSearchQuery("");
+            if (playerVideo.channelId) {
+              setChannelFilter(playerVideo.channelId);
+            } else {
+              // No channelId known: fall back to the old text search.
+              setChannelFilter(null);
+              setSearchQuery(channelName);
+            }
+          }}
           quality={playerQuality}
           defaultResolution={settings?.defaultPlayerResolution ?? "1080p"}
           onQualityChange={(q) => setPlayerQuality(q as typeof playerQuality)}
