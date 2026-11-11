@@ -79,7 +79,7 @@ Refresh interval, video retention, registration and login providers are set in t
 Keep the same `./data` volume. On its first start, 2.x imports users, subscriptions, lists, watch history, watch later, settings, API keys and login providers from the 1.x database (`data/tubeshelf.db`) into a new file (`data/shelf.db`). The 1.x file is not modified, so going back to a 1.x image is possible.
 
 - Passwords and API keys keep working.
-- Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set for the first start so OIDC client secrets can be carried over. If it is missing, the provider is imported disabled and you re-enter its secret under Admin.
+- OIDC client secrets are carried over. Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set to the value 1.x used. If a secret cannot be decrypted, 2.x stops before importing anything and says so, so you can fix the variable and start again. Set `TUBESHELF_IMPORT_SKIP_OIDC=1` to import anyway and re-enter the client secret under Admin.
 - The OIDC redirect URI is unchanged (`/api/auth/oidc/callback`).
 - Removed in 2.x: video comments, SubRelay sync, the welcome wizard, the "standard" scraping fetcher.
 
