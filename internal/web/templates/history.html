@@ -1,0 +1,9 @@
+{{define "title"}}History · TubeShelf{{end}}
+{{define "main"}}
+<h1 class="page-title">History</h1>
+{{if .Videos}}
+<div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}</div>
+{{else}}
+<div class="empty"><h2>No history yet</h2><p>Videos you play or mark as watched show up here.</p></div>
+{{end}}
+{{end}}

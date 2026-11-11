@@ -1,0 +1,45 @@
+{{define "title"}}Channels · TubeShelf{{end}}
+{{define "main"}}
+<h1 class="page-title">Channels <small>{{len .Channels}}</small></h1>
+<div class="panels">
+  <form class="panel" method="post" action="/channels">
+    <h2>Subscribe</h2>
+    <label for="channel">Channel URL, @handle or channel id</label>
+    <div class="row"><input id="channel" name="channel" placeholder="@veritasium" required autocomplete="off"><button class="button primary">Subscribe</button></div>
+  </form>
+  <form class="panel" method="post" action="/channels/import" enctype="multipart/form-data">
+    <h2>Import and export</h2>
+    <label for="file">OPML, Google Takeout <code>subscriptions.csv</code>, or a text file with one channel per line</label>
+    <div class="row"><input id="file" type="file" name="file" accept=".opml,.xml,.csv,.txt" required><button class="button">Import</button>
+    <a class="button" href="/channels/export.opml">Export OPML</a></div>
+  </form>
+  <div class="panel">
+    <h2>Lists</h2>
+    <form class="row" method="post" action="/lists"><input name="name" placeholder="New list name" aria-label="New list name" maxlength="60" required><button class="button">Create</button></form>
+    {{if .Lists}}<ul class="plain">{{range .Lists}}
+      <li><a href="/?list={{.ID}}">{{.Name}}</a>
+        <form method="post" action="/lists/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the list “{{.Name}}”? Its channels stay subscribed.">Delete</button></form></li>{{end}}
+    </ul>{{end}}
+  </div>
+</div>
+{{if .Channels}}
+<table class="table">
+  <thead><tr><th>Channel</th><th class="num">Videos</th><th>Last fetch</th>{{if .Lists}}<th>Lists</th>{{end}}<th></th></tr></thead>
+  <tbody>{{range $c := .Channels}}
+    <tr>
+      <td><a class="channel" href="/?channel={{.ID}}"><span class="avatar" data-initial="{{initial .Title}}">{{if .HasAvatar}}<img src="/avatar/{{.ID}}" alt="" loading="lazy" width="36" height="36">{{end}}</span>{{.Title}}</a></td>
+      <td class="num">{{.Videos}}</td>
+      <td>{{if .LastError}}<span class="bad" title="{{.LastError}}">Failing</span>{{else if .LastSuccess}}{{ago .LastSuccess}}{{else}}Queued{{end}}</td>
+      {{if $.Lists}}<td><div class="chips">{{range $.Lists}}
+        <form method="post" action="/lists/{{.ID}}/channels" data-toggle="list">
+          <input type="hidden" name="channel" value="{{$c.ID}}"><input type="hidden" name="on" value="{{if index $c.InList .ID}}0{{else}}1{{end}}">
+          <button class="chip small" aria-pressed="{{index $c.InList .ID}}">{{.Name}}</button>
+        </form>{{end}}</div></td>{{end}}
+      <td class="end"><form method="post" action="/channels/{{.ID}}/delete"><button class="link danger" data-confirm="Unsubscribe from {{.Title}}?">Unsubscribe</button></form></td>
+    </tr>{{end}}
+  </tbody>
+</table>
+{{else}}
+<div class="empty"><h2>No subscriptions yet</h2><p>Paste a channel link above, or import your subscriptions from another app.</p></div>
+{{end}}
+{{end}}

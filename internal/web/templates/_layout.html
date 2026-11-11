@@ -1,0 +1,79 @@
+{{define "layout"}}<!doctype html>
+<html lang="en" data-theme="{{.Set.theme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>{{block "title" .}}TubeShelf{{end}}</title>
+<link rel="stylesheet" href="/static/app.css?v={{.AssetV}}">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/static/manifest.json">
+<script type="module" src="/static/app.js?v={{.AssetV}}"></script>
+{{block "head" .}}{{end}}
+</head>
+<body class="view-{{.Set.view}} page-{{.Page}}">
+{{if .User}}
+<header class="top">
+  <a class="brand" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg><span>TubeShelf</span></a>
+  <nav aria-label="Main">
+    <a href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>Feed</a>
+    <a href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>Later</a>
+    <a href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>History</a>
+    <a href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>Channels</a>
+  </nav>
+  <form class="search" action="/" role="search">
+    <input type="search" name="q" value="{{.Search}}" placeholder="Search feed" aria-label="Search feed" id="search">
+  </form>
+  <nav class="account" aria-label="Account">
+    {{if .User.IsAdmin}}<a href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>Admin</a>{{end}}
+    <a href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>Settings</a>
+    <form method="post" action="/logout"><button class="link">Sign out</button></form>
+  </nav>
+</header>
+{{end}}
+<main>
+{{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
+{{if .Msg}}<p class="flash" role="status">{{.Msg}}</p>{{end}}
+{{template "main" .}}
+</main>
+</body>
+</html>{{end}}
+
+{{define "i-check"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-clock"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{{end}}
+
+{{/* card expects {V: Video, Set: user settings} */}}
+{{define "card"}}{{$v := .V}}
+<article class="card{{if $v.Watched}} watched{{end}}{{if $v.Later}} later{{end}}" data-id="{{$v.ID}}">
+  <a class="thumb" {{if eq .Set.open_on_youtube "1"}}href="https://www.youtube.com/watch?v={{$v.ID}}" target="_blank" rel="noopener"{{else}}href="/watch/{{$v.ID}}"{{end}} tabindex="-1" aria-hidden="true">
+    <img src="/thumb/{{$v.ID}}.jpg" alt="" loading="lazy" width="320" height="180">
+    {{if eq $v.Kind "live"}}<span class="badge live">Live</span>
+    {{else if eq $v.Kind "upcoming"}}<span class="badge">Upcoming</span>
+    {{else if eq $v.Kind "short"}}<span class="badge">Short{{if $v.Duration}} · {{dur $v.Duration}}{{end}}</span>
+    {{else if $v.Duration}}<span class="badge">{{dur $v.Duration}}</span>{{end}}
+    {{if and (not $v.Watched) (pct $v.Progress $v.Duration)}}<progress value="{{pct $v.Progress $v.Duration}}" max="100"></progress>{{end}}
+  </a>
+  <div class="meta">
+    <a class="avatar" href="/?channel={{$v.ChannelID}}" tabindex="-1" aria-hidden="true" data-initial="{{initial $v.Channel}}">{{if $v.HasAvatar}}<img src="/avatar/{{$v.ChannelID}}" alt="" loading="lazy" width="36" height="36">{{end}}</a>
+    <div class="text">
+      <h3><a class="title" {{if eq .Set.open_on_youtube "1"}}href="https://www.youtube.com/watch?v={{$v.ID}}" target="_blank" rel="noopener"{{else}}href="/watch/{{$v.ID}}"{{end}}>{{$v.Title}}</a></h3>
+      <p>{{if $v.ChannelID}}<a href="/?channel={{$v.ChannelID}}">{{$v.Channel}}</a>{{else}}{{$v.Channel}}{{end}} · <time datetime="{{iso $v.Published}}">{{ago $v.Published}}</time>{{if $v.Members}} · Members only{{end}}</p>
+    </div>
+  </div>
+  <div class="actions">
+    <form method="post" action="/videos/{{$v.ID}}/watched" data-toggle="watched">
+      <input type="hidden" name="on" value="{{if $v.Watched}}0{{else}}1{{end}}">
+      <button title="{{if $v.Watched}}Mark as not watched{{else}}Mark as watched{{end}} (w)" aria-pressed="{{$v.Watched}}">{{template "i-check"}}<span class="sr">Watched</span></button>
+    </form>
+    <form method="post" action="/videos/{{$v.ID}}/later" data-toggle="later">
+      <input type="hidden" name="on" value="{{if $v.Later}}0{{else}}1{{end}}">
+      <button title="{{if $v.Later}}Remove from Later{{else}}Save for later{{end}} (l)" aria-pressed="{{$v.Later}}">{{template "i-clock"}}<span class="sr">Later</span></button>
+    </form>
+  </div>
+</article>{{end}}
+
+{{define "auth-shell"}}
+<section class="auth">
+  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg>TubeShelf</h1>
+  {{template "auth" .}}
+</section>{{end}}

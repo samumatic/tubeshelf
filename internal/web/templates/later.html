@@ -1,0 +1,9 @@
+{{define "title"}}Later · TubeShelf{{end}}
+{{define "main"}}
+<h1 class="page-title">Watch later</h1>
+{{if .Videos}}
+<div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}</div>
+{{else}}
+<div class="empty"><h2>Nothing saved</h2><p>Press <kbd>l</kbd> on a video, or use its clock button, to save it here.</p></div>
+{{end}}
+{{end}}

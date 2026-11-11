@@ -1,0 +1,14 @@
+{{define "title"}}Sign in · TubeShelf{{end}}
+{{define "main"}}{{template "auth-shell" .}}{{end}}
+{{define "auth"}}
+{{range .Providers}}<a class="button primary wide" href="/api/auth/oidc/start?provider={{.ID}}">Sign in with {{.Name}}</a>{{end}}
+{{if not .OIDCOnly}}
+{{if .Providers}}<p class="or">or</p>{{end}}
+<form method="post" action="/login">
+  <label>Email <input type="email" name="email" required autofocus autocomplete="username"></label>
+  <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+  <button class="button {{if not .Providers}}primary{{end}} wide">Sign in</button>
+</form>
+{{if .Registration}}<p class="muted">No account? <a href="/register">Register</a></p>{{end}}
+{{end}}
+{{end}}

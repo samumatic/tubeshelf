@@ -9,7 +9,9 @@ services:
     user: "1000:1000"
     security_opt:
       - no-new-privileges:true
-    environment:
-      BETTER_AUTH_SECRET: "replace-with-a-random-32+-char-secret"
+    # Optional: fixed secret for encrypting OIDC client secrets. Without it,
+    # one is generated in ./data/.secret on first start.
+    # environment:
+    #   TUBESHELF_SECRET: "replace-with-a-random-32+-char-secret"
     volumes:
       - ./data:/app/data

@@ -1,0 +1,38 @@
+{{define "title"}}{{.V.Title}} · TubeShelf{{end}}
+{{define "head"}}<script type="module" src="/static/player.js?v={{.AssetV}}"></script>{{end}}
+{{define "main"}}
+<div class="watch">
+  <section>
+    <div id="player" class="player" data-id="{{.V.ID}}" data-duration="{{.V.Duration}}" data-sponsorblock="{{.Set.sponsorblock}}">
+      <iframe id="yt" title="{{.V.Title}}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"
+        src="https://www.youtube-nocookie.com/embed/{{.V.ID}}?enablejsapi=1&autoplay=1&rel=0{{if .Start}}&start={{.Start}}{{end}}"></iframe>
+      <p id="toast" class="toast" role="status" hidden></p>
+    </div>
+    <h1>{{.V.Title}}</h1>
+    <div class="watch-meta">
+      <p>{{if .V.ChannelID}}<a href="/?channel={{.V.ChannelID}}">{{.V.Channel}}</a>{{else}}{{.V.Channel}}{{end}}{{if .V.Published}} · <time datetime="{{iso .V.Published}}">{{date .V.Published}}</time>{{end}}</p>
+      <div class="row">
+        <form method="post" action="/videos/{{.V.ID}}/watched" data-toggle="watched">
+          <input type="hidden" name="on" value="{{if .V.Watched}}0{{else}}1{{end}}">
+          <button class="button" aria-pressed="{{.V.Watched}}">{{template "i-check"}} Watched</button>
+        </form>
+        <form method="post" action="/videos/{{.V.ID}}/later" data-toggle="later">
+          <input type="hidden" name="on" value="{{if .V.Later}}0{{else}}1{{end}}">
+          <button class="button" aria-pressed="{{.V.Later}}">{{template "i-clock"}} Later</button>
+        </form>
+        <a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">Open on YouTube</a>
+      </div>
+    </div>
+    <details class="keys">
+      <summary>Keyboard shortcuts</summary>
+      <p><kbd>k</kbd>/<kbd>space</kbd> play · <kbd>j</kbd> <kbd>l</kbd> ±10s · <kbd>←</kbd> <kbd>→</kbd> ±5s · <kbd>0</kbd>–<kbd>9</kbd> seek · <kbd>m</kbd> mute · <kbd>f</kbd> fullscreen · <kbd>&lt;</kbd> <kbd>&gt;</kbd> speed · <kbd>w</kbd> watched</p>
+    </details>
+  </section>
+  {{if .UpNext}}
+  <aside>
+    <h2>Up next</h2>
+    <div class="videos compact">{{range .UpNext}}{{template "card" (card . $.Set)}}{{end}}</div>
+  </aside>
+  {{end}}
+</div>
+{{end}}

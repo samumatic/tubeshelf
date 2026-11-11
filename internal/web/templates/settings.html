@@ -1,0 +1,64 @@
+{{define "title"}}Settings · TubeShelf{{end}}
+{{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
+{{define "main"}}
+<h1 class="page-title">Settings</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/settings">
+    <h2>Appearance and feed</h2>
+    <div class="fields">
+      <label>Theme <select name="theme">{{range $v := list "system" "dark" "light"}}<option {{if eq $v $.Set.theme}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Layout <select name="view">{{range $v := list "grid" "list"}}<option {{if eq $v $.Set.view}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Sort <select name="sort">{{range $v := list "newest" "oldest"}}<option {{if eq $v $.Set.sort}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Mark as watched at <span class="row"><input type="number" name="watched_percent" min="25" max="100" value="{{.Set.watched_percent}}"> %</span></label>
+    </div>
+    {{template "check" (toggle "hide_shorts" "Hide Shorts" .Set)}}
+    {{template "check" (toggle "hide_live" "Hide live streams and premieres" .Set)}}
+    {{template "check" (toggle "hide_members" "Hide members-only videos" .Set)}}
+    {{template "check" (toggle "hide_watched" "Hide watched videos" .Set)}}
+    <h2>Player</h2>
+    {{template "check" (toggle "sponsorblock" "Skip sponsor segments (SponsorBlock)" .Set)}}
+    {{template "check" (toggle "open_on_youtube" "Open videos on youtube.com instead of the built-in player" .Set)}}
+    <p><button class="button primary">Save</button></p>
+  </form>
+
+  <form class="panel" method="post" action="/settings/profile">
+    <h2>Profile</h2>
+    <div class="fields">
+      <label>Email <input value="{{.User.Email}}" disabled></label>
+      <label>Name <input name="name" value="{{.User.Name}}" maxlength="80" autocomplete="name"></label>
+    </div>
+    <p><button class="button">Save profile</button></p>
+  </form>
+
+  <form class="panel" method="post" action="/settings/password">
+    <h2>{{if .User.HasPass}}Change password{{else}}Set a password{{end}}</h2>
+    <div class="fields">
+      {{if .User.HasPass}}<label>Current password <input type="password" name="current" required autocomplete="current-password"></label>{{end}}
+      <label>New password <input type="password" name="new" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+    </div>
+    <p><button class="button">Change password</button></p>
+  </form>
+
+  <div class="panel" id="keys">
+    <h2>API keys</h2>
+    <p class="muted">For scripts that manage subscriptions: send the key as <code>X-API-Key</code> to <code>/api/subscriptions</code>.</p>
+    {{if .NewKey}}<p class="flash">New key, shown only once: <code class="select">{{.NewKey}}</code></p>{{end}}
+    {{if .Keys}}<ul class="plain">{{range .Keys}}
+      <li><span>{{.Name}} <small>created {{date .Created}}{{if .LastUsed}}, used {{ago .LastUsed}}{{else}}, never used{{end}}</small></span>
+        <form method="post" action="/settings/keys/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the API key “{{.Name}}”?">Delete</button></form></li>{{end}}
+    </ul>{{end}}
+    <form class="row" method="post" action="/settings/keys"><input name="name" placeholder="Key name" aria-label="Key name" maxlength="60"><button class="button">Create key</button></form>
+  </div>
+
+  <form class="panel danger-zone" method="post" action="/settings/danger">
+    <h2>Danger zone</h2>
+    <label class="check"><input type="checkbox" name="confirm" value="1" required> I understand this cannot be undone</label>
+    <div class="row">
+      <button class="button danger" name="action" value="history">Clear watch history</button>
+      <button class="button danger" name="action" value="subscriptions">Delete all subscriptions</button>
+      <button class="button danger" name="action" value="account">Delete my account</button>
+    </div>
+  </form>
+  <p class="muted">TubeShelf {{.Version}}</p>
+</div>
+{{end}}

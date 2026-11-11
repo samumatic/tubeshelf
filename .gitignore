@@ -1,12 +1,12 @@
 # macOS
 .DS_Store
 
-# dependencies
-node_modules/
+# build output
+/tubeshelf
 
-# Next.js
+# leftovers of the v1 (Node.js) tree
+node_modules/
 .next/
-out/
 
 # local app data
 data/

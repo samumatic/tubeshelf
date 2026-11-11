@@ -1,0 +1,11 @@
+{{define "title"}}Set up · TubeShelf{{end}}
+{{define "main"}}{{template "auth-shell" .}}{{end}}
+{{define "auth"}}
+<p class="muted">Create the admin account to get started.</p>
+<form method="post" action="/setup">
+  <label>Email <input type="email" name="email" required autofocus autocomplete="username"></label>
+  <label>Name <input name="name" autocomplete="name"></label>
+  <label>Password <input type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+  <button class="button primary wide">Create admin account</button>
+</form>
+{{end}}

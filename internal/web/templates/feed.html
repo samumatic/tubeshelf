@@ -1,0 +1,44 @@
+{{define "main"}}
+<div class="toolbar">
+  <div class="chips" role="group" aria-label="Lists">
+    <a class="chip" href="{{query .Q "list" ""}}" {{if not .ListID}}aria-current="true"{{end}}>All</a>
+    {{range .Lists}}<a class="chip" href="{{query $.Q "list" (print .ID)}}" {{if eq (print .ID) $.ListID}}aria-current="true"{{end}}>{{.Name}}</a>{{end}}
+    {{if .ChannelID}}<a class="chip active" href="{{query .Q "channel" ""}}" title="Clear channel filter">{{or .ChannelTitle "Channel"}} ×</a>{{end}}
+    {{if .Search}}<a class="chip active" href="{{query .Q "q" ""}}" title="Clear search">“{{.Search}}” ×</a>{{end}}
+  </div>
+  <form class="chips filters" method="post" action="/settings" aria-label="Filters">
+    {{template "toggle" (toggle "hide_shorts" "Shorts" .Set)}}
+    {{template "toggle" (toggle "hide_live" "Live" .Set)}}
+    {{template "toggle" (toggle "hide_members" "Members" .Set)}}
+    {{template "toggle" (toggle "hide_watched" "Watched" .Set)}}
+    <span class="sep"></span>
+    <button class="chip" name="sort" value="{{if eq .Set.sort "oldest"}}newest{{else}}oldest{{end}}" title="Change sort order">{{if eq .Set.sort "oldest"}}Oldest first{{else}}Newest first{{end}}</button>
+    <button class="chip" name="view" value="{{if eq .Set.view "list"}}grid{{else}}list{{end}}" title="Switch layout">{{if eq .Set.view "list"}}List{{else}}Grid{{end}}</button>
+  </form>
+</div>
+{{if .Videos}}
+<div id="feed" class="videos">{{template "items" .}}</div>
+{{else}}
+<div class="empty" {{if .Pending}}data-reload="4"{{end}}>
+  {{if eq .Subs 0}}
+    <h2>Your shelf is empty</h2>
+    <p>Subscribe to channels to fill your feed. No Google account needed.</p>
+    <p><a class="button primary" href="/channels">Add channels</a></p>
+  {{else if .Pending}}
+    <h2>Fetching videos…</h2>
+    <p>{{.Pending}} of {{.Subs}} channels are being fetched for the first time. This page reloads on its own.</p>
+  {{else}}
+    <h2>Nothing to show</h2>
+    <p>No videos match the current filters.</p>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{/* toggle expects {Key, Label, On}, where On means the kind is hidden: a chip that is "on" while the kind is shown */}}
+{{define "toggle"}}<button class="chip" name="{{.Key}}" value="{{if .On}}0{{else}}1{{end}}" aria-pressed="{{not .On}}" title="{{if .On}}Show{{else}}Hide{{end}} {{.Label}}">{{.Label}}</button>{{end}}
+
+{{define "items"}}
+{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}
+{{if .Next}}<a id="more" class="more" href="{{query .Q "before" .Next}}">Load more</a>{{end}}
+{{end}}

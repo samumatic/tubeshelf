@@ -1,36 +1,29 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate Dashboard",
   "osvVulnerabilityAlerts": true,
-  "lockFileMaintenance": {
-    "description": "Renovate's vulnerability-alert PRs (native GitHub alerts + osvVulnerabilityAlerts above) only target direct dependencies it extracts from package.json - a vulnerable transitive dependency (e.g. js-yaml/@humanfs/node pulled in by eslint) doesn't get its own remediation PR even when the parent's already-declared semver range permits the patched version. This does a periodic full lockfile refresh instead, which picks those up automatically since npm just re-resolves within existing ranges.",
-    "enabled": true,
-    "automerge": true,
-    "schedule": ["before 4am on monday"]
-  },
   "packageRules": [
     {
       "description": "Automerge minor/patch/pin/digest updates via PR once CI passes. main now requires a PR + passing status checks (branch protection), so a direct branch push (the previous automergeType) would just be rejected - this still ends up hands-off, but with an actual CI gate and a paper trail instead of a silent direct push.",
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
       "automerge": true,
       "automergeType": "pr"
     },
     {
       "description": "Keep majors in PRs (no automerge)",
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false
-    },
-    {
-      "description": "eslint-config-next's plugins (eslint-plugin-react, typescript-eslint) do not support ESLint 10 yet - it crashes on any lint run. Unpin once they do.",
-      "matchPackageNames": ["eslint"],
-      "allowedVersions": "<10"
-    },
-    {
-      "description": "typescript-eslint (even latest) only supports typescript <6.1.0. TS7 doesn't just warn on the peer mismatch, it crashes `npm run lint` outright (TypeError reading 'Cjs' in typescript-estree's create-program). tsc itself is fine on 7 - this is purely about the lint toolchain. Unpin once typescript-eslint supports it.",
-      "matchPackageNames": ["typescript"],
-      "allowedVersions": "<6.1.0"
     }
   ],
   "major": {

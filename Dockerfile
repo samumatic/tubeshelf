@@ -1,89 +1,32 @@
-# Build stage
-FROM node:24-alpine AS builder
+FROM golang:1.27-alpine AS build
+WORKDIR /src
 
-WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Update packages for security, and add the toolchain node-gyp needs to
-# compile native modules (better-sqlite3 has no prebuilt binary for musl/
-# Alpine yet, so it always builds from source here)
-RUN apk update && apk upgrade && \
-    apk add --no-cache python3 make g++ && \
-    rm -rf /var/cache/apk/*
+COPY VERSION main.go ./
+COPY internal ./internal
 
-# Copy package files
-COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* .npmrc* ./
-
-# Install dependencies
-RUN npm ci || npm install
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Runtime stage - minimal Node.js Alpine
-FROM node:24-alpine
-
-WORKDIR /app
-
-# Install dumb-init for proper signal handling and update packages for security
-RUN apk update && apk upgrade && apk add --no-cache dumb-init && \
-    rm -rf /var/cache/apk/*
-
-# Copy only necessary built files from builder (standalone includes everything needed)
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-
-# Copy lib folder (needed for CLI commands)
-COPY --from=builder /app/lib ./lib
-
-# lib/cli.js runs unbundled by plain `node` (it's outside Next's route graph,
-# so webpack/output-file-tracing never sees it) - its only non-builtin,
-# non-native dependency is bcryptjs, which Next's standalone output omits
-# because every *bundled* route that uses it gets bcryptjs's code inlined
-# directly into the compiled route bundle instead of requiring it from
-# node_modules at runtime. Copy it in explicitly so the unbundled CLI can
-# still resolve it.
-COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
-
-# Copy CLI script (keep standalone server.js from Next build). Kept under
-# bin/ here too so cli.js's "../lib/cli.js" import resolves the same way it
-# does in the source tree.
-COPY --from=builder /app/bin/cli.js ./bin/cli.js
-COPY bin/cli ./bin/cli
-COPY bin/entrypoint.sh ./bin/entrypoint.sh
-
-# Make scripts executable
-RUN chmod +x ./bin/cli.js ./server.js ./bin/cli ./bin/entrypoint.sh
-
-# Remove npm to avoid shipping known vulnerabilities in the runtime image
-# (runtime doesn't need npm or npx)
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
-
-# Create symlink for easy CLI access
-RUN ln -s /app/bin/cli /usr/local/bin/cli
-
-# Create required writable dirs for non-root runtime user
-RUN mkdir -p /app/data /app/.next/cache && \
-    chown 1000:1000 /app/data /app/.next/cache
-
-# Expose port
-EXPOSE 3000
-
-# Use entrypoint script for proper signal handling and privilege dropping
-ENTRYPOINT ["/app/bin/entrypoint.sh"]
-
-# Start the application with the server script
-CMD ["node", "server.js"]
-
-# Set the NODE_ENV environment variable to production
-ENV NODE_ENV=production
-
-# Only the dev-container workflow sets these; release images leave them empty
-# so the app reports the plain package.json version (see lib/version.ts).
+# Only the dev-container workflow sets these; release images report the plain VERSION.
 ARG BUILD_CHANNEL=""
 ARG BUILD_COMMIT=""
-ENV TUBESHELF_BUILD_CHANNEL=$BUILD_CHANNEL \
-    TUBESHELF_BUILD_COMMIT=$BUILD_COMMIT
+
+# CGO is off: SQLite is the pure-Go port, so the binary is fully static.
+RUN V="$(cat VERSION)${BUILD_CHANNEL:+-$BUILD_CHANNEL}${BUILD_COMMIT:++$BUILD_COMMIT}" && \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$V" -o /tubeshelf . && \
+    mkdir -p /out/data
+
+FROM scratch
+
+# Root certificates for the HTTPS calls to YouTube and OIDC providers.
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /tubeshelf /tubeshelf
+# Same path as v1, so existing volume mounts keep working.
+COPY --from=build --chown=1000:1000 /out/data /app/data
+
+ENV TUBESHELF_DATA=/app/data
+USER 1000:1000
+EXPOSE 3000
+VOLUME /app/data
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD ["/tubeshelf", "health"]
+ENTRYPOINT ["/tubeshelf"]
