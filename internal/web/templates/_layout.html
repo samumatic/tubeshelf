@@ -22,15 +22,15 @@
     </div>
     <nav aria-label="Main">
       <h2 class="nav-heading">Library</h2>
-      <a class="nav-item" href="/" {{if and (eq .Page "feed") (not .ListID)}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
-      <a class="nav-item" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
-      <a class="nav-item" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+      <a class="nav-item" title="Feed" href="/" {{if and (eq .Page "feed") (not .ListID)}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+      <a class="nav-item" title="Later" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
+      <a class="nav-item" title="History" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
       {{if .NavLists}}<h2 class="nav-heading">Lists</h2>
-      {{range .NavLists}}<a class="nav-item" href="/?list={{.ID}}" {{if eq (print .ID) (print $.ListID)}}aria-current="page"{{end}}><span class="dot"></span><span class="grow">{{.Name}}</span></a>{{end}}{{end}}
+      {{range .NavLists}}<a class="nav-item" title="{{.Name}}" href="/?list={{.ID}}" {{if eq (print .ID) (print $.ListID)}}aria-current="page"{{end}}><span class="dot"></span><span class="grow">{{.Name}}</span></a>{{end}}{{end}}
       <h2 class="nav-heading">Manage</h2>
-      <a class="nav-item" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
-      <a class="nav-item" href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
-      {{if .User.IsAdmin}}<a class="nav-item" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-admin"}}Admin</a>{{end}}
+      <a class="nav-item" title="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+      <a class="nav-item" title="Settings" href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
+      {{if .User.IsAdmin}}<a class="nav-item" title="Admin" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-admin"}}Admin</a>{{end}}
     </nav>
     <div class="sidebar-foot">
       <p class="version">TubeShelf {{.Version}}</p>
@@ -44,7 +44,7 @@
   <div class="content">
     <header class="phone-bar">
       <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
-      <button type="button" class="icon-button" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
+      <a class="me" href="/settings" aria-label="Settings for {{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></a>
     </header>
     <main id="main">
       {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
@@ -59,19 +59,22 @@
     <a href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
     <a href="/settings" {{if or (eq .Page "settings") (eq .Page "admin")}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
   </nav>
+  <button type="button" class="phone-search" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
 </div>
 <dialog class="palette" id="palette" aria-label="Command palette">
   <input type="text" placeholder="Go to a page, list or channel, or search the feed" aria-label="Command" autocomplete="off">
   <ul role="listbox">
+    <li class="group" role="presentation">Navigation</li>
     <li data-k="feed home"><a href="/">{{template "i-feed"}}Feed</a></li>
     <li data-k="later saved"><a href="/later">{{template "i-clock"}}Watch later</a></li>
     <li data-k="history"><a href="/history">{{template "i-history"}}History</a></li>
     <li data-k="channels subscriptions import"><a href="/channels">{{template "i-channels"}}Channels</a></li>
     <li data-k="settings theme password api keys"><a href="/settings">{{template "i-settings"}}Settings</a></li>
     {{if .User.IsAdmin}}<li data-k="admin users oidc"><a href="/admin">{{template "i-admin"}}Admin</a></li>{{end}}
+    {{if .NavLists}}<li class="group" role="presentation">Lists</li>{{end}}
     {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
   </ul>
-  <footer><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+  <footer><button type="button" class="button palette-close" data-palette-close>Close</button><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
 </dialog>
 {{else}}
 <main class="auth-page" id="main">

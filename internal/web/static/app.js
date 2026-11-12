@@ -9,6 +9,15 @@ function leave(el) {
   setTimeout(() => el.remove(), 200);
 }
 
+// The first page after signing in plays the shell reveal; the sign-in pages leave the mark.
+try {
+  if (document.querySelector('.auth-page')) sessionStorage.setItem('reveal', '1');
+  else if (sessionStorage.getItem('reveal')) {
+    sessionStorage.removeItem('reveal');
+    document.documentElement.classList.add('app-reveal');
+  }
+} catch { /* storage blocked: no reveal */ }
+
 const post = (form) =>
   fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)), headers: { 'X-Requested-With': 'fetch' } });
 
@@ -116,7 +125,14 @@ if (palette) {
   const input = palette.querySelector('input');
   const list = palette.querySelector('ul');
   let loaded = false;
-  const visible = () => [...list.children].filter((li) => !li.hidden);
+  const visible = () => [...list.children].filter((li) => !li.hidden && !li.classList.contains('group'));
+  const group = (label) => {
+    const li = document.createElement('li');
+    li.className = 'group';
+    li.role = 'presentation';
+    li.textContent = label;
+    return li;
+  };
   const select = (li) => {
     list.querySelector('[aria-selected="true"]')?.removeAttribute('aria-selected');
     li?.setAttribute('aria-selected', 'true');
@@ -127,7 +143,8 @@ if (palette) {
     const a = document.createElement('a');
     const small = document.createElement('small');
     a.href = href;
-    a.textContent = label;
+    if (kind === 'Channel') a.append(Object.assign(document.createElement('span'), { className: 'dot' }));
+    a.append(label);
     small.textContent = kind;
     a.append(small);
     li.append(a);
@@ -137,7 +154,7 @@ if (palette) {
   const filter = () => {
     const q = input.value.trim().toLowerCase();
     list.querySelector('[data-search-item]')?.remove();
-    for (const li of list.children) li.hidden = q !== '' && !(li.dataset.k + ' ' + li.textContent).toLowerCase().includes(q);
+    for (const li of list.children) li.hidden = q !== '' && (li.classList.contains('group') || !(li.dataset.k + ' ' + li.textContent).toLowerCase().includes(q));
     if (q) {
       const li = item('/?q=' + encodeURIComponent(input.value.trim()), `Search the feed for “${input.value.trim()}”`, 'Search', '');
       li.dataset.searchItem = '';
@@ -152,13 +169,14 @@ if (palette) {
     if (loaded) return;
     loaded = true;
     const channels = await fetch('/api/subscriptions').then((r) => r.json()).catch(() => []);
+    if (channels.length) list.append(group('Channels'));
     for (const c of channels) list.append(item('/?channel=' + encodeURIComponent(c.channelId), c.title, 'Channel', 'channel'));
     filter();
   };
   openPalette = open;
   for (const b of document.querySelectorAll('[data-palette]')) b.addEventListener('click', open);
   input.addEventListener('input', filter);
-  palette.addEventListener('click', (e) => { if (e.target === palette) palette.close(); });
+  palette.addEventListener('click', (e) => { if (e.target === palette || e.target.closest('[data-palette-close]')) palette.close(); });
   palette.addEventListener('keydown', (e) => {
     const rows = visible();
     const i = rows.indexOf(list.querySelector('[aria-selected="true"]'));
