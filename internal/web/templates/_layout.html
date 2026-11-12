@@ -14,37 +14,39 @@
 <body class="view-{{.Set.view}} page-{{.Page}}">
 {{if .User}}
 <div class="shell">
+  <a class="skip" href="#main">Skip to content</a>
   <aside class="sidebar">
-    <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
-    <form class="search" action="/" role="search">
-      {{template "i-search"}}
-      <input type="search" name="q" value="{{.Search}}" placeholder="Search" aria-label="Search feed" data-search>
-      <kbd>⌘K</kbd>
-    </form>
+    <div class="brand-row">
+      <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
+      <button type="button" class="icon-button" data-palette aria-label="Search and jump (Cmd or Ctrl + K)" title="Search and jump  ⌘K">{{template "i-search"}}</button>
+    </div>
     <nav aria-label="Main">
+      <h2 class="nav-heading">Library</h2>
       <a class="nav-item" href="/" {{if and (eq .Page "feed") (not .ListID)}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
       <a class="nav-item" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
       <a class="nav-item" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
-      <a class="nav-item" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
       {{if .NavLists}}<h2 class="nav-heading">Lists</h2>
       {{range .NavLists}}<a class="nav-item" href="/?list={{.ID}}" {{if eq (print .ID) (print $.ListID)}}aria-current="page"{{end}}><span class="dot"></span><span class="grow">{{.Name}}</span></a>{{end}}{{end}}
+      <h2 class="nav-heading">Manage</h2>
+      <a class="nav-item" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+      <a class="nav-item" href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
+      {{if .User.IsAdmin}}<a class="nav-item" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-admin"}}Admin</a>{{end}}
     </nav>
     <div class="sidebar-foot">
-      {{if .User.IsAdmin}}<a class="nav-item" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-admin"}}Admin</a>{{end}}
-      <a class="nav-item" href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
+      <p class="version">TubeShelf {{.Version}}</p>
       <div class="account">
         <span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span>
-        <span class="who"><span>{{or .User.Name .User.Email}}</span>{{if .User.Name}}<small>{{.User.Email}}</small>{{end}}</span>
+        <span class="who"><span>{{or .User.Name .User.Email}}</span></span>
         <form method="post" action="/logout"><button class="icon-button" aria-label="Sign out" title="Sign out">{{template "i-logout"}}</button></form>
       </div>
     </div>
   </aside>
   <div class="content">
     <header class="phone-bar">
-      <a class="brand" href="/" aria-label="TubeShelf home"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span></a>
-      <form class="search" action="/" role="search">{{template "i-search"}}<input type="search" name="q" value="{{.Search}}" placeholder="Search feed" aria-label="Search feed"></form>
+      <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
+      <button type="button" class="icon-button" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
     </header>
-    <main>
+    <main id="main">
       {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
       {{if .Msg}}<p class="flash" role="status">{{.Msg}}</p>{{end}}
       {{template "main" .}}
@@ -72,7 +74,7 @@
   <footer><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
 </dialog>
 {{else}}
-<main class="auth-page">
+<main class="auth-page" id="main">
   {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
   {{template "main" .}}
 </main>

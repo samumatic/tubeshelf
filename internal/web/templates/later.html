@@ -1,5 +1,6 @@
 {{define "title"}}Later · TubeShelf{{end}}
 {{define "main"}}
+<p class="eyebrow">Library</p>
 <h1 class="page-title">Watch later</h1>
 {{if .Videos}}
 <div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}</div>

@@ -34,6 +34,52 @@ type Video struct {
 // Cursor identifies this video's position in the newest-first feed order.
 func (v Video) Cursor() string { return fmt.Sprintf("%d_%s", v.Published, v.ID) }
 
+// DayGroup is a run of feed videos published on the same day.
+type DayGroup struct {
+	Label  string // empty when the previous page already showed this heading
+	Videos []Video
+}
+
+// dayLabel names the day of a timestamp relative to now.
+func dayLabel(ts int64, now time.Time) string {
+	t := time.Unix(ts, 0).In(now.Location())
+	y, m, d := now.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+	switch days := int(today.Sub(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())).Hours() / 24); {
+	case days < 0:
+		return "Upcoming"
+	case days == 0:
+		return "Today"
+	case days == 1:
+		return "Yesterday"
+	case days < 7:
+		return t.Weekday().String()
+	case t.Year() == now.Year():
+		return t.Format("2 January")
+	}
+	return t.Format("2 January 2006")
+}
+
+// groupByDay splits videos (already sorted by time) into day groups. prev is
+// the label the previous page ended with, so a day that continues across
+// pages gets no second heading.
+func groupByDay(vids []Video, now time.Time, prev string) []DayGroup {
+	var out []DayGroup
+	for _, v := range vids {
+		label := dayLabel(v.Published, now)
+		if n := len(out); n > 0 && (out[n-1].Label == label || (out[n-1].Label == "" && label == prev)) {
+			out[n-1].Videos = append(out[n-1].Videos, v)
+			continue
+		}
+		g := DayGroup{Label: label, Videos: []Video{v}}
+		if len(out) == 0 && label == prev {
+			g.Label = ""
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
 type List struct {
 	ID   int64
 	Name string
@@ -154,7 +200,12 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	data := M{"Videos": vids, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
+	prev := ""
+	if ts, _, found := strings.Cut(q["before"], "_"); found {
+		n, _ := strconv.ParseInt(ts, 10, 64)
+		prev = dayLabel(n, time.Now())
+	}
+	data := M{"Videos": vids, "Groups": groupByDay(vids, time.Now(), prev), "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"]}
 	if q["channel"] != "" {
 		var title string

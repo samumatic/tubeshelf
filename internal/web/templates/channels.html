@@ -1,15 +1,16 @@
 {{define "title"}}Channels · TubeShelf{{end}}
 {{define "main"}}
+<p class="eyebrow">Manage</p>
 <h1 class="page-title">Channels <small>{{len .Channels}}</small></h1>
 <div class="panels">
   <form class="panel" method="post" action="/channels">
     <h2>Subscribe</h2>
     <label for="channel">Channel URL, @handle or channel id</label>
-    <div class="row"><input id="channel" name="channel" placeholder="@veritasium" required autocomplete="off"><button class="button primary">Subscribe</button></div>
+    <div class="row"><input id="channel" name="channel" placeholder="@veritasium" required autocomplete="off" aria-label="Channel URL, @handle or channel id"><button class="button primary">Subscribe</button></div>
   </form>
   <form class="panel" method="post" action="/channels/import" enctype="multipart/form-data">
     <h2>Import and export</h2>
-    <label for="file">OPML, Google Takeout <code>subscriptions.csv</code>, or a text file with one channel per line</label>
+    <label for="file"><span>OPML, Google Takeout <code>subscriptions.csv</code>, or a text file with one channel per line</span></label>
     <div class="row"><input id="file" type="file" name="file" accept=".opml,.xml,.csv,.txt" required><button class="button">Import</button>
     <a class="button" href="/channels/export.opml">Export OPML</a></div>
   </form>
@@ -28,8 +29,8 @@
   <tbody>{{range $c := .Channels}}
     <tr>
       <td><a class="channel" href="/?channel={{.ID}}"><span class="avatar" data-initial="{{initial .Title}}">{{if .HasAvatar}}<img src="/avatar/{{.ID}}" alt="" loading="lazy" width="36" height="36">{{end}}</span>{{.Title}}</a></td>
-      <td class="num">{{.Videos}}</td>
-      <td>{{if .LastError}}<span class="bad" title="{{.LastError}}">Failing</span>{{else if .LastSuccess}}{{ago .LastSuccess}}{{else}}Queued{{end}}</td>
+      <td class="num" data-label="Videos">{{.Videos}}</td>
+      <td data-label="Last fetch">{{if .LastError}}<span class="bad" title="{{.LastError}}">Failing</span>{{else if .LastSuccess}}{{ago .LastSuccess}}{{else}}Queued{{end}}</td>
       {{if $.Lists}}<td><div class="chips">{{range $.Lists}}
         <form method="post" action="/lists/{{.ID}}/channels" data-toggle="list">
           <input type="hidden" name="channel" value="{{$c.ID}}"><input type="hidden" name="on" value="{{if index $c.InList .ID}}0{{else}}1{{end}}">

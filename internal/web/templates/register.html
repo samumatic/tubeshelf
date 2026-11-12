@@ -4,7 +4,7 @@
 {{define "auth"}}
 <form method="post" action="/register">
   <label>Email <input type="email" name="email" required autofocus autocomplete="username"></label>
-  <label>Name <input name="name" autocomplete="name"></label>
+  <label><span>Name<span class="optional">Optional</span></span> <input name="name" autocomplete="name" aria-label="Name"></label>
   <label>Password <input type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
   <button class="button primary wide">Create account</button>
 </form>

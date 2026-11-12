@@ -1,6 +1,7 @@
 {{define "title"}}Settings · TubeShelf{{end}}
 {{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
 {{define "main"}}
+<p class="eyebrow">Manage</p>
 <h1 class="page-title">Settings</h1>
 <div class="stack">
   <form class="panel" method="post" action="/settings">
@@ -25,7 +26,7 @@
     <h2>Profile</h2>
     <div class="fields">
       <label>Email <input value="{{.User.Email}}" disabled></label>
-      <label>Name <input name="name" value="{{.User.Name}}" maxlength="80" autocomplete="name"></label>
+      <label><span>Name<span class="optional">Optional</span></span> <input name="name" value="{{.User.Name}}" maxlength="80" autocomplete="name" aria-label="Name"></label>
     </div>
     <p><button class="button">Save profile</button></p>
   </form>

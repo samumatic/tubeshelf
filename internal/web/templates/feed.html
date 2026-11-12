@@ -1,11 +1,18 @@
 {{define "main"}}
-<div class="page-head"><h1 class="page-title">{{if .ChannelTitle}}{{.ChannelTitle}}{{else}}Feed{{end}}</h1></div>
+<div class="page-head">
+  <div><p class="eyebrow">{{if .ChannelTitle}}Channel{{else if .Search}}Search results{{else}}Your subscriptions{{end}}</p>
+  <h1 class="page-title">{{if .ChannelTitle}}{{.ChannelTitle}}{{else if .Search}}“{{.Search}}”{{else}}Feed{{end}}</h1></div>
+  <form class="search" action="/" role="search">
+    {{template "i-search"}}
+    <label class="sr" for="feed-search">Search the feed</label>
+    <input id="feed-search" type="search" name="q" value="{{.Search}}" placeholder="Search videos and channels" data-search>
+  </form>
+</div>
 <div class="toolbar">
   <div class="chips tabs" role="group" aria-label="Lists">
     <a class="chip" href="{{query .Q "list" ""}}" {{if not .ListID}}aria-current="true"{{end}}>All</a>
     {{range .Lists}}<a class="chip" href="{{query $.Q "list" (print .ID)}}" {{if eq (print .ID) $.ListID}}aria-current="true"{{end}}>{{.Name}}</a>{{end}}
-    {{if .ChannelID}}<a class="chip active" href="{{query .Q "channel" ""}}" title="Clear channel filter">{{or .ChannelTitle "Channel"}} ×</a>{{end}}
-    {{if .Search}}<a class="chip active" href="{{query .Q "q" ""}}" title="Clear search">“{{.Search}}” ×</a>{{end}}
+    {{if or .ChannelID .Search}}<a class="chip clear" href="/">Clear filter ×</a>{{end}}
   </div>
   <form class="chips filters" method="post" action="/settings" aria-label="Filters">
     {{template "toggle" (toggle "hide_shorts" "Shorts" .Set)}}
@@ -40,6 +47,7 @@
 {{define "toggle"}}<button class="chip" name="{{.Key}}" value="{{if .On}}0{{else}}1{{end}}" aria-pressed="{{not .On}}" title="{{if .On}}Show{{else}}Hide{{end}} {{.Label}}">{{.Label}}</button>{{end}}
 
 {{define "items"}}
-{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}
+{{range .Groups}}{{if .Label}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>{{end}}
+{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}{{end}}
 {{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{end}}
 {{end}}
