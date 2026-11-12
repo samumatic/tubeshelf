@@ -216,18 +216,22 @@ func APIKeyUser(d *sql.DB, key string) (*User, error) {
 // OIDC state cookie.
 type Secret [32]byte
 
-// LoadSecret derives the key from TUBESHELF_SECRET, or from a random value
-// kept in dataDir/.secret when the variable is unset.
+// LoadSecret returns the instance key. TUBESHELF_SECRET wins when set.
+// Otherwise the key lives in dataDir/.secret, created on first start: seeded
+// from v1's BETTER_AUTH_SECRET if that is still set, else random. Seeding
+// once, instead of reading BETTER_AUTH_SECRET on every start, means the v1
+// variable can be removed after the upgrade without losing the OIDC client
+// secrets that were sealed with it.
 func LoadSecret(dataDir string) (Secret, error) {
 	raw := os.Getenv("TUBESHELF_SECRET")
-	if raw == "" {
-		raw = os.Getenv("BETTER_AUTH_SECRET") // v1 name, so existing compose files keep working
-	}
 	if raw == "" {
 		path := filepath.Join(dataDir, ".secret")
 		b, err := os.ReadFile(path)
 		if errors.Is(err, os.ErrNotExist) {
-			b = []byte(newToken())
+			b = []byte(os.Getenv("BETTER_AUTH_SECRET"))
+			if len(b) == 0 {
+				b = []byte(newToken())
+			}
 			err = os.WriteFile(path, b, 0o600)
 		}
 		if err != nil {

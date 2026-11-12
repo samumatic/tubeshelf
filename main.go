@@ -40,7 +40,7 @@ Environment:
   TUBESHELF_DATA    data directory (default ./data)
   PORT              listen port (default 3000)
   TUBESHELF_URL     public URL, needed for OIDC behind a proxy that rewrites Host
-  TUBESHELF_SECRET  secret for encrypting OIDC client secrets (default: generated in the data directory)
+  TUBESHELF_SECRET  secret for encrypting OIDC client secrets (default: kept in <data>/.secret)
   TRUST_PROXY_HEADERS=1  use X-Forwarded-For for login rate limiting
   TUBESHELF_IMPORT_SKIP_OIDC=1  import v1 data even if an OIDC client secret cannot be decrypted
 `

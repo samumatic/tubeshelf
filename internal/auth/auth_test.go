@@ -139,3 +139,27 @@ func TestHasGroup(t *testing.T) {
 		t.Error("admin group found where there is none")
 	}
 }
+
+// Upgrading from v1: the key is seeded from BETTER_AUTH_SECRET once, so
+// removing that variable later must not change it.
+func TestSecretSurvivesRemovingV1Variable(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TUBESHELF_SECRET", "")
+	t.Setenv("BETTER_AUTH_SECRET", "the-v1-secret")
+	first, err := LoadSecret(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := first.Seal("client-secret")
+
+	t.Setenv("BETTER_AUTH_SECRET", "")
+	later, _ := LoadSecret(dir)
+	if got, err := later.Open(sealed); err != nil || got != "client-secret" {
+		t.Errorf("after removing BETTER_AUTH_SECRET: %q, %v", got, err)
+	}
+	t.Setenv("BETTER_AUTH_SECRET", "something-else")
+	changed, _ := LoadSecret(dir)
+	if changed != first {
+		t.Error("a changed BETTER_AUTH_SECRET replaced the stored key")
+	}
+}

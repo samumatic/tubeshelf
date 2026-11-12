@@ -69,7 +69,7 @@ Everything is optional.
 | `PORT` | `3000` | Listen port |
 | `TUBESHELF_DATA` | `/app/data` | Database, cached thumbnails, generated secret |
 | `TUBESHELF_URL` | from the request | Public URL; set it when OIDC runs behind a proxy that rewrites `Host` |
-| `TUBESHELF_SECRET` | generated in the data directory | Encrypts OIDC client secrets |
+| `TUBESHELF_SECRET` | kept in `data/.secret` | Encrypts OIDC client secrets. Set it before the first start or not at all: changing it later makes stored client secrets unreadable |
 | `TRUST_PROXY_HEADERS` | unset | Set to `1` to rate-limit logins by `X-Forwarded-For` |
 
 Refresh interval, video retention, registration and login providers are set in the app under **Admin**.
@@ -80,6 +80,7 @@ Keep the same `./data` volume. On its first start, 2.x imports users, subscripti
 
 - Passwords and API keys keep working.
 - OIDC client secrets are carried over. Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set to the value 1.x used. If a secret cannot be decrypted, 2.x stops before importing anything and says so, so you can fix the variable and start again. Set `TUBESHELF_IMPORT_SKIP_OIDC=1` to import anyway and re-enter the client secret under Admin.
+- After that first start `BETTER_AUTH_SECRET` is no longer needed: the key is kept in `data/.secret`, so back that file up with the database.
 - The OIDC redirect URI is unchanged (`/api/auth/oidc/callback`).
 - Removed in 2.x: video comments, SubRelay sync, the welcome wizard, the "standard" scraping fetcher.
 
