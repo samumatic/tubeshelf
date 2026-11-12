@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark light">
-<title>{{block "title" .}}TubeShelf{{end}}</title>
+<meta name="color-scheme" content="{{if eq .Set.theme "dark"}}dark{{else if eq .Set.theme "light"}}light{{else}}dark light{{end}}">
+<title>{{block "title" .}}{{.Brand.Name}}{{end}}</title>
 <link rel="stylesheet" href="/static/app.css?v={{.AssetV}}">
-<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{.Brand.Theme}}">
+{{if .Brand.Logo}}<link rel="icon" href="{{.Brand.Logo}}">{{else}}<link rel="icon" href="/static/icon.svg" type="image/svg+xml">{{end}}
 <link rel="manifest" href="/static/manifest.json">
 <script type="module" src="/static/app.js?v={{.AssetV}}"></script>
 {{block "head" .}}{{end}}
@@ -14,11 +15,11 @@
 <body class="view-{{.Set.view}} page-{{.Page}}">
 {{if .User}}
 <div class="shell">
-  {{with .Backdrop}}<img class="backdrop" src="/thumb/{{.}}" alt="" decoding="async" fetchpriority="low">{{end}}
+  {{if eq .Brand.Layout "backdrop"}}<img class="backdrop" src="{{.Brand.Background}}" alt="" fetchpriority="high">{{end}}
   <a class="skip" href="#main">Skip to content</a>
   <aside class="sidebar">
     <div class="brand-row">
-      <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
+      <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>
       <button type="button" class="icon-button" data-palette aria-label="Search and jump (Cmd or Ctrl + K)" title="Search and jump  ⌘K">{{template "i-search"}}</button>
     </div>
     <nav aria-label="Main">
@@ -34,7 +35,8 @@
       <a class="nav-item" title="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status</a>
       <a class="nav-item" title="Users" href="/admin/users" {{if eq .Page "admin-users"}}aria-current="page"{{end}}>{{template "i-users"}}Users</a>
       <a class="nav-item" title="Sign-in" href="/admin/sign-in" {{if eq .Page "admin-signin"}}aria-current="page"{{end}}>{{template "i-key"}}Sign-in</a>
-      <a class="nav-item" title="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>{{end}}
+      <a class="nav-item" title="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>
+      <a class="nav-item" title="Appearance" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Appearance</a>{{end}}
     </nav>
     <div class="sidebar-foot">
       <p class="version">TubeShelf {{.Version}}</p>
@@ -47,7 +49,7 @@
   </aside>
   <div class="content">
     <header class="phone-bar">
-      <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
+      <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>
       <button type="button" class="me" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
     </header>
     <main id="main">
@@ -60,7 +62,7 @@
     <a href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
     <a href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
     <a href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
-    <a href="/library" {{if eq .Page "library" "channels" "lists" "import" "admin" "admin-users" "admin-signin" "admin-instance"}}aria-current="page"{{end}}>{{template "i-library"}}Library</a>
+    <a href="/library" {{if eq .Page "library" "channels" "lists" "import" "admin" "admin-users" "admin-signin" "admin-instance" "admin-appearance"}}aria-current="page"{{end}}>{{template "i-library"}}Library</a>
   </nav>
   <button type="button" class="phone-search" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
   <div class="popmenu account-menu" id="account-menu" popover role="menu" aria-label="Account">
@@ -95,13 +97,15 @@
     <li data-k="admin status fetcher refresh failing"><a href="/admin">{{template "i-pulse"}}Status</a></li>
     <li data-k="admin users accounts"><a href="/admin/users">{{template "i-users"}}Users</a></li>
     <li data-k="admin sign-in login oidc providers registration"><a href="/admin/sign-in">{{template "i-key"}}Sign-in</a></li>
-    <li data-k="admin instance refresh retention fetch"><a href="/admin/instance">{{template "i-server"}}Instance</a></li>{{end}}
+    <li data-k="admin instance refresh retention fetch"><a href="/admin/instance">{{template "i-server"}}Instance</a></li>
+    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Appearance</a></li>{{end}}
     {{if .NavLists}}<li class="group" role="presentation">Lists</li>{{end}}
     {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
   </ul>
   <footer><button type="button" class="button palette-close" data-palette-close>Close</button><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
 </dialog>
 {{else}}
+<img class="auth-bg" src="{{.Brand.Background}}" alt="">
 <main class="auth-page" id="main">
   {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
   {{template "main" .}}
@@ -161,9 +165,10 @@
   </div>
 </article>{{end}}
 
+{{define "logo"}}<span class="logo{{if .Brand.Logo}} custom{{end}}">{{if .Brand.Logo}}<img src="{{.Brand.Logo}}" alt="">{{else}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg>{{end}}</span>{{end}}
 {{define "auth-shell"}}
 <section class="auth">
-  <span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>
+  {{template "logo" .}}
   <h1>{{template "auth-title" .}}</h1>
   {{template "auth" .}}
 </section>{{end}}

@@ -1,8 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"database/sql"
+	"image"
+	"image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -197,6 +201,9 @@ func TestAccessControl(t *testing.T) {
 			t.Errorf("non-admin %s: status %d, want 403", p, code)
 		}
 	}
+	if code, _ := user.upload("/admin/appearance", map[string]string{"app_name": "x", "layout": "plain", "radius": "1"}, nil); code != http.StatusForbidden {
+		t.Errorf("non-admin POST /admin/appearance: status %d, want 403", code)
+	}
 	if code, _ := user.post("/admin/settings", url.Values{"retention_days": {"7"}}); code != http.StatusForbidden {
 		t.Errorf("non-admin POST /admin/settings: status %d, want 403", code)
 	}
@@ -295,6 +302,7 @@ func TestPagesRender(t *testing.T) {
 		"/channels": "Channels", "/lists": "Lists", "/channels/import": "Import &amp; export",
 		"/account": "My account", "/account/preferences": "Preferences", "/account/keys": "API keys",
 		"/admin": "Status", "/admin/users": "Users", "/admin/sign-in": "Sign-in", "/admin/instance": "Instance",
+		"/admin/appearance": "Appearance",
 	}
 	for path, title := range pages {
 		code, body := a.get(path)
@@ -323,5 +331,97 @@ func TestInstanceSettingsPartial(t *testing.T) {
 	a.post("/admin/settings", url.Values{"public_registration": {"0"}})
 	if v := db.Setting(a.db, "public_registration"); v != "0" {
 		t.Errorf("public_registration = %q after switching it off, want 0", v)
+	}
+}
+
+// upload posts a multipart form the way a browser does (no fetch header).
+func (a *app) upload(path string, fields map[string]string, files map[string][]byte) (int, string) {
+	a.t.Helper()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	for k, v := range fields {
+		mw.WriteField(k, v)
+	}
+	for k, data := range files {
+		fw, _ := mw.CreateFormFile(k, k+".bin")
+		fw.Write(data)
+	}
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, a.url+path, &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	res, err := a.c.Do(req)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return res.StatusCode, string(b)
+}
+
+func TestAppearance(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	var pngData bytes.Buffer
+	png.Encode(&pngData, image.NewRGBA(image.Rect(0, 0, 2, 2)))
+	fields := map[string]string{"app_name": "MyTube", "layout": "plain", "primary": "custom", "primary_custom": "#E5484D", "radius": "0.5"}
+
+	_, body := a.upload("/admin/appearance", fields, map[string][]byte{"logo": pngData.Bytes()})
+	if !strings.Contains(body, "Appearance saved") {
+		t.Fatalf("save did not succeed: %.300s", body)
+	}
+	_, body = a.get("/")
+	if !strings.Contains(body, "<title>MyTube</title>") && !strings.Contains(body, "MyTube</a>") {
+		t.Error("the application name is not used")
+	}
+	if strings.Contains(body, `class="backdrop"`) {
+		t.Error("plain layout still renders the backdrop photo")
+	}
+	if !strings.Contains(body, `<img src="/branding/logo?v=`) {
+		t.Error("uploaded logo is not shown")
+	}
+	_, css := a.get("/branding/theme.css")
+	if !strings.Contains(css, "--primary: #e5484d") || !strings.Contains(css, "--primary-fg: #000000") || !strings.Contains(css, "--radius-md: 6px") {
+		t.Errorf("theme.css misses the saved values: %s", css)
+	}
+
+	// The logo is public, for the sign-in page.
+	anon := &app{t: t, db: a.db, url: a.url, c: &http.Client{}}
+	res, err := http.Get(a.url + "/branding/logo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "image/png" {
+		t.Errorf("logo: status %d, type %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+	if _, body := anon.get("/login"); !strings.Contains(body, "Sign in to MyTube") || !strings.Contains(body, `class="auth-bg"`) {
+		t.Error("sign-in page misses the name or the background")
+	}
+
+	// Not an image: rejected, nothing stored.
+	_, body = a.upload("/admin/appearance", fields, map[string][]byte{"background": []byte("<html>not an image</html>")})
+	if !strings.Contains(body, "use a PNG, JPEG, WebP or GIF image") || db.Setting(a.db, "background_v") != "" {
+		t.Error("a non-image background was accepted")
+	}
+
+	// Reset goes back to the built-in logo.
+	a.post("/admin/appearance/reset", url.Values{"kind": {"logo"}})
+	if code, _ := anon.get("/branding/logo"); code != http.StatusNotFound {
+		t.Errorf("logo after reset: status %d, want 404", code)
+	}
+}
+
+func TestThemeCSS(t *testing.T) {
+	if css := themeCSS("", "1.25"); strings.Contains(css, "--primary") || !strings.Contains(css, "--radius-3xl: 30px") {
+		t.Errorf("default theme: %s", css)
+	}
+	if css := themeCSS("#ffc53d", "1"); !strings.Contains(css, "--primary-fg: #000000") {
+		t.Errorf("light primary needs dark text: %s", css)
+	}
+	if css := themeCSS("#3e63dd", "1"); !strings.Contains(css, "--primary-fg: #ffffff") {
+		t.Errorf("dark primary needs light text: %s", css)
+	}
+	if css := themeCSS("red;}", "1"); strings.Contains(css, "red") {
+		t.Errorf("invalid color leaked into the stylesheet: %s", css)
 	}
 }

@@ -1,6 +1,6 @@
-{{define "title"}}Sign in · TubeShelf{{end}}
+{{define "title"}}Sign in · {{.Brand.Name}}{{end}}
 {{define "main"}}{{template "auth-shell" .}}{{end}}
-{{define "auth-title"}}Sign in to TubeShelf{{end}}
+{{define "auth-title"}}Sign in to {{.Brand.Name}}{{end}}
 {{define "auth"}}
 <p>Your subscriptions, without the algorithm.</p>
 {{range .Providers}}<a class="button primary wide" href="/api/auth/oidc/start?provider={{.ID}}">Sign in with {{.Name}}</a>{{end}}

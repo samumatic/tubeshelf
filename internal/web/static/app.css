@@ -119,7 +119,8 @@ main { view-transition-name: content; }
 @keyframes scroll-fade-end { from { --fade-end: 24px; } to { --fade-end: 0px; } }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+/* The canvas color on html too, so no frame between two pages shows the browser's own white. */
+html { background: var(--canvas); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 body { margin: 0; background: var(--canvas); color: var(--fg); font: 400 15px/22px var(--font-sans); overflow-wrap: break-word; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, p, dl, dd { margin: 0; }
@@ -143,7 +144,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .skip:focus { top: 12px; }
 .shell { position: relative; isolation: isolate; display: flex; gap: var(--s2); min-height: 100dvh; padding: var(--s2); }
 /* A photo behind the shell, as in Pocket ID's backdrop layout: the newest video's thumbnail, blurred, shows around the cards and through the glass sidebar. */
-.backdrop { position: fixed; inset: -64px; z-index: -1; width: calc(100% + 128px); height: calc(100% + 128px); object-fit: cover; filter: var(--backdrop-filter); pointer-events: none; view-transition-name: backdrop; }
+.backdrop { position: fixed; inset: -64px; z-index: -1; width: calc(100% + 128px); height: calc(100% + 128px); object-fit: cover; filter: var(--backdrop-filter); pointer-events: none; }
 .shell:has(> .backdrop) .sidebar { --fg-muted: color-mix(in oklab, var(--fg) 75%, var(--sidebar)); --fill-hover: var(--glass-hover); --fill-muted: var(--glass-hover); --fill-selected: var(--glass-selected); --border: var(--glass-border); }
 .sidebar { position: sticky; top: var(--s2); z-index: 20; flex: none; display: flex; flex-direction: column; width: var(--sidebar-w); height: calc(100dvh - 2 * var(--s2)); padding: var(--s4) var(--s3) var(--s3); overflow: hidden;
   border-radius: var(--radius-3xl); background: color-mix(in oklab, var(--sidebar) 60%, transparent); backdrop-filter: blur(34px) saturate(1.5); box-shadow: var(--glass-shadow); transition: width var(--dur-slow) var(--ease-out); }
@@ -152,6 +153,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; border-radius: var(--radius-sm); }
 .brand .logo, .auth .logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--primary); color: var(--primary-fg); }
 .brand .logo svg { width: 15px; height: 15px; fill: currentColor; }
+.logo.custom { overflow: hidden; background: none; }
+.logo img { width: 100%; height: 100%; object-fit: contain; }
 .search { position: relative; display: flex; align-items: center; }
 .search svg { position: absolute; left: 12px; color: var(--fg-muted); pointer-events: none; }
 .search input[type="search"]:not([type="checkbox"]):not([type="file"]) { padding-left: 38px; }
@@ -406,6 +409,36 @@ label.check { display: flex; align-items: center; gap: 10px; min-height: 28px; f
 .hub a:hover { background: var(--fill-hover); }
 .hub svg { width: 18px; height: 18px; flex: none; color: var(--fg-muted); }
 .hub a > span { margin-left: auto; display: grid; }
+/* Administration › Appearance */
+.image-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s4); }
+.image-tile { display: grid; gap: var(--s2); align-content: start; }
+.image-tile small { color: var(--fg-muted); font-size: 13px; line-height: 18px; }
+.tile-preview { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); object-fit: cover; background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--border); }
+.logo-preview { display: grid; place-items: center; }
+.logo-preview .logo { width: 64px; height: 64px; border-radius: 18px; }
+.logo-preview .logo svg { width: 36px; height: 36px; fill: currentColor; }
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: var(--s3); }
+.choice { position: relative; display: grid; gap: var(--s2); padding: 10px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--border); font-size: 14px; font-weight: 500; text-align: center; cursor: pointer; transition: box-shadow var(--dur-fast) var(--ease-out); }
+.choice:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.choice:has(:checked) { box-shadow: inset 0 0 0 2px var(--primary); }
+.choice:has(:focus-visible), .swatch:has(:focus-visible) { outline: 2px solid var(--ring); outline-offset: 2px; }
+.choice input[type="radio"], .swatch input[type="radio"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.mini { display: flex; gap: 4px; height: 64px; padding: 4px; border-radius: calc(var(--radius-md) - 4px); background: var(--canvas); }
+.mini::before { content: ""; width: 28%; border-radius: 6px; background: var(--sidebar); box-shadow: inset 0 0 0 1px var(--border); }
+.mini::after { content: ""; flex: 1; border-radius: 6px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.mini-backdrop { background: url("/static/backdrop.svg") center / cover; }
+.mini-backdrop::before { background: color-mix(in oklab, var(--sidebar) 60%, transparent); backdrop-filter: blur(6px); }
+.mini-radius { display: block; position: relative; background: var(--surface-sunken); }
+.mini-radius::before { position: absolute; left: 22%; top: 26%; width: 78%; height: 74%; border: 2px solid var(--fg-muted); border-right: 0; border-bottom: 0; background: none; box-shadow: none; }
+.mini-radius::after { display: none; }
+.r0::before { border-top-left-radius: 0; } .r1::before { border-top-left-radius: 8px; } .r2::before { border-top-left-radius: 16px; } .r3::before { border-top-left-radius: 20px; } .r4::before { border-top-left-radius: 24px; }
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.swatch { position: relative; width: 32px; height: 32px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12); cursor: pointer; }
+.swatch:has(:checked) { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c); }
+.sw-mono { --c: var(--fg); } .sw-red { --c: #e5484d; } .sw-orange { --c: #f76b15; } .sw-amber { --c: #ffc53d; } .sw-green { --c: #30a46c; } .sw-teal { --c: #12a594; }
+.sw-blue { --c: #0090ff; } .sw-indigo { --c: #3e63dd; } .sw-violet { --c: #8e4ec6; } .sw-pink { --c: #d6409f; }
+.sw-custom { --c: var(--fg-muted); background: conic-gradient(#e5484d, #ffc53d, #30a46c, #0090ff, #8e4ec6, #e5484d); }
+.swatches input[type="color"] { width: 44px; height: 32px; padding: 2px; border-radius: var(--radius-sm); cursor: pointer; }
 .tag { padding: 1px 7px; border-radius: 999px; background: var(--fill-muted); color: var(--fg-muted); font-size: 12px; line-height: 16px; font-weight: 500; }
 .stats { display: flex; flex-wrap: wrap; gap: 12px 36px; }
 .stats dt { color: var(--fg-muted); font-size: 13px; line-height: 18px; }
@@ -425,7 +458,9 @@ details > form, details > div { display: grid; gap: 14px; padding: 14px 0 4px; }
 .channel:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- Sign-in ---------- */
-.auth-page { display: grid; place-items: center; min-height: 100dvh; max-width: none; padding: 24px; background: var(--surface-sunken); }
+.auth-page { display: grid; place-items: center; min-height: 100dvh; max-width: none; padding: 24px; }
+/* The sign-in pages show the background photo as it is; the app shows it blurred behind the glass. */
+.auth-bg { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; }
 .auth { width: min(464px, 100%); display: grid; gap: 16px; padding: 44px; border-radius: var(--radius-3xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border), var(--elevation-overlay); animation: pop var(--dur-slow) var(--ease-out) backwards; }
 .auth .logo { width: 48px; height: 48px; border-radius: 14px; margin-bottom: 8px; }
 .auth .logo svg { width: 26px; height: 26px; fill: currentColor; }

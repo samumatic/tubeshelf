@@ -1,4 +1,4 @@
-{{define "title"}}Library · TubeShelf{{end}}
+{{define "title"}}Library · {{.Brand.Name}}{{end}}
 {{define "main"}}
 <p class="eyebrow">Your shelf</p>
 <h1 class="page-title">Library</h1>
@@ -17,6 +17,7 @@
       <li><a href="/admin/users">{{template "i-users"}}Users<span>{{template "i-chevron"}}</span></a></li>
       <li><a href="/admin/sign-in">{{template "i-key"}}Sign-in<span>{{template "i-chevron"}}</span></a></li>
       <li><a href="/admin/instance">{{template "i-server"}}Instance<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/admin/appearance">{{template "i-theme"}}Appearance<span>{{template "i-chevron"}}</span></a></li>
     </ul>
   </div>{{end}}
 </div>

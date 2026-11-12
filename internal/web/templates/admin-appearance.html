@@ -1,0 +1,62 @@
+{{define "title"}}Appearance · {{.Brand.Name}}{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Appearance</h1>
+<div class="stack">
+  <form class="stack" method="post" action="/admin/appearance" enctype="multipart/form-data" data-appearance>
+    <div class="panel">
+      <h2>Branding</h2>
+      <div class="fields">
+        <label>Application name <input name="app_name" value="{{.Brand.Name}}" maxlength="40" required autocomplete="off"></label>
+      </div>
+      <div class="image-tiles">
+        <div class="image-tile">
+          <span class="tile-preview logo-preview">{{template "logo" .}}</span>
+          <label>Logo <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+          <small>Square, 1 MB at most. Also the browser tab icon.</small>
+        </div>
+        <div class="image-tile">
+          <img class="tile-preview" src="{{.Brand.Background}}" alt="">
+          <label>Background <input type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+          <small>8 MB at most. Shown on the sign-in page and, blurred, behind the app.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Layout</h2>
+      <div class="choices" role="radiogroup" aria-label="Layout">
+        <label class="choice"><input type="radio" name="layout" value="backdrop" {{if eq .Brand.Layout "backdrop"}}checked{{end}}><span class="mini mini-backdrop"></span>Backdrop</label>
+        <label class="choice"><input type="radio" name="layout" value="plain" {{if eq .Brand.Layout "plain"}}checked{{end}}><span class="mini"></span>Plain</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Primary color</h2>
+      <p class="muted">Buttons, switches and the selected chips.</p>
+      <div class="swatches" role="radiogroup" aria-label="Primary color">
+        {{range .Primaries}}<label class="swatch {{.Class}}" title="{{.Label}}"><input type="radio" name="primary" value="{{.Value}}" aria-label="{{.Label}}" {{if and (eq .Value $.Brand.Primary) (not $.CustomPrimary)}}checked{{end}}></label>{{end}}
+        <label class="swatch sw-custom" title="Custom color"><input type="radio" name="primary" value="custom" aria-label="Custom color" {{if .CustomPrimary}}checked{{end}}></label>
+        <input type="color" name="primary_custom" value="{{or .CustomPrimary "#0090ff"}}" aria-label="Custom primary color">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Corner radius</h2>
+      <div class="choices" role="radiogroup" aria-label="Corner radius">
+        {{range $i, $r := .Radii}}<label class="choice"><input type="radio" name="radius" value="{{.Value}}" {{if eq .Value $.Brand.Radius}}checked{{end}}><span class="mini mini-radius r{{$i}}"></span>{{.Label}}</label>{{end}}
+      </div>
+    </div>
+
+    <p><button class="button primary">Save appearance</button></p>
+  </form>
+
+  {{if or .Brand.Logo .Brand.CustomBackground}}<div class="panel">
+    <h2>Uploaded images</h2>
+    <div class="row">
+      {{if .Brand.Logo}}<form method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="logo"><button class="button">Use the default logo</button></form>{{end}}
+      {{if .Brand.CustomBackground}}<form method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="background"><button class="button">Use the default background</button></form>{{end}}
+    </div>
+  </div>{{end}}
+</div>
+{{end}}

@@ -1,4 +1,4 @@
-{{define "title"}}Preferences · TubeShelf{{end}}
+{{define "title"}}Preferences · {{.Brand.Name}}{{end}}
 {{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" role="switch" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
 {{define "main"}}
 <p class="eyebrow">Account</p>

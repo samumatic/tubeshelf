@@ -75,6 +75,8 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.HandleFunc("GET /register", s.registerPage)
 	mux.HandleFunc("POST /register", s.registerSubmit)
 	mux.HandleFunc("GET /api/auth/oidc/start", s.oidcStart)
+	mux.HandleFunc("GET /branding/theme.css", s.themeStylesheet)
+	mux.HandleFunc("GET /branding/{kind}", s.brandImage)
 	mux.HandleFunc("GET "+auth.CallbackPath, s.oidcCallback)
 
 	// Signed-in pages.
@@ -120,6 +122,9 @@ func (s *Server) Handler() (http.Handler, error) {
 	admin("GET /admin/users", s.adminUsersPage)
 	admin("GET /admin/sign-in", s.adminSignInPage)
 	admin("GET /admin/instance", s.adminInstancePage)
+	admin("GET /admin/appearance", s.adminAppearancePage)
+	admin("POST /admin/appearance", s.saveAppearance)
+	admin("POST /admin/appearance/reset", s.resetBrandImage)
 	admin("POST /admin/settings", s.saveInstanceSettings)
 	admin("POST /admin/refresh", s.refreshAll)
 	admin("POST /admin/users", s.adminAddUser)
@@ -183,12 +188,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["User"] = u
 	if u != nil {
 		data["NavLists"] = s.lists(u.ID)
-		// The newest regular video of the user's channels; its thumbnail is the shell's backdrop photo.
-		var backdrop string
-		s.DB.QueryRow(`SELECT v.id FROM videos v JOIN subscriptions s ON s.channel_id = v.channel_id AND s.user_id = ?
-			WHERE v.kind = 'video' ORDER BY v.published_at DESC LIMIT 1`, u.ID).Scan(&backdrop)
-		data["Backdrop"] = backdrop
 	}
+	data["Brand"] = s.brand()
 	data["Page"] = page
 	data["AssetV"] = s.assetVer
 	data["Version"] = s.Version

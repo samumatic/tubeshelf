@@ -227,6 +227,7 @@ if (accountMenu) {
     const b = e.submitter;
     post(e.target, b).catch(() => {});
     document.documentElement.dataset.theme = b.value;
+    document.querySelector('meta[name="color-scheme"]').content = b.value === 'system' ? 'dark light' : b.value;
     for (const x of themeMenu.querySelectorAll('button')) x.setAttribute('aria-checked', x === b);
     sub.querySelector('small').textContent = b.value;
     hide(accountMenu);
@@ -247,6 +248,33 @@ sidebarForm?.addEventListener('submit', (e) => {
   button.setAttribute('aria-label', label);
   button.title = label;
 });
+
+// Administration › Appearance: preview the color and corner radius before saving.
+const appearanceForm = document.querySelector('form[data-appearance]');
+if (appearanceForm) {
+  const root = document.documentElement.style;
+  const radii = { xs: 6, sm: 10, md: 12, lg: 16, xl: 20, '3xl': 24 };
+  const readable = (hex) => {
+    const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return (l + 0.05) / 0.05 > 1.05 / (l + 0.05) ? '#000000' : '#ffffff';
+  };
+  appearanceForm.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.name === 'radius') for (const [k, px] of Object.entries(radii)) root.setProperty(`--radius-${k}`, `${px * t.value}px`);
+    if (t.name === 'primary_custom') appearanceForm.querySelector('input[name="primary"][value="custom"]').checked = true;
+    if (t.name !== 'primary' && t.name !== 'primary_custom') return;
+    const picked = appearanceForm.querySelector('input[name="primary"]:checked').value;
+    const color = picked === 'custom' ? appearanceForm.elements.primary_custom.value : picked;
+    for (const k of ['--primary', '--primary-fg', '--primary-hover']) root.removeProperty(k);
+    if (color) {
+      root.setProperty('--primary', color);
+      root.setProperty('--primary-fg', readable(color));
+      root.setProperty('--primary-hover', `color-mix(in oklab, ${color} 85%, #000)`);
+    }
+  });
+}
 
 // A long sidebar scrolls; keep the current page in view.
 const navCurrent = document.querySelector('.sidebar nav [aria-current]');

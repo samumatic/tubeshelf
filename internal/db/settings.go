@@ -12,6 +12,15 @@ var Defaults = map[string]string{
 	"retention_days":      "270",
 	"public_registration": "0",
 	"oidc_only":           "0",
+	// Appearance (Administration › Appearance).
+	"app_name":        "TubeShelf",
+	"layout":          "backdrop", // backdrop | plain
+	"primary":         "",         // "" = monochrome, else #rrggbb
+	"radius":          "1.25",     // corner radius scale
+	"background_v":    "",         // version of the uploaded background, "" = built-in
+	"background_type": "",
+	"logo_v":          "",
+	"logo_type":       "",
 }
 
 // Per-user settings and their defaults.
