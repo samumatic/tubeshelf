@@ -1,5 +1,5 @@
 {{define "layout"}}<!doctype html>
-<html lang="en" data-theme="{{.Set.theme}}">
+<html lang="en" data-theme="{{.Set.theme}}"{{if eq .Set.sidebar "collapsed"}} class="rail"{{end}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,16 +35,16 @@
     <div class="sidebar-foot">
       <p class="version">TubeShelf {{.Version}}</p>
       <div class="account">
-        <span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span>
-        <span class="who"><span>{{or .User.Name .User.Email}}</span></span>
-        <form method="post" action="/logout"><button class="icon-button" aria-label="Sign out" title="Sign out">{{template "i-logout"}}</button></form>
+        <button type="button" class="account-button" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" title="Account menu"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span class="who">{{or .User.Name .User.Email}}</span></button>
+        {{$label := "Collapse sidebar"}}{{if eq .Set.sidebar "collapsed"}}{{$label = "Expand sidebar"}}{{end}}
+        <form class="collapse-toggle" method="post" action="/settings" data-sidebar><input type="hidden" name="sidebar" value="{{if eq .Set.sidebar "collapsed"}}expanded{{else}}collapsed{{end}}"><button class="icon-button" aria-label="{{$label}}" title="{{$label}}">{{template "i-sidebar"}}</button></form>
       </div>
     </div>
   </aside>
   <div class="content">
     <header class="phone-bar">
       <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
-      <a class="me" href="/settings" aria-label="Settings for {{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></a>
+      <button type="button" class="me" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
     </header>
     <main id="main">
       {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
@@ -60,6 +60,18 @@
     <a href="/settings" {{if or (eq .Page "settings") (eq .Page "admin")}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
   </nav>
   <button type="button" class="phone-search" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
+  <div class="popmenu account-menu" id="account-menu" popover role="menu" aria-label="Account">
+    <div class="menu-head"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span><strong>{{or .User.Name .User.Email}}</strong>{{if .User.Name}}<small>{{.User.Email}}</small>{{end}}</span></div>
+    <hr>
+    <a role="menuitem" href="/settings">{{template "i-user"}}My account</a>
+    {{if .User.IsAdmin}}<a role="menuitem" href="/admin">{{template "i-admin"}}Admin</a>{{end}}
+    <button type="button" role="menuitem" class="has-sub" popovertarget="theme-menu" popovertargetaction="show" aria-haspopup="menu" aria-expanded="false">{{template "i-theme"}}<span>Appearance<small>{{.Set.theme}}</small></span>{{template "i-chevron"}}</button>
+    <div class="popmenu theme-menu" id="theme-menu" popover role="menu" aria-label="Appearance">
+      <form method="post" action="/settings">{{range list "light" "dark" "system"}}<button role="menuitemradio" name="theme" value="{{.}}" aria-checked="{{eq . $.Set.theme}}">{{.}}{{template "i-check"}}</button>{{end}}</form>
+    </div>
+    <hr>
+    <form method="post" action="/logout"><button role="menuitem">{{template "i-logout"}}Sign out</button></form>
+  </div>
 </div>
 <dialog class="palette" id="palette" aria-label="Command palette">
   <input type="text" placeholder="Go to a page, list or channel, or search the feed" aria-label="Command" autocomplete="off">
@@ -93,6 +105,10 @@
 {{define "i-admin"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.500 3 8 7 10 4-2 7-5.500 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>{{end}}
 {{define "i-logout"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 8l4 4-4 4M19 12H9"/></svg>{{end}}
 
+{{define "i-sidebar"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15M15.5 10l-2 2 2 2"/></svg>{{end}}
+{{define "i-user"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.5 1.7-2.2 3-2.2s2.5.7 3 2.2M15 10h3M15 13h3"/></svg>{{end}}
+{{define "i-theme"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>{{end}}
+{{define "i-chevron"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>{{end}}
 {{define "i-check"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
 {{define "i-clock"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{{end}}
 

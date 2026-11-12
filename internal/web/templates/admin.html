@@ -9,8 +9,8 @@
   <label>Group claim <input name="group_claim" value="{{.GroupClaim}}" placeholder="groups"></label>
   <label>Admin group <input name="admin_group" value="{{.AdminGroup}}" placeholder="leave empty to manage admins here"></label>
 </div>
-<label class="check"><input type="checkbox" name="auto_provision" value="1" {{if .AutoProvision}}checked{{end}}> Create accounts on first login</label>
-<label class="check"><input type="checkbox" name="enabled" value="1" {{if or .Enabled (not .ID)}}checked{{end}}> Enabled</label>
+<label class="check"><input type="checkbox" role="switch" name="auto_provision" value="1" {{if .AutoProvision}}checked{{end}}> Create accounts on first login</label>
+<label class="check"><input type="checkbox" role="switch" name="enabled" value="1" {{if or .Enabled (not .ID)}}checked{{end}}> Enabled</label>
 {{end}}
 {{define "main"}}
 <p class="eyebrow">Manage</p>
@@ -35,8 +35,8 @@
       <label>Parallel fetches <input type="number" name="fetch_concurrency" min="1" max="16" value="{{.Instance.fetch_concurrency}}"></label>
       <label>Keep videos for <span class="row"><input type="number" name="retention_days" min="7" max="3650" value="{{.Instance.retention_days}}"> days</span></label>
     </div>
-    <label class="check"><input type="checkbox" name="public_registration" value="1" {{if eq .Instance.public_registration "1"}}checked{{end}}> Anyone can register an account</label>
-    <label class="check"><input type="checkbox" name="oidc_only" value="1" {{if eq .Instance.oidc_only "1"}}checked{{end}}> Disable password login (needs an enabled login provider)</label>
+    <label class="check"><input type="checkbox" role="switch" name="public_registration" value="1" {{if eq .Instance.public_registration "1"}}checked{{end}}> Anyone can register an account</label>
+    <label class="check"><input type="checkbox" role="switch" name="oidc_only" value="1" {{if eq .Instance.oidc_only "1"}}checked{{end}}> Disable password login (needs an enabled login provider)</label>
     <p><button class="button primary">Save</button></p>
   </form>
 

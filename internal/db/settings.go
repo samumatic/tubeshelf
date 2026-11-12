@@ -26,6 +26,7 @@ var UserDefaults = map[string]string{
 	"sponsorblock":    "1",
 	"watched_percent": "90",
 	"open_on_youtube": "0",
+	"sidebar":         "expanded", // expanded | collapsed (from 1024px)
 }
 
 type querier interface {

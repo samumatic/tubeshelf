@@ -1,5 +1,5 @@
 {{define "title"}}Settings · TubeShelf{{end}}
-{{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
+{{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" role="switch" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
 {{define "main"}}
 <p class="eyebrow">Manage</p>
 <h1 class="page-title">Settings</h1>

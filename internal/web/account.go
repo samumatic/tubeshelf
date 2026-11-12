@@ -186,6 +186,7 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 // allowed values per user setting; nil means "0 or 1".
 var userChoices = map[string][]string{
 	"theme": {"system", "dark", "light"}, "view": {"grid", "list"}, "sort": {"newest", "oldest"},
+	"sidebar":     {"expanded", "collapsed"},
 	"hide_shorts": nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil,
 	"sponsorblock": nil, "open_on_youtube": nil,
 }

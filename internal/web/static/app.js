@@ -18,8 +18,8 @@ try {
   }
 } catch { /* storage blocked: no reveal */ }
 
-const post = (form) =>
-  fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)), headers: { 'X-Requested-With': 'fetch' } });
+const post = (form, submitter) =>
+  fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form, submitter)), headers: { 'X-Requested-With': 'fetch' } });
 
 // Toggle buttons (watched, later, list membership) update in place.
 document.addEventListener('submit', async (e) => {
@@ -194,6 +194,60 @@ if (palette) {
   });
 }
 
+// Account menu: arrow keys, the Appearance flyout on hover, and theme changes without leaving the page.
+const accountMenu = document.getElementById('account-menu');
+if (accountMenu) {
+  const themeMenu = document.getElementById('theme-menu');
+  const sub = accountMenu.querySelector('.has-sub');
+  const items = (menu) => [...menu.querySelectorAll('[role^="menuitem"]')].filter((el) => el.closest('[popover]') === menu);
+  const show = (menu) => menu.matches(':popover-open') || menu.showPopover();
+  const hide = (menu) => menu.matches(':popover-open') && menu.hidePopover();
+  for (const menu of [accountMenu, themeMenu]) {
+    menu.addEventListener('toggle', (e) => {
+      const open = e.newState === 'open';
+      const owners = menu === accountMenu ? document.querySelectorAll('[popovertarget="account-menu"]') : [sub];
+      for (const b of owners) b.setAttribute('aria-expanded', open);
+      if (open && menu === accountMenu) items(menu)[0]?.focus();
+    });
+    menu.addEventListener('keydown', (e) => {
+      const list = items(menu);
+      const i = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') list.at((i + (e.key === 'ArrowDown' ? 1 : -1)) % list.length)?.focus();
+      else if ((e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') && document.activeElement === sub) { show(themeMenu); items(themeMenu)[0].focus(); }
+      else if (e.key === 'ArrowLeft' && menu === themeMenu) { hide(themeMenu); sub.focus(); }
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+  sub.addEventListener('pointerenter', () => show(themeMenu));
+  for (const item of items(accountMenu)) if (item !== sub) item.addEventListener('pointerenter', () => hide(themeMenu));
+  themeMenu.querySelector('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const b = e.submitter;
+    post(e.target, b).catch(() => {});
+    document.documentElement.dataset.theme = b.value;
+    for (const x of themeMenu.querySelectorAll('button')) x.setAttribute('aria-checked', x === b);
+    sub.querySelector('small').textContent = b.value;
+    hide(accountMenu);
+  });
+}
+
+// Sidebar collapse (from 1024px): switch at once, save in the background.
+const sidebarForm = document.querySelector('form[data-sidebar]');
+sidebarForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  post(sidebarForm).catch(() => {});
+  const input = sidebarForm.elements.sidebar;
+  const collapse = input.value === 'collapsed';
+  document.documentElement.classList.toggle('rail', collapse);
+  input.value = collapse ? 'expanded' : 'collapsed';
+  const label = collapse ? 'Expand sidebar' : 'Collapse sidebar';
+  const button = sidebarForm.querySelector('button');
+  button.setAttribute('aria-label', label);
+  button.title = label;
+});
+
 // Infinite scroll: swap the "Load more" link for the next page when it nears the viewport.
 const feed = document.getElementById('feed');
 const pager = new IntersectionObserver(async ([entry]) => {
@@ -226,6 +280,7 @@ function focusCard(card) {
   card.scrollIntoView({ block: 'nearest' });
 }
 document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('[popover], dialog')) return;
   if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) {
     if (e.key === 'Escape') e.target.blur();
     return;
