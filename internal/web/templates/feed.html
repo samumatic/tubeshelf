@@ -1,6 +1,7 @@
 {{define "main"}}
+<div class="page-head"><h1 class="page-title">{{if .ChannelTitle}}{{.ChannelTitle}}{{else}}Feed{{end}}</h1></div>
 <div class="toolbar">
-  <div class="chips" role="group" aria-label="Lists">
+  <div class="chips tabs" role="group" aria-label="Lists">
     <a class="chip" href="{{query .Q "list" ""}}" {{if not .ListID}}aria-current="true"{{end}}>All</a>
     {{range .Lists}}<a class="chip" href="{{query $.Q "list" (print .ID)}}" {{if eq (print .ID) $.ListID}}aria-current="true"{{end}}>{{.Name}}</a>{{end}}
     {{if .ChannelID}}<a class="chip active" href="{{query .Q "channel" ""}}" title="Clear channel filter">{{or .ChannelTitle "Channel"}} ×</a>{{end}}
@@ -12,8 +13,8 @@
     {{template "toggle" (toggle "hide_members" "Members" .Set)}}
     {{template "toggle" (toggle "hide_watched" "Watched" .Set)}}
     <span class="sep"></span>
-    <button class="chip" name="sort" value="{{if eq .Set.sort "oldest"}}newest{{else}}oldest{{end}}" title="Change sort order">{{if eq .Set.sort "oldest"}}Oldest first{{else}}Newest first{{end}}</button>
-    <button class="chip" name="view" value="{{if eq .Set.view "list"}}grid{{else}}list{{end}}" title="Switch layout">{{if eq .Set.view "list"}}List{{else}}Grid{{end}}</button>
+    <button class="chip plain" name="sort" value="{{if eq .Set.sort "oldest"}}newest{{else}}oldest{{end}}" title="Change sort order">{{if eq .Set.sort "oldest"}}Oldest first{{else}}Newest first{{end}}</button>
+    <button class="chip plain" name="view" value="{{if eq .Set.view "list"}}grid{{else}}list{{end}}" title="Switch layout">{{if eq .Set.view "list"}}List{{else}}Grid{{end}}</button>
   </form>
 </div>
 {{if .Videos}}
@@ -40,5 +41,5 @@
 
 {{define "items"}}
 {{range .Videos}}{{template "card" (card . $.Set)}}{{end}}
-{{if .Next}}<a id="more" class="more" href="{{query .Q "before" .Next}}">Load more</a>{{end}}
+{{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{end}}
 {{end}}

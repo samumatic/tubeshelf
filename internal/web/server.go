@@ -171,6 +171,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	}
 	u := s.user(r)
 	data["User"] = u
+	if u != nil {
+		data["NavLists"] = s.lists(u.ID)
+	}
 	data["Page"] = page
 	data["AssetV"] = s.assetVer
 	data["Version"] = s.Version

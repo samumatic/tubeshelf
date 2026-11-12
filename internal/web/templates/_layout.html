@@ -13,31 +13,80 @@
 </head>
 <body class="view-{{.Set.view}} page-{{.Page}}">
 {{if .User}}
-<header class="top">
-  <a class="brand" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg><span>TubeShelf</span></a>
-  <nav aria-label="Main">
-    <a href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>Feed</a>
-    <a href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>Later</a>
-    <a href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>History</a>
-    <a href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>Channels</a>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>TubeShelf</a>
+    <form class="search" action="/" role="search">
+      {{template "i-search"}}
+      <input type="search" name="q" value="{{.Search}}" placeholder="Search" aria-label="Search feed" data-search>
+      <kbd>⌘K</kbd>
+    </form>
+    <nav aria-label="Main">
+      <a class="nav-item" href="/" {{if and (eq .Page "feed") (not .ListID)}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+      <a class="nav-item" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
+      <a class="nav-item" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+      <a class="nav-item" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+      {{if .NavLists}}<h2 class="nav-heading">Lists</h2>
+      {{range .NavLists}}<a class="nav-item" href="/?list={{.ID}}" {{if eq (print .ID) (print $.ListID)}}aria-current="page"{{end}}><span class="dot"></span><span class="grow">{{.Name}}</span></a>{{end}}{{end}}
+    </nav>
+    <div class="sidebar-foot">
+      {{if .User.IsAdmin}}<a class="nav-item" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-admin"}}Admin</a>{{end}}
+      <a class="nav-item" href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
+      <div class="account">
+        <span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span>
+        <span class="who"><span>{{or .User.Name .User.Email}}</span>{{if .User.Name}}<small>{{.User.Email}}</small>{{end}}</span>
+        <form method="post" action="/logout"><button class="icon-button" aria-label="Sign out" title="Sign out">{{template "i-logout"}}</button></form>
+      </div>
+    </div>
+  </aside>
+  <div class="content">
+    <header class="phone-bar">
+      <a class="brand" href="/" aria-label="TubeShelf home"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span></a>
+      <form class="search" action="/" role="search">{{template "i-search"}}<input type="search" name="q" value="{{.Search}}" placeholder="Search feed" aria-label="Search feed"></form>
+    </header>
+    <main>
+      {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
+      {{if .Msg}}<p class="flash" role="status">{{.Msg}}</p>{{end}}
+      {{template "main" .}}
+    </main>
+  </div>
+  <nav class="phone-nav" aria-label="Main">
+    <a href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+    <a href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
+    <a href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+    <a href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+    <a href="/settings" {{if or (eq .Page "settings") (eq .Page "admin")}}aria-current="page"{{end}}>{{template "i-settings"}}Settings</a>
   </nav>
-  <form class="search" action="/" role="search">
-    <input type="search" name="q" value="{{.Search}}" placeholder="Search feed" aria-label="Search feed" id="search">
-  </form>
-  <nav class="account" aria-label="Account">
-    {{if .User.IsAdmin}}<a href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>Admin</a>{{end}}
-    <a href="/settings" {{if eq .Page "settings"}}aria-current="page"{{end}}>Settings</a>
-    <form method="post" action="/logout"><button class="link">Sign out</button></form>
-  </nav>
-</header>
-{{end}}
-<main>
-{{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
-{{if .Msg}}<p class="flash" role="status">{{.Msg}}</p>{{end}}
-{{template "main" .}}
+</div>
+<dialog class="palette" id="palette" aria-label="Command palette">
+  <input type="text" placeholder="Go to a page, list or channel, or search the feed" aria-label="Command" autocomplete="off">
+  <ul role="listbox">
+    <li data-k="feed home"><a href="/">{{template "i-feed"}}Feed</a></li>
+    <li data-k="later saved"><a href="/later">{{template "i-clock"}}Watch later</a></li>
+    <li data-k="history"><a href="/history">{{template "i-history"}}History</a></li>
+    <li data-k="channels subscriptions import"><a href="/channels">{{template "i-channels"}}Channels</a></li>
+    <li data-k="settings theme password api keys"><a href="/settings">{{template "i-settings"}}Settings</a></li>
+    {{if .User.IsAdmin}}<li data-k="admin users oidc"><a href="/admin">{{template "i-admin"}}Admin</a></li>{{end}}
+    {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
+  </ul>
+  <footer><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+</dialog>
+{{else}}
+<main class="auth-page">
+  {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
+  {{template "main" .}}
 </main>
+{{end}}
 </body>
 </html>{{end}}
+
+{{define "i-search"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>{{end}}
+{{define "i-feed"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9.500 4.500 2.500-4.500 2.500z"/></svg>{{end}}
+{{define "i-history"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.500-5.800"/><path d="M4 4v4h4"/><path d="M12 8v4l2.500 2"/></svg>{{end}}
+{{define "i-channels"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.500"/><path d="M3 19c.600-3 3-4.500 6-4.500s5.400 1.500 6 4.500"/><path d="M16 6a3 3 0 0 1 0 6M18.500 15c1.500.700 2.300 2 2.500 4"/></svg>{{end}}
+{{define "i-settings"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>{{end}}
+{{define "i-admin"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.500 3 8 7 10 4-2 7-5.500 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>{{end}}
+{{define "i-logout"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 8l4 4-4 4M19 12H9"/></svg>{{end}}
 
 {{define "i-check"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
 {{define "i-clock"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{{end}}
@@ -74,6 +123,7 @@
 
 {{define "auth-shell"}}
 <section class="auth">
-  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg>TubeShelf</h1>
+  <span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg></span>
+  <h1>{{template "auth-title" .}}</h1>
   {{template "auth" .}}
 </section>{{end}}

@@ -1,7 +1,8 @@
 {{define "title"}}Set up · TubeShelf{{end}}
 {{define "main"}}{{template "auth-shell" .}}{{end}}
+{{define "auth-title"}}Set up TubeShelf{{end}}
 {{define "auth"}}
-<p class="muted">Create the admin account to get started.</p>
+<p>This account becomes the administrator.</p>
 <form method="post" action="/setup">
   <label>Email <input type="email" name="email" required autofocus autocomplete="username"></label>
   <label>Name <input name="name" autocomplete="name"></label>

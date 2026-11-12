@@ -94,14 +94,14 @@ func (a *app) signUp() {
 
 func TestSetupAndFeed(t *testing.T) {
 	a := newApp(t)
-	if _, body := a.get("/"); !strings.Contains(body, "Create the admin account") {
+	if _, body := a.get("/"); !strings.Contains(body, "This account becomes the administrator") {
 		t.Fatal("fresh instance does not lead to setup")
 	}
 	a.signUp()
 	if code, _ := a.get("/setup"); code != http.StatusOK {
 		t.Errorf("setup after setup: status %d", code)
 	}
-	if _, body := a.get("/setup"); strings.Contains(body, "Create the admin account") {
+	if _, body := a.get("/setup"); strings.Contains(body, "This account becomes the administrator") {
 		t.Error("setup is still reachable once a user exists")
 	}
 
