@@ -117,7 +117,7 @@ func TestSetupAndFeed(t *testing.T) {
 	}
 
 	// Showing Shorts and searching.
-	a.post("/settings", url.Values{"hide_shorts": {"0"}})
+	a.post("/account/preferences", url.Values{"hide_shorts": {"0"}})
 	if _, body := a.get("/"); !strings.Contains(body, "A short one") {
 		t.Error("Shorts still hidden after turning the filter off")
 	}
@@ -156,7 +156,7 @@ func TestWatchedLaterAndProgress(t *testing.T) {
 		t.Error("rewinding cleared the watched mark")
 	}
 
-	a.post("/settings", url.Values{"hide_watched": {"1"}})
+	a.post("/account/preferences", url.Values{"hide_watched": {"1"}})
 	if _, body := a.get("/"); strings.Contains(body, "Regular") {
 		t.Error("watched video shown although hide_watched is on")
 	}
@@ -192,8 +192,10 @@ func TestAccessControl(t *testing.T) {
 	if code, _ := user.post("/login", url.Values{"email": {"user@example.com"}, "password": {"correct horse"}}); code != http.StatusOK {
 		t.Fatalf("login: status %d", code)
 	}
-	if code, _ := user.get("/admin"); code != http.StatusForbidden {
-		t.Errorf("non-admin /admin: status %d, want 403", code)
+	for _, p := range []string{"/admin", "/admin/users", "/admin/sign-in", "/admin/instance"} {
+		if code, _ := user.get(p); code != http.StatusForbidden {
+			t.Errorf("non-admin %s: status %d, want 403", p, code)
+		}
 	}
 	if code, _ := user.post("/admin/settings", url.Values{"retention_days": {"7"}}); code != http.StatusForbidden {
 		t.Errorf("non-admin POST /admin/settings: status %d, want 403", code)
@@ -229,11 +231,11 @@ func TestAPIKey(t *testing.T) {
 		t.Errorf("invalid key: status %d", code)
 	}
 	// A key does not open the HTML pages.
-	req, _ := http.NewRequest(http.MethodGet, a.url+"/settings", nil)
+	req, _ := http.NewRequest(http.MethodGet, a.url+"/account", nil)
 	req.Header.Set("X-API-Key", key)
 	res, _ := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
 	if res.StatusCode != http.StatusSeeOther {
-		t.Errorf("API key on /settings: status %d, want redirect to login", res.StatusCode)
+		t.Errorf("API key on /account: status %d, want redirect to login", res.StatusCode)
 	}
 }
 
@@ -280,5 +282,46 @@ func TestOPMLRoundTrip(t *testing.T) {
 	}
 	if got[0].ID != chanA || got[0].List != "" || got[1].List != "Tech" {
 		t.Errorf("round trip lost data: %+v", got)
+	}
+}
+
+// Every page renders completely: a template error would only be logged and
+// leave a cut-off page with status 200.
+func TestPagesRender(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	pages := map[string]string{
+		"/": "Feed", "/later": "Watch later", "/history": "History", "/library": "Library",
+		"/channels": "Channels", "/lists": "Lists", "/channels/import": "Import &amp; export",
+		"/account": "My account", "/account/preferences": "Preferences", "/account/keys": "API keys",
+		"/admin": "Status", "/admin/users": "Users", "/admin/sign-in": "Sign-in", "/admin/instance": "Instance",
+	}
+	for path, title := range pages {
+		code, body := a.get(path)
+		if code != http.StatusOK || !strings.Contains(body, `<h1 class="page-title">`+title) || !strings.Contains(body, "</html>") {
+			t.Errorf("%s: status %d, title %q or end of page missing", path, code, title)
+		}
+	}
+	if _, body := a.get("/settings"); !strings.Contains(body, `<h1 class="page-title">Preferences`) {
+		t.Error("/settings does not lead to the preferences page")
+	}
+}
+
+// The sign-in and instance forms each send only their own fields; saving
+// one must not reset the other's.
+func TestInstanceSettingsPartial(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	a.post("/admin/settings", url.Values{"public_registration": {"0", "1"}})
+	a.post("/admin/settings", url.Values{"retention_days": {"30"}})
+	if v := db.Setting(a.db, "public_registration"); v != "1" {
+		t.Errorf("public_registration = %q after saving the instance form, want 1", v)
+	}
+	if v := db.Setting(a.db, "retention_days"); v != "30" {
+		t.Errorf("retention_days = %q, want 30", v)
+	}
+	a.post("/admin/settings", url.Values{"public_registration": {"0"}})
+	if v := db.Setting(a.db, "public_registration"); v != "0" {
+		t.Errorf("public_registration = %q after switching it off, want 0", v)
 	}
 }

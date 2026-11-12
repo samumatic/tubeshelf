@@ -1,0 +1,16 @@
+{{define "title"}}API keys · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Account</p>
+<h1 class="page-title">API keys</h1>
+<div class="stack">
+  <div class="panel">
+    <p class="muted">For scripts that manage subscriptions: send the key as <code>X-API-Key</code> to <code>/api/subscriptions</code>.</p>
+    {{if .NewKey}}<p class="flash">New key, shown only once: <code class="select">{{.NewKey}}</code></p>{{end}}
+    {{if .Keys}}<ul class="plain">{{range .Keys}}
+      <li><span>{{.Name}} <small>created {{date .Created}}{{if .LastUsed}}, used {{ago .LastUsed}}{{else}}, never used{{end}}</small></span>
+        <form method="post" action="/account/keys/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the API key “{{.Name}}”?">Delete</button></form></li>{{end}}
+    </ul>{{end}}
+    <form class="row" method="post" action="/account/keys"><input name="name" placeholder="Key name" aria-label="Key name" maxlength="60"><button class="button">Create key</button></form>
+  </div>
+</div>
+{{end}}

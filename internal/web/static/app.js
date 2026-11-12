@@ -248,6 +248,14 @@ sidebarForm?.addEventListener('submit', (e) => {
   button.title = label;
 });
 
+// A long sidebar scrolls; keep the current page in view.
+const navCurrent = document.querySelector('.sidebar nav [aria-current]');
+if (navCurrent) {
+  const nav = navCurrent.closest('nav');
+  const below = navCurrent.getBoundingClientRect().bottom - nav.getBoundingClientRect().bottom;
+  if (below > 0) nav.scrollTop += below + 16;
+}
+
 // Infinite scroll: swap the "Load more" link for the next page when it nears the viewport.
 const feed = document.getElementById('feed');
 const pager = new IntersectionObserver(async ([entry]) => {

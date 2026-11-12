@@ -80,6 +80,16 @@ func (s *Server) channelsPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "channels", M{"Channels": chans, "Lists": s.lists(u.ID)})
 }
 
+func (s *Server) listsPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "lists", M{"Lists": s.lists(s.user(r).ID)})
+}
+
+func (s *Server) importPage(w http.ResponseWriter, r *http.Request) { s.render(w, r, "import", nil) }
+
+// libraryPage is the phone's way into the Library and Administration pages,
+// which the sidebar shows on wider screens.
+func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) { s.render(w, r, "library", nil) }
+
 // subscribe stores the channel if new and subscribes the user. It reports
 // whether the subscription was new.
 func (s *Server) subscribe(userID string, ch yt.Channel) (bool, error) {
@@ -152,19 +162,19 @@ func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addList(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name == "" || len(name) > 60 {
-		fail(w, r, "/channels", errors.New("list name must be 1 to 60 characters"))
+		fail(w, r, "/lists", errors.New("list name must be 1 to 60 characters"))
 		return
 	}
 	if _, err := s.DB.Exec(`INSERT INTO lists (user_id, name) VALUES (?, ?)`, s.user(r).ID, name); err != nil {
-		fail(w, r, "/channels", errors.New("a list with that name already exists"))
+		fail(w, r, "/lists", errors.New("a list with that name already exists"))
 		return
 	}
-	ok(w, r, "/channels", "List created")
+	ok(w, r, "/lists", "List created")
 }
 
 func (s *Server) deleteList(w http.ResponseWriter, r *http.Request) {
 	s.DB.Exec(`DELETE FROM lists WHERE id = ? AND user_id = ?`, r.PathValue("id"), s.user(r).ID)
-	ok(w, r, "/channels", "List deleted")
+	ok(w, r, "/lists", "List deleted")
 }
 
 func (s *Server) setListChannel(w http.ResponseWriter, r *http.Request) {
@@ -279,14 +289,14 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		fail(w, r, "/channels", errors.New("choose a file to import (2 MB at most)"))
+		fail(w, r, "/channels/import", errors.New("choose a file to import (2 MB at most)"))
 		return
 	}
 	defer file.Close()
 	data, _ := io.ReadAll(file)
 	items, err := parseImport(data)
 	if err != nil {
-		fail(w, r, "/channels", err)
+		fail(w, r, "/channels/import", err)
 		return
 	}
 	added, failed := 0, 0
@@ -327,7 +337,7 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 	if failed > 0 {
 		msg += fmt.Sprintf(", %d could not be found", failed)
 	}
-	ok(w, r, "/channels", msg)
+	ok(w, r, "/channels/import", msg)
 }
 
 func feedURL(id string) string { return "https://www.youtube.com/feeds/videos.xml?channel_id=" + id }

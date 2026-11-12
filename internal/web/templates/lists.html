@@ -1,0 +1,15 @@
+{{define "title"}}Lists · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Library</p>
+<h1 class="page-title">Lists</h1>
+<div class="stack">
+  <div class="panel">
+    <form class="row" method="post" action="/lists"><input name="name" placeholder="New list name" aria-label="New list name" maxlength="60" required><button class="button primary">Create list</button></form>
+    {{if .Lists}}<ul class="plain">{{range .Lists}}
+      <li><a href="/?list={{.ID}}">{{.Name}} <small>{{.Channels}} channel{{if ne .Channels 1}}s{{end}}</small></a>
+        <form method="post" action="/lists/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the list “{{.Name}}”? Its channels stay subscribed.">Delete</button></form></li>{{end}}
+    </ul>{{end}}
+    <p class="muted">Add channels to a list with the list buttons on the <a class="text-link" href="/channels">Channels</a> page.</p>
+  </div>
+</div>
+{{end}}

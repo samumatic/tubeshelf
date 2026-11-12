@@ -162,7 +162,13 @@ type APIKey struct {
 	Created, LastUsed int64
 }
 
-func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) accountPage(w http.ResponseWriter, r *http.Request) { s.render(w, r, "account", nil) }
+
+func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "preferences", nil)
+}
+
+func (s *Server) keysPage(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
 	var keys []APIKey
 	rows, err := s.DB.Query(`SELECT id, name, created_at, coalesce(last_used_at, 0) FROM api_keys WHERE user_id = ? ORDER BY created_at`, u.ID)
@@ -178,9 +184,9 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 	newKey := ""
 	if c, err := r.Cookie(keyCookie); err == nil {
 		newKey = c.Value
-		http.SetCookie(w, &http.Cookie{Name: keyCookie, Path: "/settings", MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{Name: keyCookie, Path: "/account/keys", MaxAge: -1})
 	}
-	s.render(w, r, "settings", M{"Keys": keys, "NewKey": newKey})
+	s.render(w, r, "keys", M{"Keys": keys, "NewKey": newKey})
 }
 
 // allowed values per user setting; nil means "0 or 1".
@@ -219,29 +225,29 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	ok(w, r, "/settings", "")
+	ok(w, r, "/account/preferences", "")
 }
 
 func (s *Server) saveProfile(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if len(name) > 80 {
-		fail(w, r, "/settings", errors.New("name is too long"))
+		fail(w, r, "/account", errors.New("name is too long"))
 		return
 	}
 	s.DB.Exec(`UPDATE users SET name = ? WHERE id = ?`, name, s.user(r).ID)
-	ok(w, r, "/settings", "Profile saved")
+	ok(w, r, "/account", "Profile saved")
 }
 
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
 	if u.HasPass {
 		if _, err := auth.Login(s.DB, u.Email, r.FormValue("current")); err != nil {
-			fail(w, r, "/settings", errors.New("current password is wrong"))
+			fail(w, r, "/account", errors.New("current password is wrong"))
 			return
 		}
 	}
 	if err := auth.SetPassword(s.DB, u.ID, r.FormValue("new")); err != nil {
-		fail(w, r, "/settings", err)
+		fail(w, r, "/account", err)
 		return
 	}
 	// SetPassword ended every session, including this one: start a fresh one.
@@ -251,7 +257,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, r, tok)
-	ok(w, r, "/settings", "Password changed, other devices were signed out")
+	ok(w, r, "/account", "Password changed, other devices were signed out")
 }
 
 func (s *Server) addAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -261,19 +267,19 @@ func (s *Server) addAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 	key, err := auth.NewAPIKey(s.DB, s.user(r).ID, name)
 	if err != nil {
-		fail(w, r, "/settings", err)
+		fail(w, r, "/account/keys", err)
 		return
 	}
 	// Shown once on the next page; only the hash is stored. A short-lived
 	// cookie carries it there so the key never appears in a URL.
-	http.SetCookie(w, &http.Cookie{Name: keyCookie, Value: key, Path: "/settings", HttpOnly: true,
+	http.SetCookie(w, &http.Cookie{Name: keyCookie, Value: key, Path: "/account/keys", HttpOnly: true,
 		Secure: isHTTPS(r), SameSite: http.SameSiteStrictMode, MaxAge: 60})
-	http.Redirect(w, r, "/settings#keys", http.StatusSeeOther)
+	http.Redirect(w, r, "/account/keys", http.StatusSeeOther)
 }
 
 func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	s.DB.Exec(`DELETE FROM api_keys WHERE id = ? AND user_id = ?`, r.PathValue("id"), s.user(r).ID)
-	ok(w, r, "/settings", "API key deleted")
+	ok(w, r, "/account/keys", "API key deleted")
 }
 
 // danger runs one of the destructive account actions. Each needs the
@@ -281,22 +287,22 @@ func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 func (s *Server) danger(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
 	if r.FormValue("confirm") != "1" {
-		fail(w, r, "/settings", errors.New("tick the confirmation box first"))
+		fail(w, r, "/account", errors.New("tick the confirmation box first"))
 		return
 	}
 	switch r.FormValue("action") {
 	case "history":
 		s.DB.Exec(`DELETE FROM watch_state WHERE user_id = ?`, u.ID)
-		ok(w, r, "/settings", "Watch history and watched marks cleared")
+		ok(w, r, "/account", "Watch history and watched marks cleared")
 	case "subscriptions":
 		s.DB.Exec(`DELETE FROM lists WHERE user_id = ?`, u.ID)
 		s.DB.Exec(`DELETE FROM subscriptions WHERE user_id = ?`, u.ID)
-		ok(w, r, "/settings", "All subscriptions and lists deleted")
+		ok(w, r, "/account", "All subscriptions and lists deleted")
 	case "account":
 		var admins int
 		s.DB.QueryRow(`SELECT count(*) FROM users WHERE is_admin = 1 AND id != ?`, u.ID).Scan(&admins)
 		if u.IsAdmin && admins == 0 {
-			fail(w, r, "/settings", errors.New("you are the only admin; make someone else admin first"))
+			fail(w, r, "/account", errors.New("you are the only admin; make someone else admin first"))
 			return
 		}
 		s.DB.Exec(`DELETE FROM users WHERE id = ?`, u.ID)
@@ -319,7 +325,15 @@ type Health struct {
 	LastFetch                          int64
 }
 
-func (s *Server) adminPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) adminStatusPage(w http.ResponseWriter, r *http.Request) {
+	var h Health
+	s.DB.QueryRow(`SELECT count(*), coalesce(sum(fail_count > 0), 0), coalesce(max(last_success_at), 0) FROM channels`).
+		Scan(&h.Channels, &h.Failing, &h.LastFetch)
+	s.DB.QueryRow(`SELECT count(*), coalesce(sum(enrich_after > 0), 0) FROM videos`).Scan(&h.Videos, &h.Pending)
+	s.render(w, r, "admin", M{"Health": h})
+}
+
+func (s *Server) adminUsersPage(w http.ResponseWriter, r *http.Request) {
 	var users []AdminUser
 	rows, err := s.DB.Query(`SELECT id, email, name, is_admin, oidc_subject IS NOT NULL, coalesce(last_login_at, 0),
 		(SELECT count(*) FROM subscriptions s WHERE s.user_id = users.id) FROM users ORDER BY created_at`)
@@ -334,37 +348,53 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request) {
 			users = append(users, u)
 		}
 	}
-	var h Health
-	s.DB.QueryRow(`SELECT count(*), coalesce(sum(fail_count > 0), 0), coalesce(max(last_success_at), 0) FROM channels`).
-		Scan(&h.Channels, &h.Failing, &h.LastFetch)
-	s.DB.QueryRow(`SELECT count(*), coalesce(sum(enrich_after > 0), 0) FROM videos`).Scan(&h.Videos, &h.Pending)
-	instance := map[string]string{}
+	s.render(w, r, "admin-users", M{"Users": users})
+}
+
+func (s *Server) instance() map[string]string {
+	out := map[string]string{}
 	for k := range db.Defaults {
-		instance[k] = db.Setting(s.DB, k)
+		out[k] = db.Setting(s.DB, k)
 	}
+	return out
+}
+
+func (s *Server) adminSignInPage(w http.ResponseWriter, r *http.Request) {
 	providers, _ := auth.Providers(s.DB, false)
-	s.render(w, r, "admin", M{"Users": users, "Health": h, "Instance": instance, "Providers": providers,
-		"Callback": baseURL(r) + auth.CallbackPath})
+	s.render(w, r, "admin-signin", M{"Instance": s.instance(), "Providers": providers, "Callback": baseURL(r) + auth.CallbackPath})
+}
+
+func (s *Server) adminInstancePage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "admin-instance", M{"Instance": s.instance()})
 }
 
 func (s *Server) saveInstanceSettings(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
 	limits := map[string][2]int{"refresh_minutes": {5, 1440}, "fetch_concurrency": {1, 16}, "retention_days": {7, 3650}}
 	for key, lim := range limits {
-		n, err := strconv.Atoi(r.FormValue(key))
+		if !r.PostForm.Has(key) {
+			continue
+		}
+		n, err := strconv.Atoi(r.PostForm.Get(key))
 		if err != nil || n < lim[0] || n > lim[1] {
-			fail(w, r, "/admin", errors.New(strings.ReplaceAll(key, "_", " ")+" must be between "+strconv.Itoa(lim[0])+" and "+strconv.Itoa(lim[1])))
+			fail(w, r, "/admin/instance", errors.New(strings.ReplaceAll(key, "_", " ")+" must be between "+strconv.Itoa(lim[0])+" and "+strconv.Itoa(lim[1])))
 			return
 		}
 		db.SetSetting(s.DB, key, strconv.Itoa(n))
 	}
+	// Switches send a hidden "0" first and "1" after it when on.
 	for _, key := range []string{"public_registration", "oidc_only"} {
+		vals := r.PostForm[key]
+		if len(vals) == 0 {
+			continue
+		}
 		v := "0"
-		if r.FormValue(key) == "1" {
+		if vals[len(vals)-1] == "1" {
 			v = "1"
 		}
 		db.SetSetting(s.DB, key, v)
 	}
-	ok(w, r, "/admin", "Settings saved")
+	ok(w, r, "/admin/instance", "Settings saved")
 }
 
 func (s *Server) refreshAll(w http.ResponseWriter, r *http.Request) {
@@ -374,14 +404,14 @@ func (s *Server) refreshAll(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) adminAddUser(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("password") == "" {
-		fail(w, r, "/admin", errors.New("set an initial password"))
+		fail(w, r, "/admin/users", errors.New("set an initial password"))
 		return
 	}
 	if _, err := auth.CreateUser(s.DB, r.FormValue("email"), r.FormValue("name"), r.FormValue("password"), r.FormValue("admin") == "1"); err != nil {
-		fail(w, r, "/admin", err)
+		fail(w, r, "/admin/users", err)
 		return
 	}
-	ok(w, r, "/admin", "User created")
+	ok(w, r, "/admin/users", "User created")
 }
 
 func (s *Server) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -390,28 +420,28 @@ func (s *Server) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	switch r.FormValue("action") {
 	case "admin":
 		if id == me.ID {
-			fail(w, r, "/admin", errors.New("you cannot change your own admin role"))
+			fail(w, r, "/admin/users", errors.New("you cannot change your own admin role"))
 			return
 		}
 		s.DB.Exec(`UPDATE users SET is_admin = ? WHERE id = ?`, r.FormValue("on") == "1", id)
-		ok(w, r, "/admin", "Role updated")
+		ok(w, r, "/admin/users", "Role updated")
 	case "password":
 		if err := auth.SetPassword(s.DB, id, r.FormValue("password")); err != nil {
-			fail(w, r, "/admin", err)
+			fail(w, r, "/admin/users", err)
 			return
 		}
-		ok(w, r, "/admin", "Password reset, that user was signed out")
+		ok(w, r, "/admin/users", "Password reset, that user was signed out")
 	case "delete":
 		if id == me.ID {
-			fail(w, r, "/admin", errors.New("delete your own account from Settings"))
+			fail(w, r, "/admin/users", errors.New("delete your own account from My account"))
 			return
 		}
 		if r.FormValue("confirm") != "1" {
-			fail(w, r, "/admin", errors.New("tick the confirmation box first"))
+			fail(w, r, "/admin/users", errors.New("tick the confirmation box first"))
 			return
 		}
 		s.DB.Exec(`DELETE FROM users WHERE id = ?`, id)
-		ok(w, r, "/admin", "User deleted")
+		ok(w, r, "/admin/users", "User deleted")
 	default:
 		http.Error(w, "unknown action", http.StatusBadRequest)
 	}
@@ -425,10 +455,10 @@ func (s *Server) adminSaveProvider(w http.ResponseWriter, r *http.Request) {
 		AdminGroup: strings.TrimSpace(r.FormValue("admin_group")), Enabled: r.FormValue("enabled") == "1",
 	}
 	if err := auth.SaveProvider(s.DB, s.Secret, p, r.FormValue("client_secret")); err != nil {
-		fail(w, r, "/admin", err)
+		fail(w, r, "/admin/sign-in", err)
 		return
 	}
-	ok(w, r, "/admin", "Login provider saved")
+	ok(w, r, "/admin/sign-in", "Login provider saved")
 }
 
 func (s *Server) adminDeleteProvider(w http.ResponseWriter, r *http.Request) {
@@ -436,5 +466,5 @@ func (s *Server) adminDeleteProvider(w http.ResponseWriter, r *http.Request) {
 	if providers, _ := auth.Providers(s.DB, true); len(providers) == 0 {
 		db.SetSetting(s.DB, "oidc_only", "0") // never lock everyone out
 	}
-	ok(w, r, "/admin", "Login provider deleted")
+	ok(w, r, "/admin/sign-in", "Login provider deleted")
 }

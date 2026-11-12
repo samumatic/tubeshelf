@@ -1,0 +1,35 @@
+{{define "title"}}My account · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Account</p>
+<h1 class="page-title">My account</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/account/profile">
+    <h2>Profile</h2>
+    <div class="fields">
+      <label>Email <input value="{{.User.Email}}" disabled></label>
+      <label><span>Name<span class="optional">Optional</span></span> <input name="name" value="{{.User.Name}}" maxlength="80" autocomplete="name" aria-label="Name"></label>
+    </div>
+    <p><button class="button">Save profile</button></p>
+  </form>
+
+  <form class="panel" method="post" action="/account/password">
+    <h2>{{if .User.HasPass}}Change password{{else}}Set a password{{end}}</h2>
+    <div class="fields">
+      {{if .User.HasPass}}<label>Current password <input type="password" name="current" required autocomplete="current-password"></label>{{end}}
+      <label>New password <input type="password" name="new" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+    </div>
+    <p><button class="button">Change password</button></p>
+  </form>
+
+  <form class="panel danger-zone" method="post" action="/account/danger">
+    <h2>Danger zone</h2>
+    <label class="check"><input type="checkbox" name="confirm" value="1" required> I understand this cannot be undone</label>
+    <div class="row">
+      <button class="button danger" name="action" value="history">Clear watch history</button>
+      <button class="button danger" name="action" value="subscriptions">Delete all subscriptions</button>
+      <button class="button danger" name="action" value="account">Delete my account</button>
+    </div>
+  </form>
+  <p class="muted">TubeShelf {{.Version}}</p>
+</div>
+{{end}}

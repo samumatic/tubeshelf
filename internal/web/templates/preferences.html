@@ -1,0 +1,25 @@
+{{define "title"}}Preferences · TubeShelf{{end}}
+{{define "check"}}<label class="check"><input type="hidden" name="{{.Key}}" value="0"><input type="checkbox" role="switch" name="{{.Key}}" value="1" {{if .On}}checked{{end}}> {{.Label}}</label>{{end}}
+{{define "main"}}
+<p class="eyebrow">Account</p>
+<h1 class="page-title">Preferences</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/account/preferences">
+    <h2>Appearance and feed</h2>
+    <div class="fields">
+      <label>Theme <select name="theme">{{range $v := list "system" "dark" "light"}}<option {{if eq $v $.Set.theme}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Layout <select name="view">{{range $v := list "grid" "list"}}<option {{if eq $v $.Set.view}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Sort <select name="sort">{{range $v := list "newest" "oldest"}}<option {{if eq $v $.Set.sort}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
+      <label>Mark as watched at <span class="row"><input type="number" name="watched_percent" min="25" max="100" value="{{.Set.watched_percent}}"> %</span></label>
+    </div>
+    {{template "check" (toggle "hide_shorts" "Hide Shorts" .Set)}}
+    {{template "check" (toggle "hide_live" "Hide live streams and premieres" .Set)}}
+    {{template "check" (toggle "hide_members" "Hide members-only videos" .Set)}}
+    {{template "check" (toggle "hide_watched" "Hide watched videos" .Set)}}
+    <h2>Player</h2>
+    {{template "check" (toggle "sponsorblock" "Skip sponsor segments (SponsorBlock)" .Set)}}
+    {{template "check" (toggle "open_on_youtube" "Open videos on youtube.com instead of the built-in player" .Set)}}
+    <p><button class="button primary">Save</button></p>
+  </form>
+</div>
+{{end}}

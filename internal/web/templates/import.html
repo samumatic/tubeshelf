@@ -1,0 +1,17 @@
+{{define "title"}}Import & export · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Library</p>
+<h1 class="page-title">Import &amp; export</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/channels/import" enctype="multipart/form-data">
+    <h2>Import</h2>
+    <label for="file"><span>OPML, Google Takeout <code>subscriptions.csv</code>, or a text file with one channel per line</span></label>
+    <div class="row"><input id="file" type="file" name="file" accept=".opml,.xml,.csv,.txt" required><button class="button primary">Import</button></div>
+  </form>
+  <div class="panel">
+    <h2>Export</h2>
+    <p class="muted">All your subscriptions as one OPML file; each list becomes a folder.</p>
+    <p><a class="button" href="/channels/export.opml" download>Download OPML</a></p>
+  </div>
+</div>
+{{end}}

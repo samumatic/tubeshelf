@@ -1,0 +1,36 @@
+{{define "title"}}Users · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Users</h1>
+<div class="stack">
+  <div class="panel">
+    <table class="table">
+      <thead><tr><th>User</th><th class="num">Channels</th><th>Last login</th><th></th></tr></thead>
+      <tbody>{{range .Users}}
+        <tr>
+          <td>{{.Email}}{{if .Name}} <small>{{.Name}}</small>{{end}}{{if .IsAdmin}} <span class="tag">admin</span>{{end}}{{if .OIDC}} <span class="tag">SSO</span>{{end}}</td>
+          <td class="num" data-label="Channels">{{.Subs}}</td>
+          <td data-label="Last login">{{if .LastLogin}}{{ago .LastLogin}}{{else}}never{{end}}</td>
+          <td class="end">{{if ne .ID $.User.ID}}
+            <details class="menu"><summary>Manage</summary><div>
+              <form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="admin"><input type="hidden" name="on" value="{{if .IsAdmin}}0{{else}}1{{end}}"><button class="button">{{if .IsAdmin}}Remove admin{{else}}Make admin{{end}}</button></form>
+              <form class="row" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="password"><input type="password" name="password" placeholder="New password" aria-label="New password" minlength="8" required autocomplete="new-password"><button class="button">Reset</button></form>
+              <form class="row" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="delete"><label class="check"><input type="checkbox" name="confirm" value="1" required> Really</label><button class="button danger">Delete user</button></form>
+            </div></details>{{end}}</td>
+        </tr>{{end}}
+      </tbody>
+    </table>
+    <details><summary>Add user</summary>
+      <form method="post" action="/admin/users">
+        <div class="fields">
+          <label>Email <input type="email" name="email" required autocomplete="off"></label>
+          <label>Name <input name="name" autocomplete="off"></label>
+          <label>Initial password <input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="admin" value="1"> Admin</label>
+        <p><button class="button">Create user</button></p>
+      </form>
+    </details>
+  </div>
+</div>
+{{end}}

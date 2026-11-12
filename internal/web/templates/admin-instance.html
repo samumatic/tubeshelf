@@ -1,0 +1,16 @@
+{{define "title"}}Instance · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Instance</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/admin/settings">
+    <h2>Fetching</h2>
+    <div class="fields">
+      <label>Refresh every <span class="row"><input type="number" name="refresh_minutes" min="5" max="1440" value="{{.Instance.refresh_minutes}}"> minutes</span></label>
+      <label>Parallel fetches <input type="number" name="fetch_concurrency" min="1" max="16" value="{{.Instance.fetch_concurrency}}"></label>
+      <label>Keep videos for <span class="row"><input type="number" name="retention_days" min="7" max="3650" value="{{.Instance.retention_days}}"> days</span></label>
+    </div>
+    <p><button class="button primary">Save</button></p>
+  </form>
+</div>
+{{end}}

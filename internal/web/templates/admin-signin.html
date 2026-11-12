@@ -1,0 +1,39 @@
+{{define "title"}}Sign-in · TubeShelf{{end}}
+{{define "provider-fields"}}
+<div class="fields">
+  <label>Name <input name="name" value="{{.Name}}" required></label>
+  <label>Issuer URL <input name="issuer" type="url" value="{{.Issuer}}" placeholder="https://id.example.com" required></label>
+  <label>Client ID <input name="client_id" value="{{.ClientID}}" required autocomplete="off"></label>
+  <label>Client secret <input name="client_secret" type="password" autocomplete="off" {{if .ID}}placeholder="unchanged"{{else}}required{{end}}></label>
+  <label>Scopes <input name="scopes" value="{{or .Scopes "openid profile email"}}"></label>
+  <label>Group claim <input name="group_claim" value="{{.GroupClaim}}" placeholder="groups"></label>
+  <label>Admin group <input name="admin_group" value="{{.AdminGroup}}" placeholder="leave empty to manage admins here"></label>
+</div>
+<label class="check"><input type="checkbox" role="switch" name="auto_provision" value="1" {{if .AutoProvision}}checked{{end}}> Create accounts on first login</label>
+<label class="check"><input type="checkbox" role="switch" name="enabled" value="1" {{if or .Enabled (not .ID)}}checked{{end}}> Enabled</label>
+{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Sign-in</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/admin/settings">
+    <h2>Accounts</h2>
+    <label class="check"><input type="hidden" name="public_registration" value="0"><input type="checkbox" role="switch" name="public_registration" value="1" {{if eq .Instance.public_registration "1"}}checked{{end}}> Anyone can register an account</label>
+    <label class="check"><input type="hidden" name="oidc_only" value="0"><input type="checkbox" role="switch" name="oidc_only" value="1" {{if eq .Instance.oidc_only "1"}}checked{{end}}> Disable password login (needs an enabled login provider)</label>
+    <p><button class="button primary">Save</button></p>
+  </form>
+
+  <div class="panel">
+    <h2>Login providers (OIDC)</h2>
+    <p class="muted">Redirect URI to register with the provider: <code class="select">{{.Callback}}</code></p>
+    {{range .Providers}}
+    <details><summary>{{.Name}} {{if not .Enabled}}<span class="tag">disabled</span>{{end}}</summary>
+      <form method="post" action="/admin/providers"><input type="hidden" name="id" value="{{.ID}}">{{template "provider-fields" .}}<p><button class="button">Save</button></p></form>
+      <form method="post" action="/admin/providers/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the login provider “{{.Name}}”?">Delete provider</button></form>
+    </details>{{end}}
+    <details><summary>Add provider</summary>
+      <form method="post" action="/admin/providers">{{template "provider-fields" (newProvider)}}<p><button class="button">Add provider</button></p></form>
+    </details>
+  </div>
+</div>
+{{end}}

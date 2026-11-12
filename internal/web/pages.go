@@ -81,8 +81,9 @@ func groupByDay(vids []Video, now time.Time, prev string) []DayGroup {
 }
 
 type List struct {
-	ID   int64
-	Name string
+	ID       int64
+	Name     string
+	Channels int
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -119,7 +120,8 @@ func (s *Server) videos(query string, args ...any) ([]Video, error) {
 }
 
 func (s *Server) lists(userID string) []List {
-	rows, err := s.DB.Query(`SELECT id, name FROM lists WHERE user_id = ? ORDER BY name COLLATE NOCASE`, userID)
+	rows, err := s.DB.Query(`SELECT id, name, (SELECT count(*) FROM list_channels WHERE list_id = lists.id)
+		FROM lists WHERE user_id = ? ORDER BY name COLLATE NOCASE`, userID)
 	if err != nil {
 		return nil
 	}
@@ -127,7 +129,7 @@ func (s *Server) lists(userID string) []List {
 	var out []List
 	for rows.Next() {
 		var l List
-		if rows.Scan(&l.ID, &l.Name) == nil {
+		if rows.Scan(&l.ID, &l.Name, &l.Channels) == nil {
 			out = append(out, l)
 		}
 	}

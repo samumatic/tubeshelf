@@ -1,0 +1,23 @@
+{{define "title"}}Library · TubeShelf{{end}}
+{{define "main"}}
+<p class="eyebrow">Your shelf</p>
+<h1 class="page-title">Library</h1>
+<div class="stack">
+  <div class="panel">
+    <ul class="hub">
+      <li><a href="/channels">{{template "i-channels"}}Channels<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/lists">{{template "i-list"}}Lists<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/channels/import">{{template "i-import"}}Import &amp; export<span>{{template "i-chevron"}}</span></a></li>
+    </ul>
+  </div>
+  {{if .User.IsAdmin}}<div class="panel">
+    <h2>Administration</h2>
+    <ul class="hub">
+      <li><a href="/admin">{{template "i-pulse"}}Status<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/admin/users">{{template "i-users"}}Users<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/admin/sign-in">{{template "i-key"}}Sign-in<span>{{template "i-chevron"}}</span></a></li>
+      <li><a href="/admin/instance">{{template "i-server"}}Instance<span>{{template "i-chevron"}}</span></a></li>
+    </ul>
+  </div>{{end}}
+</div>
+{{end}}

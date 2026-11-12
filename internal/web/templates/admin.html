@@ -1,20 +1,7 @@
-{{define "title"}}Admin · TubeShelf{{end}}
-{{define "provider-fields"}}
-<div class="fields">
-  <label>Name <input name="name" value="{{.Name}}" required></label>
-  <label>Issuer URL <input name="issuer" type="url" value="{{.Issuer}}" placeholder="https://id.example.com" required></label>
-  <label>Client ID <input name="client_id" value="{{.ClientID}}" required autocomplete="off"></label>
-  <label>Client secret <input name="client_secret" type="password" autocomplete="off" {{if .ID}}placeholder="unchanged"{{else}}required{{end}}></label>
-  <label>Scopes <input name="scopes" value="{{or .Scopes "openid profile email"}}"></label>
-  <label>Group claim <input name="group_claim" value="{{.GroupClaim}}" placeholder="groups"></label>
-  <label>Admin group <input name="admin_group" value="{{.AdminGroup}}" placeholder="leave empty to manage admins here"></label>
-</div>
-<label class="check"><input type="checkbox" role="switch" name="auto_provision" value="1" {{if .AutoProvision}}checked{{end}}> Create accounts on first login</label>
-<label class="check"><input type="checkbox" role="switch" name="enabled" value="1" {{if or .Enabled (not .ID)}}checked{{end}}> Enabled</label>
-{{end}}
+{{define "title"}}Status · TubeShelf{{end}}
 {{define "main"}}
-<p class="eyebrow">Manage</p>
-<h1 class="page-title">Admin</h1>
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Status</h1>
 <div class="stack">
   <div class="panel">
     <h2>Fetcher</h2>
@@ -26,62 +13,6 @@
       <div><dt>Last fetch</dt><dd>{{if .Health.LastFetch}}{{ago .Health.LastFetch}}{{else}}never{{end}}</dd></div>
     </dl>
     <form method="post" action="/admin/refresh"><button class="button">Refresh all channels now</button></form>
-  </div>
-
-  <form class="panel" method="post" action="/admin/settings">
-    <h2>Instance settings</h2>
-    <div class="fields">
-      <label>Refresh every <span class="row"><input type="number" name="refresh_minutes" min="5" max="1440" value="{{.Instance.refresh_minutes}}"> minutes</span></label>
-      <label>Parallel fetches <input type="number" name="fetch_concurrency" min="1" max="16" value="{{.Instance.fetch_concurrency}}"></label>
-      <label>Keep videos for <span class="row"><input type="number" name="retention_days" min="7" max="3650" value="{{.Instance.retention_days}}"> days</span></label>
-    </div>
-    <label class="check"><input type="checkbox" role="switch" name="public_registration" value="1" {{if eq .Instance.public_registration "1"}}checked{{end}}> Anyone can register an account</label>
-    <label class="check"><input type="checkbox" role="switch" name="oidc_only" value="1" {{if eq .Instance.oidc_only "1"}}checked{{end}}> Disable password login (needs an enabled login provider)</label>
-    <p><button class="button primary">Save</button></p>
-  </form>
-
-  <div class="panel">
-    <h2>Users</h2>
-    <table class="table">
-      <thead><tr><th>User</th><th class="num">Channels</th><th>Last login</th><th></th></tr></thead>
-      <tbody>{{range .Users}}
-        <tr>
-          <td>{{.Email}}{{if .Name}} <small>{{.Name}}</small>{{end}}{{if .IsAdmin}} <span class="tag">admin</span>{{end}}{{if .OIDC}} <span class="tag">SSO</span>{{end}}</td>
-          <td class="num" data-label="Channels">{{.Subs}}</td>
-          <td data-label="Last login">{{if .LastLogin}}{{ago .LastLogin}}{{else}}never{{end}}</td>
-          <td class="end">{{if ne .ID $.User.ID}}
-            <details class="menu"><summary>Manage</summary><div>
-              <form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="admin"><input type="hidden" name="on" value="{{if .IsAdmin}}0{{else}}1{{end}}"><button class="button">{{if .IsAdmin}}Remove admin{{else}}Make admin{{end}}</button></form>
-              <form class="row" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="password"><input type="password" name="password" placeholder="New password" aria-label="New password" minlength="8" required autocomplete="new-password"><button class="button">Reset</button></form>
-              <form class="row" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="delete"><label class="check"><input type="checkbox" name="confirm" value="1" required> Really</label><button class="button danger">Delete user</button></form>
-            </div></details>{{end}}</td>
-        </tr>{{end}}
-      </tbody>
-    </table>
-    <details><summary>Add user</summary>
-      <form method="post" action="/admin/users">
-        <div class="fields">
-          <label>Email <input type="email" name="email" required autocomplete="off"></label>
-          <label>Name <input name="name" autocomplete="off"></label>
-          <label>Initial password <input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
-        </div>
-        <label class="check"><input type="checkbox" name="admin" value="1"> Admin</label>
-        <p><button class="button">Create user</button></p>
-      </form>
-    </details>
-  </div>
-
-  <div class="panel">
-    <h2>Login providers (OIDC)</h2>
-    <p class="muted">Redirect URI to register with the provider: <code class="select">{{.Callback}}</code></p>
-    {{range .Providers}}
-    <details><summary>{{.Name}} {{if not .Enabled}}<span class="tag">disabled</span>{{end}}</summary>
-      <form method="post" action="/admin/providers"><input type="hidden" name="id" value="{{.ID}}">{{template "provider-fields" .}}<p><button class="button">Save</button></p></form>
-      <form method="post" action="/admin/providers/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the login provider “{{.Name}}”?">Delete provider</button></form>
-    </details>{{end}}
-    <details><summary>Add provider</summary>
-      <form method="post" action="/admin/providers">{{template "provider-fields" (newProvider)}}<p><button class="button">Add provider</button></p></form>
-    </details>
   </div>
 </div>
 {{end}}

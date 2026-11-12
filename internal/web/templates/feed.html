@@ -14,7 +14,7 @@
     {{range .Lists}}<a class="chip" href="{{query $.Q "list" (print .ID)}}" {{if eq (print .ID) $.ListID}}aria-current="true"{{end}}>{{.Name}}</a>{{end}}
     {{if or .ChannelID .Search}}<a class="chip clear" href="/">Clear filter ×</a>{{end}}
   </div>
-  <form class="chips filters" method="post" action="/settings" aria-label="Filters">
+  <form class="chips filters" method="post" action="/account/preferences" aria-label="Filters">
     {{template "toggle" (toggle "hide_shorts" "Shorts" .Set)}}
     {{template "toggle" (toggle "hide_live" "Live" .Set)}}
     {{template "toggle" (toggle "hide_members" "Members" .Set)}}
