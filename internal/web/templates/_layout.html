@@ -22,11 +22,9 @@
     </div>
     <nav aria-label="Main">
       <h2 class="nav-heading">Watch</h2>
-      <a class="nav-item" title="Feed" href="/" {{if and (eq .Page "feed") (not .ListID)}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+      <a class="nav-item" title="Feed" href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
       <a class="nav-item" title="Watch later" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Watch later</a>
       <a class="nav-item" title="History" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
-      {{if .NavLists}}<h2 class="nav-heading">Lists</h2>
-      {{range .NavLists}}<a class="nav-item" title="{{.Name}}" href="/?list={{.ID}}" {{if eq (print .ID) (print $.ListID)}}aria-current="page"{{end}}><span class="dot"></span><span class="grow">{{.Name}}</span></a>{{end}}{{end}}
       <h2 class="nav-heading">Library</h2>
       <a class="nav-item" title="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
       <a class="nav-item" title="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
