@@ -14,6 +14,7 @@
 <body class="view-{{.Set.view}} page-{{.Page}}">
 {{if .User}}
 <div class="shell">
+  {{with .Backdrop}}<img class="backdrop" src="/thumb/{{.}}" alt="" decoding="async" fetchpriority="low">{{end}}
   <a class="skip" href="#main">Skip to content</a>
   <aside class="sidebar">
     <div class="brand-row">

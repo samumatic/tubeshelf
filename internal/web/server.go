@@ -183,6 +183,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["User"] = u
 	if u != nil {
 		data["NavLists"] = s.lists(u.ID)
+		// The newest regular video of the user's channels; its thumbnail is the shell's backdrop photo.
+		var backdrop string
+		s.DB.QueryRow(`SELECT v.id FROM videos v JOIN subscriptions s ON s.channel_id = v.channel_id AND s.user_id = ?
+			WHERE v.kind = 'video' ORDER BY v.published_at DESC LIMIT 1`, u.ID).Scan(&backdrop)
+		data["Backdrop"] = backdrop
 	}
 	data["Page"] = page
 	data["AssetV"] = s.assetVer
