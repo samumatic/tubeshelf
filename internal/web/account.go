@@ -194,7 +194,7 @@ var userChoices = map[string][]string{
 	"theme": {"system", "dark", "light"}, "view": {"grid", "list"}, "sort": {"newest", "oldest"},
 	"sidebar":       {"expanded", "collapsed"},
 	"sidebar_width": sidebarWidths(),
-	"hide_shorts":   nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil,
+	"hide_shorts":   nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil, "group_days": nil,
 	"sponsorblock": nil, "open_on_youtube": nil,
 }
 

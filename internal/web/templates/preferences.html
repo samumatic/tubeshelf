@@ -12,6 +12,7 @@
       <label>Sort <select name="sort">{{range $v := list "newest" "oldest"}}<option {{if eq $v $.Set.sort}}selected{{end}}>{{$v}}</option>{{end}}</select></label>
       <label>Mark as watched at <span class="row"><input type="number" name="watched_percent" min="25" max="100" value="{{.Set.watched_percent}}"> %</span></label>
     </div>
+    {{template "check" (toggle "group_days" "Group the feed by day" .Set)}}
     {{template "check" (toggle "hide_shorts" "Hide Shorts" .Set)}}
     {{template "check" (toggle "hide_live" "Hide live streams and premieres" .Set)}}
     {{template "check" (toggle "hide_members" "Hide members-only videos" .Set)}}

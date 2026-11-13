@@ -32,6 +32,7 @@ var UserDefaults = map[string]string{
 	"hide_watched":    "0",
 	"hide_members":    "0",
 	"hide_live":       "0",
+	"group_days":      "1", // day headings in the feed
 	"sponsorblock":    "1",
 	"watched_percent": "90",
 	"open_on_youtube": "0",

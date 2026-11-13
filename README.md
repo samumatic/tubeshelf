@@ -2,34 +2,30 @@
   <picture>
     <source srcset="docs/icon-dark.svg" media="(prefers-color-scheme: dark)">
     <source srcset="docs/icon-light.svg" media="(prefers-color-scheme: light)">
-    <img alt="TubeShelf icon" src="docs/icon-flat.svg" width="140" height="140">
+    <img alt="TubeShelf icon" src="docs/icon-flat.svg" width="120" height="120">
   </picture>
   <h1>TubeShelf</h1>
   <h3>Self-hosted YouTube subscription feed<br />chronological, distraction-free, yours.</h3>
 </div>
 
 > [!WARNING]
-> TubeShelf is in early development and subject to breaking changes. Expect bugs and missing features. Contributions and feedback are welcome!
+> TubeShelf is in early development. Expect breaking changes and bugs; feedback and contributions are welcome.
 
-**TubeShelf** is a self-hosted YouTube subscription experience without a Google account. Browse your subscriptions in a clean, chronological feed - no algorithm, no tracking, just the videos you want in the order they were uploaded.
+Your YouTube subscriptions in a clean, chronological feed, without a Google account: no algorithm, no tracking.
+
+<img src="docs/screenshot.webp" alt="TubeShelf feed" width="100%">
 
 ## Features
 
-- **Chronological feed** - videos sorted by upload time, no algorithm
-- **No Google account, no API key** - channels are read from YouTube's public RSS feeds
-- **Background fetching** - the feed is served from the local database and is always ready
-- **Filters** - hide Shorts, live streams, members-only and watched videos; search; newest or oldest first
-- **Lists** - group channels and filter the feed by list
-- **Built-in player** - resumes where you stopped, marks videos as watched, skips sponsors (SponsorBlock), keyboard shortcuts
-- **Watch later and history**
-- **Import/export** - OPML, Google Takeout `subscriptions.csv`, or a plain list of channels
-- **Private by default** - thumbnails and avatars are cached and served by TubeShelf, so your browser only contacts YouTube when you press play
-- **Multi-user** - local accounts, OIDC single sign-on, per-user API keys
-- **Small** - one static Go binary, about 6 MB to pull, a few MB of RAM
+- **Chronological feed** from YouTube's public RSS feeds: no Google account, no API key
+- **Filters** for Shorts, live streams, members-only and watched videos; search; lists of channels
+- **Built-in player** that resumes, marks videos watched and skips sponsors (SponsorBlock)
+- **Watch later, history, import/export** (OPML, Google Takeout, plain lists)
+- **Private**: thumbnails and avatars are served by TubeShelf; your browser only contacts YouTube when you press play
+- **Multi-user** with local accounts, OIDC sign-in and API keys
+- **Small**: one static Go binary, about 6 MB to pull
 
-## Quick Start
-
-### Docker Compose (Recommended)
+## Quick start
 
 ```yaml
 services:
@@ -47,44 +43,28 @@ services:
 ```
 
 ```bash
-mkdir -p data
+mkdir -p data && chown 1000:1000 data && docker compose up -d
 ```
 
-```bash
-chown 1000:1000 data
-```
-
-```bash
-docker compose up -d
-```
-
-Open **http://localhost:3000** and create the admin account.
-
-### Configuration
-
-Everything is optional.
+Open **http://localhost:3000** and create the admin account. Refresh interval, retention, registration, sign-in providers and branding are set in the app under **Administration**.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `3000` | Listen port |
-| `TUBESHELF_DATA` | `/app/data` | Database, cached thumbnails, generated secret |
-| `TUBESHELF_URL` | from the request | Public URL; set it when OIDC runs behind a proxy that rewrites `Host` |
-| `TUBESHELF_SECRET` | kept in `data/.secret` | Encrypts OIDC client secrets. Set it before the first start or not at all: changing it later makes stored client secrets unreadable |
-| `TRUST_PROXY_HEADERS` | unset | Set to `1` to rate-limit logins by `X-Forwarded-For` |
+| `TUBESHELF_DATA` | `/app/data` | Database, cached images, generated secret |
+| `TUBESHELF_URL` | from the request | Public URL, for OIDC behind a proxy that rewrites `Host` |
+| `TUBESHELF_SECRET` | kept in `data/.secret` | Encrypts OIDC client secrets; set it before the first start or never |
+| `TRUST_PROXY_HEADERS` | unset | `1` rate-limits logins by `X-Forwarded-For` |
 
-Refresh interval, video retention, registration and login providers are set in the app under **Admin**.
+## Upgrading from 1.x
 
-### Upgrading from 1.x
+Keep the `./data` volume. The first 2.x start copies users, subscriptions, lists, history, watch later, settings, API keys and sign-in providers from `data/tubeshelf.db` into `data/shelf.db`; the 1.x file stays untouched, so you can go back.
 
-Keep the same `./data` volume. On its first start, 2.x imports users, subscriptions, lists, watch history, watch later, settings, API keys and login providers from the 1.x database (`data/tubeshelf.db`) into a new file (`data/shelf.db`). The 1.x file is not modified, so going back to a 1.x image is possible.
+- Passwords, API keys and the OIDC redirect URI (`/api/auth/oidc/callback`) keep working.
+- Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set for that first start so OIDC client secrets can be decrypted; 2.x stops and says so if they can't. `TUBESHELF_IMPORT_SKIP_OIDC=1` imports without them. Afterwards the key lives in `data/.secret`: back it up with the database.
+- Removed: video comments, SubRelay sync, the welcome wizard, the scraping fetcher.
 
-- Passwords and API keys keep working.
-- OIDC client secrets are carried over. Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set to the value 1.x used. If a secret cannot be decrypted, 2.x stops before importing anything and says so, so you can fix the variable and start again. Set `TUBESHELF_IMPORT_SKIP_OIDC=1` to import anyway and re-enter the client secret under Admin.
-- After that first start `BETTER_AUTH_SECRET` is no longer needed: the key is kept in `data/.secret`, so back that file up with the database.
-- The OIDC redirect URI is unchanged (`/api/auth/oidc/callback`).
-- Removed in 2.x: video comments, SubRelay sync, the welcome wizard, the "standard" scraping fetcher.
-
-## CLI
+## CLI and API
 
 ```bash
 docker exec -it tubeshelf /tubeshelf reset-password <email>
@@ -94,9 +74,7 @@ docker exec -it tubeshelf /tubeshelf reset-password <email>
 docker exec tubeshelf /tubeshelf make-admin <email>
 ```
 
-## API
-
-Create a key under **Settings > API keys** and send it as `X-API-Key`.
+Create a key under **Account › API keys** and send it as `X-API-Key`:
 
 | Request | Purpose |
 |---|---|
@@ -108,31 +86,17 @@ Create a key under **Settings > API keys** and send it as `X-API-Key`.
 ## Development
 
 ```bash
-go test ./...
-```
-
-```bash
-go run .
+go test ./... && go run .
 ```
 
 ## Why TubeShelf?
 
-Some Invidious instances do work, though with varying issues. However, they aim to replicate the entire YouTube interface. **TubeShelf** takes a different path: instead of building an alternative YouTube frontend, it focuses on a single, well-defined goal:  
-A distraction-free subscription feed without a Google account.
+Invidious and similar projects rebuild all of YouTube. TubeShelf does one thing: a distraction-free subscription feed for your home network, played in a privacy-friendly embed or on YouTube.
 
-It fetches videos from your subscriptions and displays them chronologically, and plays them in a privacy-friendly embed or on YouTube, as you prefer.
+## AI assistance disclaimer
 
-## AI Assistance Disclaimer
 This project was developed with assistance from AI/LLMs (including GitHub Copilot, ChatGPT, and related tools), supervised by humans who occasionally knew what they were doing.
-
----
-
-<sub>TubeShelf is designed primarily for local/home network use.</sub>
-
-## Credits
-
-The default background is [Gray forest with fog](https://unsplash.com/photos/gray-forest-with-fog-kbKEuU-YEIw) by Inggrid Koe on Unsplash, used under the [Unsplash License](https://unsplash.com/license) and turned black and white.
 
 ## License
 
-This project is licensed under [AGPL-3.0 License](LICENSE).
+[AGPL-3.0](LICENSE)

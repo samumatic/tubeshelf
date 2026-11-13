@@ -40,7 +40,7 @@
     </nav>
     <div class="sidebar-foot">
       <div class="foot-slot">
-        <p class="version">TubeShelf {{.Version}}</p>
+        <p class="version" title="TubeShelf {{.Version}}">TubeShelf {{.Release}}</p>
         <button type="button" class="rail-avatar" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" data-tip="{{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
       </div>
       <div class="account">
@@ -170,7 +170,7 @@
   </div>
 </article>{{end}}
 
-{{define "logo"}}<span class="logo{{if .Brand.Logo}} custom{{end}}">{{if .Brand.Logo}}<img src="{{.Brand.Logo}}" alt="">{{else}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3zm0 12h18v2H3zM5 8h3v8H5zm5 0h3v8h-3zm5.2.6 2.9-.8 2 7.7-2.9.8z"/></svg>{{end}}</span>{{end}}
+{{define "logo"}}<span class="logo{{if .Brand.Logo}} custom{{end}}">{{if .Brand.Logo}}<img src="{{.Brand.Logo}}" alt="">{{else}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h18v2H3zM4 9h3v7H4zm4.5-3.5h3V16h-3zM13.5 7.5l7 4.25-7 4.25z"/></svg>{{end}}</span>{{end}}
 {{define "auth-shell"}}
 <section class="auth">
   {{template "logo" .}}

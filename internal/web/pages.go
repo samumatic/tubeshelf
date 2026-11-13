@@ -207,7 +207,11 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.ParseInt(ts, 10, 64)
 		prev = dayLabel(n, time.Now())
 	}
-	data := M{"Videos": vids, "Groups": groupByDay(vids, time.Now(), prev), "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
+	groups := []DayGroup{{Videos: vids}} // one continuous grid
+	if set["group_days"] == "1" {
+		groups = groupByDay(vids, time.Now(), prev)
+	}
+	data := M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"]}
 	if q["channel"] != "" {
 		var title string

@@ -358,6 +358,18 @@ func (a *app) upload(path string, fields map[string]string, files map[string][]b
 	return res.StatusCode, string(b)
 }
 
+func TestGroupDays(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	if _, body := a.get("/"); !strings.Contains(body, `<h2 class="day">`) {
+		t.Fatal("day headings missing by default")
+	}
+	a.post("/account/preferences", url.Values{"group_days": {"0"}})
+	if _, body := a.get("/"); strings.Contains(body, `<h2 class="day">`) || !strings.Contains(body, `class="videos"`) {
+		t.Fatal("feed still grouped by day")
+	}
+}
+
 func TestSidebarWidth(t *testing.T) {
 	a := newApp(t)
 	a.signUp()

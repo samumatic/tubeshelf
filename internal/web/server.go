@@ -193,6 +193,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["Page"] = page
 	data["AssetV"] = s.assetVer
 	data["Version"] = s.Version
+	data["Release"], _, _ = strings.Cut(s.Version, "+") // without the build hash, for the sidebar
 	data["Msg"] = r.URL.Query().Get("msg")
 	data["Err"] = r.URL.Query().Get("err")
 	if _, ok := data["Set"]; !ok {

@@ -191,7 +191,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--fg-subtle); }
 .sidebar-foot { padding-top: var(--s2); box-shadow: inset 0 1px 0 var(--border); }
 /* One slot holds the version (expanded) or the avatar (rail), as in Pocket ID's footer. */
-.foot-slot { display: grid; height: 24px; transition: height var(--dur-slow) var(--ease-out); }
+.foot-slot { display: grid; grid-template-rows: minmax(0, 1fr); height: 24px; transition: height var(--dur-slow) var(--ease-out); }
 .foot-slot > * { grid-area: 1 / 1; }
 .version { align-self: end; padding: 0 var(--s4) var(--s1); font-size: 13px; line-height: 20px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   transition: color var(--dur-base) var(--ease-out) var(--dur-fast); }
