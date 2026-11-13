@@ -21,6 +21,8 @@ let segments = [];
 let savedAt = now.t;
 let captions = false;
 let started = false;
+// Set when the browser refused to start with sound and the video started muted instead; the stored choice stays.
+let forcedMute = false;
 
 // Volume and mute are remembered in this browser. A muted start also starts the embed muted.
 const sound = (() => {
@@ -107,12 +109,14 @@ function drawState() {
 }
 
 function drawSound() {
-  box.classList.toggle('muted', sound.muted || sound.volume === 0);
-  volumeInput.value = sound.muted ? 0 : sound.volume;
+  const off = sound.muted || forcedMute;
+  box.classList.toggle('muted', off || sound.volume === 0);
+  box.classList.toggle('asks-sound', forcedMute);
+  volumeInput.value = off ? 0 : sound.volume;
   volumeInput.style.setProperty('--fill', `${volumeInput.value}%`);
   const mute = box.querySelector('[data-act="mute"]');
-  mute.setAttribute('aria-label', sound.muted ? 'Unmute (m)' : 'Mute (m)');
-  mute.dataset.tip = sound.muted ? 'Unmute' : 'Mute';
+  mute.setAttribute('aria-label', off ? 'Unmute (m)' : 'Mute (m)');
+  mute.dataset.tip = off ? 'Unmute' : 'Mute';
 }
 drawSound();
 
@@ -125,12 +129,25 @@ addEventListener('message', (e) => {
     connected = true;
     command('setVolume', sound.volume);
     command(sound.muted ? 'mute' : 'unMute');
-    // Browsers may refuse to start with sound; then the play button asks for one click.
+    // Browsers may refuse to start with sound. Then start muted, which they allow, and give the sound back
+    // at the first click or key; if even that is refused, the play button asks for one click.
+    const running = () => now.state === PLAYING || now.state === BUFFERING;
     setTimeout(() => {
-      if (now.state !== PLAYING && now.state !== BUFFERING) {
+      if (running()) return;
+      if (!sound.muted) {
+        forcedMute = true;
+        command('mute');
+        command('playVideo');
+        drawSound();
+      }
+      setTimeout(() => {
+        if (running()) {
+          if (forcedMute) say('Muted by the browser · click or press any key for sound');
+          return;
+        }
         box.classList.add('blocked');
         say('Press play or k to start');
-      }
+      }, forcedMute ? 1500 : 0);
     }, 1500);
   }
   const info = msg.info;
@@ -184,6 +201,7 @@ function seek(to) {
 }
 const toggle = () => command(now.state === PLAYING || now.state === BUFFERING ? 'pauseVideo' : 'playVideo');
 function setVolume(v) {
+  forcedMute = false;
   sound.volume = Math.max(0, Math.min(100, Math.round(v)));
   sound.muted = sound.volume === 0;
   command('setVolume', sound.volume);
@@ -191,7 +209,20 @@ function setVolume(v) {
   keepSound();
   drawSound();
 }
+// The first click or key after a forced mute brings the sound back (the mute button and m do it themselves).
+function liftMute() {
+  if (!forcedMute) return;
+  forcedMute = false;
+  command('setVolume', sound.volume);
+  command('unMute');
+  drawSound();
+  say('Sound on');
+}
+addEventListener('pointerdown', (e) => { if (!e.target.closest?.('[data-act="mute"], .volume')) liftMute(); }, true);
+addEventListener('keydown', (e) => { if (e.key !== 'm' && !e.metaKey && !e.ctrlKey && !e.altKey) liftMute(); }, true);
+
 function mute() {
+  if (forcedMute) return liftMute();
   sound.muted = !sound.muted;
   if (!sound.muted && sound.volume === 0) sound.volume = 50;
   command(sound.muted ? 'mute' : 'unMute');
