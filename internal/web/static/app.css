@@ -40,7 +40,7 @@
   --elevation-popover: 0 1px 2px rgb(31 29 27 / 0.06), 0 8px 24px -6px rgb(31 29 27 / 0.14);
   --elevation-overlay: 0 2px 4px rgb(31 29 27 / 0.06), 0 16px 40px -8px rgb(31 29 27 / 0.2);
   --glass-shadow: 0 0 0 1px rgb(255 255 255 / 0.5), 0 16px 40px -16px rgb(0 0 0 / 0.2);
-  --glass-hover: rgb(0 0 0 / 0.05); --glass-selected: rgb(0 0 0 / 0.08); --glass-border: rgb(0 0 0 / 0.08); --backdrop-filter: blur(48px) saturate(1.4); --card-shadow: 0 0 0 1px rgb(0 0 0 / 0.06), 0 24px 48px -12px rgb(0 0 0 / 0.25);
+  --glass-hover: rgb(0 0 0 / 0.05); --glass-selected: rgb(0 0 0 / 0.08); --glass-border: rgb(0 0 0 / 0.08); --backdrop-filter: none; --card-shadow: 0 0 0 1px rgb(0 0 0 / 0.06), 0 24px 48px -12px rgb(0 0 0 / 0.25);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -53,7 +53,7 @@
   --danger-solid: #f45a56; --danger-fg: #ff8f8d; --danger-soft: #3b1e1e; --danger-border: #813939;
   --scrim: rgb(0 0 0 / 0.6); --ring: #ededed; --ring-halo: rgb(237 237 237 / 0.24);
   --elevation-popover: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -6px rgb(0 0 0 / 0.6);
-  --elevation-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.7); --glass-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 40px -16px #000; --glass-hover: rgb(255 255 255 / 0.07); --glass-selected: rgb(255 255 255 / 0.11); --glass-border: rgb(255 255 255 / 0.08); --backdrop-filter: blur(48px) saturate(1.4) brightness(0.55); --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 48px -12px #000;
+  --elevation-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.7); --glass-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 40px -16px #000; --glass-hover: rgb(255 255 255 / 0.07); --glass-selected: rgb(255 255 255 / 0.11); --glass-border: rgb(255 255 255 / 0.08); --backdrop-filter: brightness(0.55); --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 48px -12px #000;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
@@ -67,7 +67,7 @@
     --danger-solid: #f45a56; --danger-fg: #ff8f8d; --danger-soft: #3b1e1e; --danger-border: #813939;
     --scrim: rgb(0 0 0 / 0.6); --ring: #ededed; --ring-halo: rgb(237 237 237 / 0.24);
     --elevation-popover: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -6px rgb(0 0 0 / 0.6);
-    --elevation-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.7); --glass-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 40px -16px #000; --glass-hover: rgb(255 255 255 / 0.07); --glass-selected: rgb(255 255 255 / 0.11); --glass-border: rgb(255 255 255 / 0.08); --backdrop-filter: blur(48px) saturate(1.4) brightness(0.55); --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 48px -12px #000;
+    --elevation-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.7); --glass-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 40px -16px #000; --glass-hover: rgb(255 255 255 / 0.07); --glass-selected: rgb(255 255 255 / 0.11); --glass-border: rgb(255 255 255 / 0.08); --backdrop-filter: brightness(0.55); --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 48px -12px #000;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -81,9 +81,13 @@
 @view-transition { navigation: auto; }
 :root { view-transition-name: none; }
 main { view-transition-name: content; }
-::view-transition-old(content) { animation: var(--dur-fast) var(--ease-out) both vt-out; }
-::view-transition-new(content) { animation: 180ms var(--ease-out) both vt-in; }
-::view-transition-group(nav-fill), ::view-transition-group(tab-fill) { animation-duration: var(--dur-slow); animation-timing-function: var(--ease-out); }
+/* As in Pocket ID: the old page gets its own name (app.js, pageswap), so it fades out where it was while the new
+   one fades in; neither box morphs into the other. The shell stays live between the two. */
+::view-transition-group(content), ::view-transition-group(content-old) { animation: none; }
+::view-transition-old(content-old) { animation: var(--dur-fast) ease-out both vt-out; }
+::view-transition-new(content) { animation: 180ms ease-out both vt-in; }
+::view-transition-group(phone-bar), ::view-transition-group(phone-nav), ::view-transition-group(phone-search) { z-index: 1; animation: none; }
+::view-transition-group(nav-fill), ::view-transition-group(tab-fill) { animation-duration: var(--dur-base); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes vt-out { to { opacity: 0; } }
 @keyframes vt-in { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; translate: 0 var(--rise); } }
@@ -144,13 +148,17 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .skip:focus { top: 12px; }
 .shell { position: relative; isolation: isolate; display: flex; gap: var(--s2); min-height: 100dvh; padding: var(--s2); }
 /* A photo behind the shell, as in Pocket ID's backdrop layout: the newest video's thumbnail, blurred, shows around the cards and through the glass sidebar. */
-.backdrop { position: fixed; inset: -64px; z-index: -1; width: calc(100% + 128px); height: calc(100% + 128px); object-fit: cover; filter: var(--backdrop-filter); pointer-events: none; }
+.backdrop { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; filter: var(--backdrop-filter); pointer-events: none; }
 .shell:has(> .backdrop) .sidebar { --fg-muted: color-mix(in oklab, var(--fg) 75%, var(--sidebar)); --fill-hover: var(--glass-hover); --fill-muted: var(--glass-hover); --fill-selected: var(--glass-selected); --border: var(--glass-border); }
 .sidebar { position: sticky; top: var(--s2); z-index: 20; flex: none; display: flex; flex-direction: column; width: var(--sidebar-w); height: calc(100dvh - 2 * var(--s2)); padding: var(--s4) var(--s3) var(--s3); overflow: hidden;
   border-radius: var(--radius-3xl); background: color-mix(in oklab, var(--sidebar) 60%, transparent); backdrop-filter: blur(34px) saturate(1.5); box-shadow: var(--glass-shadow); transition: width var(--dur-slow) var(--ease-out); }
 @media (prefers-reduced-transparency: reduce) { .sidebar, dialog.palette { background: var(--surface-raised) !important; backdrop-filter: none !important; } }
-.brand-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); height: 42px; padding-left: var(--s2); }
+/* The collapse follows Pocket ID's classic-sidebar: rows keep their place and only fade, headings shrink to a short line,
+   the search button glides under the logo. Labels fade out at once and back in after the width has started to grow. */
+.brand-row { position: relative; display: flex; align-items: center; height: 42px; padding-left: var(--s2); transition: height var(--dur-slow) var(--ease-out), padding var(--dur-slow) var(--ease-out); }
+.brand-row > .icon-button { position: absolute; top: 3px; right: 0; transition: top var(--dur-slow) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), scale var(--dur-fast) var(--ease-out); }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; border-radius: var(--radius-sm); }
+.sidebar .brand { white-space: nowrap; transition: color var(--dur-base) var(--ease-out) var(--dur-fast); }
 .brand .logo, .auth .logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--primary); color: var(--primary-fg); }
 .brand .logo svg { width: 15px; height: 15px; fill: currentColor; }
 .logo.custom { overflow: hidden; background: none; }
@@ -161,11 +169,20 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .search input::-webkit-search-cancel-button { display: none; }
 .page-head .search { flex: 0 1 340px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; flex: 1; margin-top: var(--s1); padding: 0 0 var(--s4); }
-.nav-heading { margin: 20px 0 0; padding: 0 var(--s4) var(--s2); font-size: 13px; line-height: 18px; font-weight: 600; color: var(--fg-muted); }
-.nav-heading:first-child { margin-top: var(--s3); }
-.nav-item { position: relative; isolation: isolate; display: flex; align-items: center; gap: 12px; flex: none; width: 100%; height: 36px; padding: 0 var(--s3) 0 9.5px; border: 0; background: none;
+.nav-heading { position: relative; flex: none; display: flex; align-items: flex-end; height: 46px; margin: 0; padding: 0 var(--s4) var(--s2); overflow: hidden; white-space: nowrap;
+  font-size: 13px; line-height: 18px; font-weight: 600; color: var(--fg-muted); transition: height var(--dur-slow) var(--ease-out), color var(--dur-base) var(--ease-out) var(--dur-fast); }
+.nav-heading:first-child { height: 38px; }
+.nav-heading::after { content: ""; position: absolute; left: calc(50% - 12px); bottom: 12px; width: 24px; height: 1px; background: var(--border); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.nav-item { position: relative; isolation: isolate; display: flex; align-items: center; gap: 12px; flex: none; width: 100%; height: 36px; padding: 0 var(--s3) 0 var(--s4); border: 0; background: none;
+  transition: color var(--dur-base) var(--ease-out) var(--dur-fast), padding var(--dur-slow) var(--ease-out);
   border-radius: var(--radius-sm); font-size: 15px; line-height: 22px; font-weight: 500; color: var(--fg); text-align: left; white-space: nowrap; overflow: hidden; }
-.nav-item svg { width: 18px; height: 18px; color: var(--fg-muted); transition: color var(--dur-fast) var(--ease-out); }
+.nav-item svg { width: 17px; height: 17px; flex: none; color: var(--fg-muted); transition: color var(--dur-fast) var(--ease-out); }
+/* Pocket ID's line icons: 17px with a 1.5 stroke. */
+:is(.sidebar, .popmenu, .phone-nav, .palette, .hub) svg { stroke-width: 1.5; }
+/* The collapse button's chevron points the way the sidebar will move. */
+.collapse-toggle .icon-button svg { width: 17px; height: 17px; }
+.chevron { transform-box: fill-box; transform-origin: center; }
+:root.rail .chevron { scale: -1 1; }
 .nav-item::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--fill-hover); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
 .nav-item:hover::before { opacity: 1; }
 .nav-item:hover svg, .nav-item[aria-current] svg { color: var(--fg); }
@@ -173,16 +190,25 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .dot { width: 18px; flex: none; display: grid; place-items: center; }
 .dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--fg-subtle); }
 .sidebar-foot { padding-top: var(--s2); box-shadow: inset 0 1px 0 var(--border); }
-.version { padding: 0 var(--s3) var(--s1); font-size: 13px; line-height: 18px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account { display: flex; align-items: center; gap: var(--s1); padding-top: var(--s1); }
-.account-button { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--fg);
-  font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer; anchor-name: --account; transition: background-color var(--dur-fast) var(--ease-out), scale var(--dur-fast) var(--ease-out); }
+/* One slot holds the version (expanded) or the avatar (rail), as in Pocket ID's footer. */
+.foot-slot { display: grid; height: 24px; transition: height var(--dur-slow) var(--ease-out); }
+.foot-slot > * { grid-area: 1 / 1; }
+.version { align-self: end; padding: 0 var(--s4) var(--s1); font-size: 13px; line-height: 20px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color var(--dur-base) var(--ease-out) var(--dur-fast); }
+.rail-avatar { align-self: start; display: grid; place-items: center; width: 36px; height: 36px; margin-top: var(--s1); padding: 0; border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  anchor-name: --account-rail; opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast), background-color var(--dur-fast) var(--ease-out); }
+.rail-avatar:hover { background: var(--fill-hover); }
+.rail-avatar[aria-expanded="true"] { background: var(--fill-selected); }
+.rail-avatar .avatar { width: 20px; height: 20px; font-size: 9px; }
+.account { display: flex; align-items: center; padding-top: var(--s1); }
+.account-button { flex: 1; min-width: 0; margin-right: var(--s1); overflow: hidden; white-space: nowrap; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--fg);
+  font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer; anchor-name: --account; transition: background-color var(--dur-fast) var(--ease-out), scale var(--dur-fast) var(--ease-out), opacity var(--dur-base) var(--ease-out) var(--dur-fast), visibility 0s; }
 .account-button:hover { background: var(--fill-hover); }
 .account-button:active { scale: var(--press-scale); }
 .account-button[aria-expanded="true"] { background: var(--fill-selected); }
 .account-button .avatar { width: 20px; height: 20px; font-size: 9px; }
 .account .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:is(.account-button, .menu-head, .phone-bar) .avatar { background: var(--primary); color: var(--primary-fg); }
+:is(.account-button, .rail-avatar, .menu-head, .phone-bar) .avatar { background: var(--primary); color: var(--primary-fg); }
 
 /* ---------- Popover menus (account, appearance) ---------- */
 .popmenu { position: fixed; inset: auto; margin: 0; width: 240px; padding: 4px; overflow: visible; border: 1px solid color-mix(in oklab, var(--fg) 10%, transparent); border-radius: var(--radius-md);
@@ -426,7 +452,7 @@ label.check { display: flex; align-items: center; gap: 10px; min-height: 28px; f
 .mini { display: flex; gap: 4px; height: 64px; padding: 4px; border-radius: calc(var(--radius-md) - 4px); background: var(--canvas); }
 .mini::before { content: ""; width: 28%; border-radius: 6px; background: var(--sidebar); box-shadow: inset 0 0 0 1px var(--border); }
 .mini::after { content: ""; flex: 1; border-radius: 6px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
-.mini-backdrop { background: url("/static/backdrop.svg") center / cover; }
+.mini-backdrop { background: url("/static/backdrop.webp") center / cover; }
 .mini-backdrop::before { background: color-mix(in oklab, var(--sidebar) 60%, transparent); backdrop-filter: blur(6px); }
 .mini-radius { display: block; position: relative; background: var(--surface-sunken); }
 .mini-radius::before { position: absolute; left: 22%; top: 26%; width: 78%; height: 74%; border: 2px solid var(--fg-muted); border-right: 0; border-bottom: 0; background: none; box-shadow: none; }
@@ -495,36 +521,40 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
 @media (max-width: 1100px) { .watch { grid-template-columns: minmax(0, 1fr); } }
 /* 640 to 1023px: the sidebar folds to a rail of icons. */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .sidebar { width: var(--rail-w); padding-inline: var(--s2); }
-  .brand-row { flex-direction: column; justify-content: flex-start; gap: var(--s2); height: auto; padding: 0; }
-  .sidebar .brand { gap: 0; font-size: 0; }
-  .nav-heading { height: 1px; margin: 10px 6px; padding: 0; overflow: hidden; background: var(--border); font-size: 0; line-height: 0; }
-  .nav-heading:first-child { display: none; }
-  .sidebar nav { padding-inline: 0; }
-  .nav-item { height: 44px; padding: 0 13px; }
-  .sidebar .icon-button, .account-button { width: 44px; height: 44px; }
-  .account-button { flex: none; justify-content: center; padding: 0; }
-  .account-button .avatar { width: 24px; height: 24px; font-size: 10px; }
-  .version, .account .who { display: none; }
-  .account { flex-direction: column; }
-  .account-menu { position-area: right span-top; margin: 0 0 0 8px; transform-origin: bottom left; }
-  .collapse-toggle { display: none; }
+  .sidebar { width: var(--rail-w); }
+  .brand-row { height: 90px; padding-left: 5px; }
+  .brand-row > .icon-button { top: 54px; }
+  .sidebar .brand, .version { color: transparent; transition: color var(--dur-fast) var(--ease-out); }
+  .nav-heading { height: 25px; color: transparent; transition: height var(--dur-slow) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+  .nav-heading:first-child { height: 0; }
+  .nav-heading::after { opacity: 1; transition: opacity var(--dur-base) var(--ease-out) var(--dur-fast); }
+  .nav-item { padding-left: 9.5px; color: transparent; transition: color var(--dur-fast) var(--ease-out), padding var(--dur-slow) var(--ease-out); }
+  .foot-slot { height: 42px; }
+  .rail-avatar { opacity: 1; visibility: visible; transition: opacity var(--dur-base) var(--ease-out) var(--dur-fast), visibility 0s linear var(--dur-fast), background-color var(--dur-fast) var(--ease-out); }
+  .account-button { margin-right: 0; padding-inline: 0; opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast); }
+  .account-menu { position-anchor: --account-rail; position-area: right span-top; margin: 0 0 0 8px; transform-origin: bottom left; }
+  /* Touch-sized rail on tablets: 44px targets. */
+  .sidebar { padding-inline: var(--s2); }
+  .nav-item { height: 44px; padding-left: 13.5px; }
+  .brand-row { height: 100px; padding-left: 9px; }
+  .brand-row > .icon-button, .rail-avatar { width: 44px; height: 44px; }
+  .foot-slot { height: 50px; }
+  .account { display: none; }
 }
-/* From 1024px the user can fold the sidebar to the same rail; the choice is saved with their settings. */
+/* From 1024px the user folds the sidebar to the same rail; the choice is saved with their settings. */
 @media (min-width: 1024px) {
-  :root.rail .sidebar { width: var(--rail-w); padding-inline: var(--s2); }
-  :root.rail .brand-row { flex-direction: column; justify-content: flex-start; gap: var(--s2); height: auto; padding: 0; }
-  :root.rail .sidebar .brand { gap: 0; font-size: 0; }
-  :root.rail .nav-heading { height: 1px; margin: 10px 6px; padding: 0; overflow: hidden; background: var(--border); font-size: 0; line-height: 0; }
-  :root.rail .nav-heading:first-child { display: none; }
-  :root.rail .sidebar nav { padding-inline: 0; }
-  :root.rail .nav-item { height: 44px; padding: 0 13px; }
-  :root.rail .sidebar .icon-button, :root.rail .account-button { width: 44px; height: 44px; }
-  :root.rail .account-button { flex: none; justify-content: center; padding: 0; }
-  :root.rail .account-button .avatar { width: 24px; height: 24px; font-size: 10px; }
-  :root.rail .version, :root.rail .account .who { display: none; }
-  :root.rail .account { flex-direction: column; }
-  :root.rail .account-menu { position-area: right span-top; margin: 0 0 0 8px; transform-origin: bottom left; }
+  :root.rail .sidebar { width: var(--rail-w); }
+  :root.rail .brand-row { height: 90px; padding-left: 5px; }
+  :root.rail .brand-row > .icon-button { top: 54px; }
+  :root.rail .sidebar .brand, :root.rail .version { color: transparent; transition: color var(--dur-fast) var(--ease-out); }
+  :root.rail .nav-heading { height: 25px; color: transparent; transition: height var(--dur-slow) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+  :root.rail .nav-heading:first-child { height: 0; }
+  :root.rail .nav-heading::after { opacity: 1; transition: opacity var(--dur-base) var(--ease-out) var(--dur-fast); }
+  :root.rail .nav-item { padding-left: 9.5px; color: transparent; transition: color var(--dur-fast) var(--ease-out), padding var(--dur-slow) var(--ease-out); }
+  :root.rail .foot-slot { height: 42px; }
+  :root.rail .rail-avatar { opacity: 1; visibility: visible; transition: opacity var(--dur-base) var(--ease-out) var(--dur-fast), visibility 0s linear var(--dur-fast), background-color var(--dur-fast) var(--ease-out); }
+  :root.rail .account-button { margin-right: 0; padding-inline: 0; opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast); }
+  :root.rail .account-menu { position-anchor: --account-rail; position-area: right span-top; margin: 0 0 0 8px; transform-origin: bottom left; }
 }
 /* Under 640px: a top bar, and the navigation floats above the page as a pill next to the search button. */
 @media (max-width: 639px) {

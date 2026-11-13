@@ -276,6 +276,14 @@ if (appearanceForm) {
   });
 }
 
+// Page transitions: the page being left names its content "content-old", so it fades out on its own while
+// the new page's "content" fades in (Pocket ID does the same). A page restored from the back/forward cache
+// drops the name again.
+addEventListener('pageswap', (e) => {
+  if (e.viewTransition) document.querySelector('main')?.style.setProperty('view-transition-name', 'content-old');
+});
+addEventListener('pagereveal', () => document.querySelector('main')?.style.removeProperty('view-transition-name'));
+
 // A long sidebar scrolls; keep the current page in view.
 const navCurrent = document.querySelector('.sidebar nav [aria-current]');
 if (navCurrent) {

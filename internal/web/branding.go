@@ -50,7 +50,7 @@ var primaryChoices = []struct{ Value, Label, Class string }{
 func (s *Server) brand() Brand {
 	get := func(k string) string { return db.Setting(s.DB, k) }
 	b := Brand{Name: get("app_name"), Layout: get("layout"), Primary: get("primary"), Radius: get("radius"),
-		Background: "/static/backdrop.svg?v=" + s.assetVer}
+		Background: "/static/backdrop.webp?v=" + s.assetVer}
 	if v := get("background_v"); v != "" {
 		b.Background = "/branding/background?v=" + v
 		b.CustomBackground = true

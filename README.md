@@ -129,6 +129,10 @@ This project was developed with assistance from AI/LLMs (including GitHub Copilo
 
 <sub>TubeShelf is designed primarily for local/home network use.</sub>
 
+## Credits
+
+The default background is [Gray forest with fog](https://unsplash.com/photos/gray-forest-with-fog-kbKEuU-YEIw) by Inggrid Koe on Unsplash, used under the [Unsplash License](https://unsplash.com/license) and turned black and white.
+
 ## License
 
 This project is licensed under [AGPL-3.0 License](LICENSE).
