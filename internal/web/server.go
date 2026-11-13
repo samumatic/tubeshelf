@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -76,6 +77,10 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.HandleFunc("POST /register", s.registerSubmit)
 	mux.HandleFunc("GET /api/auth/oidc/start", s.oidcStart)
 	mux.HandleFunc("GET /branding/theme.css", s.themeStylesheet)
+	mux.HandleFunc("GET /speculation-rules.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/speculationrules+json")
+		io.WriteString(w, speculationRules)
+	})
 	mux.HandleFunc("GET /branding/{kind}", s.brandImage)
 	mux.HandleFunc("GET "+auth.CallbackPath, s.oidcCallback)
 
@@ -180,6 +185,14 @@ type M = map[string]any
 
 // render executes a page inside the layout. Fragment requests (infinite
 // scroll) get only the "items" block.
+// speculationRules let Chromium prerender a page while the pointer rests on its link (about 200ms), so a
+// click shows the finished page, thumbnails included, and the page fade runs on it as in Pocket ID.
+// Only pages without side effects: the player is left out, it would contact YouTube before play.
+const speculationRules = `{"prerender": [{"eagerness": "moderate", "where": {"href_matches": [
+  "/", "/later", "/history", "/library", "/channels", "/channels/import", "/lists",
+  "/account", "/account/preferences", "/account/keys", "/account/profile", "/account/password", "/account/danger",
+  "/admin", "/admin/users", "/admin/sign-in", "/admin/instance", "/admin/appearance"]}}]}`
+
 func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, data M) {
 	if data == nil {
 		data = M{}
@@ -209,6 +222,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	if u != nil && block == "layout" {
+		w.Header().Set("Speculation-Rules", `"/speculation-rules.json"`)
+	}
 	if err := s.pages[page].ExecuteTemplate(w, block, data); err != nil {
 		slog.Error("render", "page", page, "err", err)
 	}

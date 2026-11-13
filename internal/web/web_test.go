@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"image"
 	"image/png"
 	"io"
@@ -356,6 +357,40 @@ func (a *app) upload(path string, fields map[string]string, files map[string][]b
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)
 	return res.StatusCode, string(b)
+}
+
+func TestSpeculationRules(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	res, err := a.c.Get(a.url + "/later")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if got := res.Header.Get("Speculation-Rules"); got != `"/speculation-rules.json"` {
+		t.Fatalf("Speculation-Rules header = %q", got)
+	}
+	res, err = a.c.Get(a.url + "/speculation-rules.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rules struct {
+		Prerender []struct {
+			Where struct {
+				HrefMatches []string `json:"href_matches"`
+			}
+		}
+	}
+	err = json.NewDecoder(res.Body).Decode(&rules)
+	res.Body.Close()
+	if err != nil || res.Header.Get("Content-Type") != "application/speculationrules+json" || len(rules.Prerender) != 1 {
+		t.Fatalf("rules: %v, %q", err, res.Header.Get("Content-Type"))
+	}
+	for _, p := range rules.Prerender[0].Where.HrefMatches {
+		if strings.HasPrefix(p, "/watch") || strings.Contains(p, "*") {
+			t.Errorf("rule %q could prerender the player or a download", p)
+		}
+	}
 }
 
 func TestGroupDays(t *testing.T) {
