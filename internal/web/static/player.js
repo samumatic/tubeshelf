@@ -106,6 +106,7 @@ function drawState() {
   play.setAttribute('aria-label', playing ? 'Pause (k)' : 'Play (k)');
   play.dataset.tip = playing ? 'Pause' : 'Play';
   if (playing) box.classList.remove('blocked');
+  wake();
 }
 
 function drawSound() {
@@ -121,34 +122,32 @@ function drawSound() {
 drawSound();
 
 // ---------- Messages from the embed ----------
+const running = () => now.state === PLAYING || now.state === BUFFERING;
+function askToPlay() {
+  box.classList.add('blocked');
+  say('Press play or k to start');
+}
 addEventListener('message', (e) => {
   if (e.origin !== ORIGIN || e.source !== frame.contentWindow) return;
   let msg;
   try { msg = JSON.parse(e.data); } catch { return; }
   if (!connected) {
     connected = true;
+    command('addEventListener', 'onAutoplayBlocked');
     command('setVolume', sound.volume);
     command(sound.muted ? 'mute' : 'unMute');
-    // Browsers may refuse to start with sound. Then start muted, which they allow, and give the sound back
-    // at the first click or key; if even that is refused, the play button asks for one click.
-    const running = () => now.state === PLAYING || now.state === BUFFERING;
-    setTimeout(() => {
-      if (running()) return;
-      if (!sound.muted) {
-        forcedMute = true;
-        command('mute');
-        command('playVideo');
-        drawSound();
-      }
-      setTimeout(() => {
-        if (running()) {
-          if (forcedMute) say('Muted by the browser · click or press any key for sound');
-          return;
-        }
-        box.classList.add('blocked');
-        say('Press play or k to start');
-      }, forcedMute ? 1500 : 0);
-    }, 1500);
+    // Should the embed neither start nor report a block (see onAutoplayBlocked), the play button asks for a click.
+    setTimeout(() => { if (!running() && !forcedMute) askToPlay(); }, 6000);
+  }
+  // The browser refused to start with sound: start muted, which browsers allow; m or the sound button
+  // gives the sound back. If even that is refused, the play button asks for one click.
+  if (msg.event === 'onAutoplayBlocked' && !forcedMute && !sound.muted) {
+    forcedMute = true;
+    command('mute');
+    command('playVideo');
+    drawSound();
+    say('Your browser started this muted · press m for sound');
+    setTimeout(() => { if (!running()) askToPlay(); }, 1500);
   }
   const info = msg.info;
   if (!info) return;
@@ -209,7 +208,7 @@ function setVolume(v) {
   keepSound();
   drawSound();
 }
-// The first click or key after a forced mute brings the sound back (the mute button and m do it themselves).
+// After a forced mute, m, the sound button or the volume bring the sound back.
 function liftMute() {
   if (!forcedMute) return;
   forcedMute = false;
@@ -218,8 +217,6 @@ function liftMute() {
   drawSound();
   say('Sound on');
 }
-addEventListener('pointerdown', (e) => { if (!e.target.closest?.('[data-act="mute"], .volume')) liftMute(); }, true);
-addEventListener('keydown', (e) => { if (e.key !== 'm' && !e.metaKey && !e.ctrlKey && !e.altKey) liftMute(); }, true);
 
 function mute() {
   if (forcedMute) return liftMute();
@@ -243,6 +240,21 @@ function toggleCaptions() {
   say(captions ? 'Captions on' : 'Captions off');
 }
 const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen()).catch(() => {});
+
+// Fullscreen: the bar lies over the video and fades out while playing and untouched. Pointer moves over the
+// embed never reach this page, so while playing a layer of ours (.screen::after) covers it: it sees moves,
+// and a click on it pauses. Paused, the layer is gone and YouTube's own links work.
+let idleTimer;
+function wake() {
+  box.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (document.fullscreenElement === box && running() && !box.querySelector('.bar:hover, .bar :focus-visible') && !speedMenu.matches(':popover-open')) box.classList.add('idle');
+  }, 2500);
+}
+box.addEventListener('pointermove', wake);
+document.addEventListener('fullscreenchange', wake);
+box.querySelector('.screen').addEventListener('click', (e) => { if (e.target.classList.contains('screen')) toggle(); });
 const showKeys = () => (keysDialog.open ? keysDialog.close() : keysDialog.showModal());
 
 const actions = {
@@ -300,6 +312,7 @@ addEventListener('blur', () => setTimeout(() => {
 }, 0));
 
 document.addEventListener('keydown', (e) => {
+  wake();
   if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input:not([type="range"]), select, textarea, dialog.palette')) return;
   if (e.target === volumeInput && e.key.startsWith('Arrow')) return;
   if (keysDialog.open && e.key !== '?') return;

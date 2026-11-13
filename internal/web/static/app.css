@@ -439,6 +439,12 @@ main:has(> .watch) { padding-top: 16px; }
 .screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .player:fullscreen { width: 100%; border-radius: 0; box-shadow: none; }
 .player:fullscreen .screen { flex: 1; aspect-ratio: auto; }
+/* Fullscreen: the bar lies over the video's foot and fades out while playing untouched (player.js sets .idle).
+   While playing, a layer of ours covers the embed so pointer moves reach the page; paused, YouTube's links work. */
+.player:fullscreen .bar { position: absolute; inset: auto 0 0; padding-top: 32px; background: linear-gradient(transparent, rgb(0 0 0 / 0.75)); transition: opacity var(--dur-base) var(--ease-out); }
+.player:fullscreen.playing .screen::after { content: ""; position: absolute; inset: 0; }
+.player:fullscreen.idle { cursor: none; }
+.player:fullscreen.idle .bar { opacity: 0; }
 
 .bar { position: relative; padding: 2px 12px 8px; background: #0e0e0f; }
 .track { position: relative; height: 18px; cursor: pointer; touch-action: none; }
