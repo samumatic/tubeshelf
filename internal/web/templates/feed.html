@@ -1,12 +1,23 @@
 {{define "main"}}
 <div class="page-head">
-  <div><p class="eyebrow">{{if .ChannelTitle}}Channel{{else if .Search}}Search results{{else}}Your subscriptions{{end}}</p>
-  <h1 class="page-title">{{if .ChannelTitle}}{{.ChannelTitle}}{{else if .Search}}“{{.Search}}”{{else}}Feed{{end}}</h1></div>
+  {{if .ChannelID}}
+  <div class="channel-head">
+    <span class="avatar" data-initial="{{initial .ChannelTitle}}">{{if .ChannelAvatar}}<img src="/avatar/{{.ChannelID}}" alt="" width="56" height="56">{{end}}</span>
+    <div><p class="eyebrow">Channel</p><h1 class="page-title">{{or .ChannelTitle .ChannelID}}</h1></div>
+  </div>
+  <div class="row">
+    <a class="button" href="https://www.youtube.com/channel/{{.ChannelID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a>
+    <form method="post" action="/channels/{{.ChannelID}}/delete"><input type="hidden" name="next" value="/"><button class="button" data-confirm="Unsubscribe from {{or .ChannelTitle .ChannelID}}?">Unsubscribe</button></form>
+  </div>
+  {{else}}
+  <div><p class="eyebrow">{{if .Search}}Search results{{else}}Your subscriptions{{end}}</p>
+  <h1 class="page-title">{{if .Search}}“{{.Search}}”{{else}}Feed{{end}}</h1></div>
   <form class="search" action="/" role="search">
     {{template "i-search"}}
     <label class="sr" for="feed-search">Search the feed</label>
     <input id="feed-search" type="search" name="q" value="{{.Search}}" placeholder="Search videos and channels" data-search>
   </form>
+  {{end}}
 </div>
 <div class="toolbar">
   <div class="chips tabs" role="group" aria-label="Lists">

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -154,6 +155,11 @@ func (s *Server) addChannel(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
 	if err := s.unsubscribe(s.user(r).ID, r.PathValue("id")); err != nil {
 		fail(w, r, "/channels", err)
+		return
+	}
+	// From the channel's own page, whose feed is now empty, go back to the feed.
+	if r.FormValue("next") == "/" {
+		http.Redirect(w, r, "/?msg="+url.QueryEscape("Unsubscribed"), http.StatusSeeOther)
 		return
 	}
 	ok(w, r, "/channels", "Unsubscribed")

@@ -332,6 +332,15 @@ function setup(box) {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input:not([type="range"]), select, textarea, dialog.palette')) return;
     if (e.target === volumeInput && e.key.startsWith('Arrow')) return;
     if (keysDialog.open && e.key !== '?') return;
+    // As on YouTube, by physical key so every layout works (a German Shift+. gives ":"): Shift+. and Shift+,
+    // change the speed; . and , step one frame while paused.
+    if (e.code === 'Period' || e.code === 'Comma') {
+      const dir = e.code === 'Period' ? 1 : -1;
+      if (e.shiftKey) step(dir);
+      else if (!running()) seek(position() + dir / 30);
+      e.preventDefault();
+      return;
+    }
     switch (e.key) {
       case ' ':
         if (e.target.closest('button, a, summary')) return; // space presses the focused control
@@ -346,8 +355,8 @@ function setup(box) {
       case 'm': mute(); break;
       case 'c': toggleCaptions(); break;
       case 'f': fullscreen(); break;
-      case '<': case ',': step(-1); break;
-      case '>': case '.': step(1); break;
+      case '<': step(-1); break;
+      case '>': step(1); break;
       case '?': showKeys(); break;
       case 'w': document.querySelector('.watch-meta [data-toggle="watched"]')?.requestSubmit(); break;
       default:

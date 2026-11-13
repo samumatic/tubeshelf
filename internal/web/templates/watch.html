@@ -24,7 +24,7 @@
         <span class="time"><span class="now">0:00</span> / <span class="total">{{if .V.Duration}}{{dur .V.Duration}}{{else}}0:00{{end}}</span></span>
         <span class="grow"></span>
         <button type="button" class="icon-button" data-act="captions" aria-label="Captions (c)" aria-pressed="false" data-tip="Captions" data-tip-key="C">{{template "i-captions"}}</button>
-        <button type="button" class="speed" popovertarget="speed-menu" aria-haspopup="menu" aria-label="Playback speed" data-tip="Speed" data-tip-key="&lt; &gt;">1×</button>
+        <button type="button" class="speed" popovertarget="speed-menu" aria-haspopup="menu" aria-label="Playback speed" data-tip="Speed" data-tip-key="⇧, ⇧.">1×</button>
         <button type="button" class="icon-button" data-act="keys" aria-label="Keyboard shortcuts (?)" data-tip="Shortcuts" data-tip-key="?">{{template "i-keyboard"}}</button>
         <button type="button" class="icon-button" data-act="fullscreen" aria-label="Fullscreen (f)" data-tip="Fullscreen" data-tip-key="F">{{template "i-expand"}}{{template "i-shrink"}}</button>
       </div>
@@ -43,7 +43,8 @@
         <dt><kbd>0</kbd>–<kbd>9</kbd></dt><dd>Jump to 0–90%</dd>
         <dt><kbd>m</kbd></dt><dd>Mute</dd>
         <dt><kbd>c</kbd></dt><dd>Captions</dd>
-        <dt><kbd>&lt;</kbd> <kbd>&gt;</kbd></dt><dd>Slower or faster</dd>
+        <dt><kbd>⇧</kbd><kbd>,</kbd> <kbd>⇧</kbd><kbd>.</kbd></dt><dd>Slower or faster</dd>
+        <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Frame back or forward, while paused</dd>
         <dt><kbd>f</kbd></dt><dd>Fullscreen</dd>
         <dt><kbd>w</kbd></dt><dd>Mark as watched</dd>
         <dt><kbd>?</kbd></dt><dd>This list</dd>

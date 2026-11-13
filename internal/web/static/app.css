@@ -293,6 +293,9 @@ main { width: 100%; max-width: calc(var(--col-content) + 80px); margin: 0 auto; 
 .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s3) var(--s5); margin-bottom: var(--s5); }
 .page-title { margin-bottom: var(--s5); font: 400 34px/42px var(--font-display); letter-spacing: -0.02em; }
 .page-head .page-title { margin-bottom: 0; }
+.channel-head { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.channel-head .avatar { width: 56px; height: 56px; flex: none; font-size: 22px; }
+.channel-head .page-title { overflow-wrap: anywhere; }
 .page-title small { margin-left: 8px; font: 400 15px/22px var(--font-sans); letter-spacing: 0; }
 .page-head p { margin-top: 2px; color: var(--fg-muted); }
 

@@ -429,6 +429,28 @@ func TestGroupDays(t *testing.T) {
 	}
 }
 
+func TestChannelPage(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	_, body := a.get("/?channel=" + chanA)
+	if strings.Contains(body, `<h2 class="day">`) {
+		t.Error("channel page is grouped by day")
+	}
+	for _, want := range []string{`class="channel-head"`, "Chan A", `action="/channels/` + chanA + `/delete"`, "youtube.com/channel/" + chanA} {
+		if !strings.Contains(body, want) {
+			t.Errorf("channel page misses %q", want)
+		}
+	}
+	if _, body := a.post("/channels/"+chanA+"/delete", url.Values{"next": {"/"}}); !strings.Contains(body, "Unsubscribed") || !strings.Contains(body, "Your subscriptions") {
+		t.Errorf("unsubscribe from the channel page does not land on the feed: %.300s", body)
+	}
+	var n int
+	a.db.QueryRow(`SELECT count(*) FROM subscriptions WHERE channel_id = ?`, chanA).Scan(&n)
+	if n != 0 {
+		t.Error("still subscribed")
+	}
+}
+
 func TestSidebarWidth(t *testing.T) {
 	a := newApp(t)
 	a.signUp()

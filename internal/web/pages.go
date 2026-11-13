@@ -208,15 +208,17 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		prev = dayLabel(n, time.Now())
 	}
 	groups := []DayGroup{{Videos: vids}} // one continuous grid
-	if set["group_days"] == "1" {
+	// A channel posts about once a day; day headings would leave one video per row.
+	if set["group_days"] == "1" && q["channel"] == "" {
 		groups = groupByDay(vids, time.Now(), prev)
 	}
 	data := M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"]}
 	if q["channel"] != "" {
 		var title string
-		s.DB.QueryRow(`SELECT title FROM channels WHERE id = ?`, q["channel"]).Scan(&title)
-		data["ChannelTitle"] = title
+		var avatar bool
+		s.DB.QueryRow(`SELECT title, coalesce(thumbnail LIKE 'https://%', 0) FROM channels WHERE id = ?`, q["channel"]).Scan(&title, &avatar)
+		data["ChannelTitle"], data["ChannelAvatar"] = title, avatar
 	}
 	if len(vids) == 0 && q["before"] == "" {
 		var subs, pending int
