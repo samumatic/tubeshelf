@@ -450,3 +450,54 @@ document.addEventListener('keydown', (e) => {
   }
   e.preventDefault();
 });
+
+// Videos open inside this page, as on YouTube and in TubeShelf 1.x: the watch page is fetched and swapped in,
+// so the click that opened it still counts as the go-ahead for sound. Firefox only gives that to the page
+// that was clicked; a freshly loaded watch page would have to start muted. Back reloads the page left.
+let playerModule = null;
+let shown = location.pathname + location.search;
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest?.('a[href]');
+  if (!a || a.origin !== location.origin || !a.pathname.startsWith('/watch/') || a.target || !document.querySelector('.shell')) return;
+  e.preventDefault();
+  openWatch(a.href);
+});
+async function openWatch(url) {
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+    if (!res.ok || res.redirected) throw new Error(`watch page: ${res.status}`);
+    const next = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const main = next.querySelector('main#main');
+    const src = next.querySelector('script[src*="/static/player.js"]')?.getAttribute('src');
+    if (!main || !src || !next.querySelector('.shell')) throw new Error('watch page: unexpected markup');
+    playerModule ??= await import(src);
+    const swap = () => {
+      playerModule.unmount();
+      document.title = next.title;
+      document.documentElement.className = next.documentElement.className;
+      document.body.className = next.body.className;
+      document.querySelector('main#main').replaceChildren(...main.childNodes);
+      for (const el of document.querySelectorAll('.sidebar nav [aria-current]')) el.removeAttribute('aria-current');
+      // The watch page folds the sidebar; the collapse button then offers to expand it.
+      const fold = next.querySelector('form[data-sidebar]');
+      if (fold && sidebarForm) {
+        sidebarForm.elements.sidebar.value = fold.elements.sidebar.value;
+        const b = sidebarForm.querySelector('button'), nb = fold.querySelector('button');
+        b.setAttribute('aria-label', nb.getAttribute('aria-label'));
+        b.dataset.tip = nb.dataset.tip;
+      }
+      scrollTo(0, 0);
+      playerModule.mount();
+    };
+    history.pushState(null, '', url);
+    shown = location.pathname + location.search;
+    if (document.startViewTransition && !still.matches) document.startViewTransition(swap);
+    else swap();
+  } catch {
+    location.href = url;
+  }
+}
+addEventListener('popstate', () => {
+  if (location.pathname + location.search !== shown) location.reload();
+});
