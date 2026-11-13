@@ -192,9 +192,19 @@ func (s *Server) keysPage(w http.ResponseWriter, r *http.Request) {
 // allowed values per user setting; nil means "0 or 1".
 var userChoices = map[string][]string{
 	"theme": {"system", "dark", "light"}, "view": {"grid", "list"}, "sort": {"newest", "oldest"},
-	"sidebar":     {"expanded", "collapsed"},
-	"hide_shorts": nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil,
+	"sidebar":       {"expanded", "collapsed"},
+	"sidebar_width": sidebarWidths(),
+	"hide_shorts":   nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil,
 	"sponsorblock": nil, "open_on_youtube": nil,
+}
+
+// sidebarWidths are the sidebar widths a user can drag to: 208 to 400px in steps of 16, as in Pocket ID.
+func sidebarWidths() []string {
+	var out []string
+	for w := 208; w <= 400; w += 16 {
+		out = append(out, strconv.Itoa(w))
+	}
+	return out
 }
 
 // saveSettings stores whichever known settings the form sent, so the feed's

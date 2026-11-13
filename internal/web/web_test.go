@@ -358,6 +358,20 @@ func (a *app) upload(path string, fields map[string]string, files map[string][]b
 	return res.StatusCode, string(b)
 }
 
+func TestSidebarWidth(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	if _, body := a.get("/"); !strings.Contains(body, `class="sw-256"`) {
+		t.Fatal("default width class missing")
+	}
+	a.post("/account/preferences", url.Values{"sidebar_width": {"304"}})
+	a.post("/account/preferences", url.Values{"sidebar_width": {"300"}}) // not a 16px step: ignored
+	a.post("/account/preferences", url.Values{"sidebar": {"collapsed"}})
+	if _, body := a.get("/"); !strings.Contains(body, `class="rail sw-304"`) || !strings.Contains(body, `aria-valuenow="304"`) {
+		t.Fatalf("width not kept: %.400s", body)
+	}
+}
+
 func TestAppearance(t *testing.T) {
 	a := newApp(t)
 	a.signUp()

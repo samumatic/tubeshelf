@@ -147,7 +147,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .skip { position: absolute; left: 12px; top: -60px; z-index: 90; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--primary); color: var(--primary-fg); font-weight: 500; transition: top var(--dur-fast) var(--ease-out); }
 .skip:focus { top: 12px; }
 .shell { position: relative; isolation: isolate; display: flex; gap: var(--s2); min-height: 100dvh; padding: var(--s2); }
-/* A photo behind the shell, as in Pocket ID's backdrop layout: the newest video's thumbnail, blurred, shows around the cards and through the glass sidebar. */
+/* A photo behind the shell, as in Pocket ID's backdrop layout: it shows around the cards and through the glass sidebar. */
 .backdrop { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; filter: var(--backdrop-filter); pointer-events: none; }
 .shell:has(> .backdrop) .sidebar { --fg-muted: color-mix(in oklab, var(--fg) 75%, var(--sidebar)); --fill-hover: var(--glass-hover); --fill-muted: var(--glass-hover); --fill-selected: var(--glass-selected); --border: var(--glass-border); }
 .sidebar { position: sticky; top: var(--s2); z-index: 20; flex: none; display: flex; flex-direction: column; width: var(--sidebar-w); height: calc(100dvh - 2 * var(--s2)); padding: var(--s4) var(--s3) var(--s3); overflow: hidden;
@@ -209,6 +209,40 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .account-button .avatar { width: 20px; height: 20px; font-size: 9px; }
 .account .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :is(.account-button, .rail-avatar, .menu-head, .phone-bar) .avatar { background: var(--primary); color: var(--primary-fg); }
+
+/* ---------- Resizable sidebar (from 1024px; the width is a per-user class on <html>) ---------- */
+:root.sw-208 { --sidebar-w: 208px; }
+:root.sw-224 { --sidebar-w: 224px; }
+:root.sw-240 { --sidebar-w: 240px; }
+:root.sw-256 { --sidebar-w: 256px; }
+:root.sw-272 { --sidebar-w: 272px; }
+:root.sw-288 { --sidebar-w: 288px; }
+:root.sw-304 { --sidebar-w: 304px; }
+:root.sw-320 { --sidebar-w: 320px; }
+:root.sw-336 { --sidebar-w: 336px; }
+:root.sw-352 { --sidebar-w: 352px; }
+:root.sw-368 { --sidebar-w: 368px; }
+:root.sw-384 { --sidebar-w: 384px; }
+:root.sw-400 { --sidebar-w: 400px; }
+.sidebar-resize { display: none; }
+@media (min-width: 1024px) {
+  :root:not(.rail) .sidebar-resize { position: absolute; top: 0; right: 0; bottom: 0; display: block; width: 12px; cursor: col-resize; touch-action: none; }
+  .sidebar-resize::after { content: ""; position: absolute; top: 50%; right: 4px; width: 4px; height: 32px; translate: 0 -50%; border-radius: 2px; background: var(--fg-muted); opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out), height var(--dur-base) var(--ease-out); }
+  .sidebar-resize:hover::after { opacity: 0.4; }
+  .sidebar-resize:focus-visible { outline: none; }
+  .sidebar-resize:focus-visible::after, :root.resizing .sidebar-resize::after { height: 48px; opacity: 0.8; }
+}
+:root.resizing .sidebar { transition: none; }
+:root.resizing, :root.resizing * { cursor: col-resize !important; user-select: none; }
+
+/* ---------- Tooltips (Pocket ID: inverse colors, 6px right of the target) ---------- */
+.tip { position: fixed; inset: auto; margin: 0; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); translate: 0 -50%; pointer-events: none;
+  background: var(--fg); color: var(--canvas); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), overlay var(--dur-fast) allow-discrete, display var(--dur-fast) allow-discrete; }
+.tip:popover-open { opacity: 1; }
+@starting-style { .tip:popover-open { opacity: 0; } }
+.tip kbd { margin-left: 8px; font: inherit; opacity: 0.6; }
 
 /* ---------- Popover menus (account, appearance) ---------- */
 .popmenu { position: fixed; inset: auto; margin: 0; width: 240px; padding: 4px; overflow: visible; border: 1px solid color-mix(in oklab, var(--fg) 10%, transparent); border-radius: var(--radius-md);

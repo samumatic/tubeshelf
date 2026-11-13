@@ -1,5 +1,5 @@
 {{define "layout"}}<!doctype html>
-<html lang="en" data-theme="{{.Set.theme}}"{{if eq .Set.sidebar "collapsed"}} class="rail"{{end}}>
+<html lang="en" data-theme="{{.Set.theme}}" class="{{if eq .Set.sidebar "collapsed"}}rail {{end}}sw-{{.Set.sidebar_width}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,36 +20,38 @@
   <aside class="sidebar">
     <div class="brand-row">
       <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>
-      <button type="button" class="icon-button" data-palette aria-label="Search and jump (Cmd or Ctrl + K)" title="Search and jump  ⌘K">{{template "i-search"}}</button>
+      <button type="button" class="icon-button" data-palette aria-label="Search and jump (Cmd or Ctrl + K)" data-tip="Search" data-tip-key="⌘K">{{template "i-search"}}</button>
     </div>
     <nav aria-label="Main">
       <h2 class="nav-heading">Watch</h2>
-      <a class="nav-item" title="Feed" href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
-      <a class="nav-item" title="Watch later" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Watch later</a>
-      <a class="nav-item" title="History" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+      <a class="nav-item" data-tip="Feed" href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+      <a class="nav-item" data-tip="Watch later" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Watch later</a>
+      <a class="nav-item" data-tip="History" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
       <h2 class="nav-heading">Library</h2>
-      <a class="nav-item" title="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
-      <a class="nav-item" title="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
-      <a class="nav-item" title="Import &amp; export" href="/channels/import" {{if eq .Page "import"}}aria-current="page"{{end}}>{{template "i-import"}}Import &amp; export</a>
+      <a class="nav-item" data-tip="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+      <a class="nav-item" data-tip="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
+      <a class="nav-item" data-tip="Import &amp; export" href="/channels/import" {{if eq .Page "import"}}aria-current="page"{{end}}>{{template "i-import"}}Import &amp; export</a>
       {{if .User.IsAdmin}}<h2 class="nav-heading">Administration</h2>
-      <a class="nav-item" title="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status</a>
-      <a class="nav-item" title="Users" href="/admin/users" {{if eq .Page "admin-users"}}aria-current="page"{{end}}>{{template "i-users"}}Users</a>
-      <a class="nav-item" title="Sign-in" href="/admin/sign-in" {{if eq .Page "admin-signin"}}aria-current="page"{{end}}>{{template "i-key"}}Sign-in</a>
-      <a class="nav-item" title="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>
-      <a class="nav-item" title="Appearance" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Appearance</a>{{end}}
+      <a class="nav-item" data-tip="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status</a>
+      <a class="nav-item" data-tip="Users" href="/admin/users" {{if eq .Page "admin-users"}}aria-current="page"{{end}}>{{template "i-users"}}Users</a>
+      <a class="nav-item" data-tip="Sign-in" href="/admin/sign-in" {{if eq .Page "admin-signin"}}aria-current="page"{{end}}>{{template "i-key"}}Sign-in</a>
+      <a class="nav-item" data-tip="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>
+      <a class="nav-item" data-tip="Appearance" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Appearance</a>{{end}}
     </nav>
     <div class="sidebar-foot">
       <div class="foot-slot">
         <p class="version">TubeShelf {{.Version}}</p>
-        <button type="button" class="rail-avatar" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" title="{{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
+        <button type="button" class="rail-avatar" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" data-tip="{{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
       </div>
       <div class="account">
-        <button type="button" class="account-button" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" title="Account menu"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span class="who">{{or .User.Name .User.Email}}</span></button>
+        <button type="button" class="account-button" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span class="who">{{or .User.Name .User.Email}}</span></button>
         {{$label := "Collapse sidebar"}}{{if eq .Set.sidebar "collapsed"}}{{$label = "Expand sidebar"}}{{end}}
-        <form class="collapse-toggle" method="post" action="/account/preferences" data-sidebar><input type="hidden" name="sidebar" value="{{if eq .Set.sidebar "collapsed"}}expanded{{else}}collapsed{{end}}"><button class="icon-button" aria-label="{{$label}}" title="{{$label}}">{{template "i-sidebar"}}</button></form>
+        <form class="collapse-toggle" method="post" action="/account/preferences" data-sidebar><input type="hidden" name="sidebar" value="{{if eq .Set.sidebar "collapsed"}}expanded{{else}}collapsed{{end}}"><button class="icon-button" aria-label="{{$label}}" data-tip="{{$label}}">{{template "i-sidebar"}}</button></form>
       </div>
     </div>
+    <div class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="208" aria-valuemax="400" aria-valuenow="{{.Set.sidebar_width}}" tabindex="0"></div>
   </aside>
+  <div class="tip" id="tip" popover="manual" role="tooltip"></div>
   <div class="content">
     <header class="phone-bar">
       <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>

@@ -246,8 +246,107 @@ sidebarForm?.addEventListener('submit', (e) => {
   const label = collapse ? 'Expand sidebar' : 'Collapse sidebar';
   const button = sidebarForm.querySelector('button');
   button.setAttribute('aria-label', label);
-  button.title = label;
+  button.dataset.tip = label;
 });
+
+// Tooltips, as in Pocket ID: inverse colors, right of the target, after a short hover or on keyboard focus;
+// once one is open, the next shows at once. Nav items and the avatar only need one in the rail.
+const tip = document.getElementById('tip');
+if (tip) {
+  const html = document.documentElement;
+  const tabletRail = matchMedia('(min-width: 640px) and (max-width: 1023px)');
+  const folded = () => tabletRail.matches || html.classList.contains('rail');
+  let timer = 0, current = null, closedAt = 0;
+  const hideTip = () => {
+    clearTimeout(timer);
+    if (!current) return;
+    current = null;
+    closedAt = performance.now();
+    tip.hidePopover();
+  };
+  const showTip = (el) => {
+    tip.replaceChildren(el.dataset.tip);
+    if (el.dataset.tipKey) tip.append(Object.assign(document.createElement('kbd'), { textContent: el.dataset.tipKey }));
+    const r = el.getBoundingClientRect();
+    tip.style.setProperty('left', `${r.right + 6}px`);
+    tip.style.setProperty('top', `${r.top + r.height / 2}px`);
+    tip.showPopover();
+    current = el;
+  };
+  const want = (el) => {
+    if (!el || el === current) return;
+    const warm = current || performance.now() - closedAt < 400;
+    hideTip();
+    if (el.matches('.nav-item, .rail-avatar') && !folded()) return;
+    if (el.getAttribute('aria-expanded') === 'true' || html.classList.contains('resizing')) return;
+    timer = setTimeout(() => showTip(el), warm ? 0 : 400);
+  };
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType === 'mouse') want(e.target.closest('[data-tip]'));
+  });
+  document.addEventListener('pointerout', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el && !el.contains(e.relatedTarget)) hideTip();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el?.matches(':focus-visible')) want(el);
+  });
+  document.addEventListener('focusout', hideTip);
+  document.addEventListener('pointerdown', hideTip);
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && hideTip());
+  addEventListener('scroll', hideTip, { passive: true, capture: true });
+}
+
+// Resizable sidebar (from 1024px), as in Pocket ID: drag the edge, arrow keys step 16px, Home/End jump to the
+// limits, a double-click resets. Letting go far left of the minimum folds it to the rail. Saved per user.
+const handle = document.querySelector('.sidebar-resize');
+if (handle && sidebarForm) {
+  const MIN = 208, MAX = 400, STEP = 16, DEFAULT = 256, FOLD = 140;
+  const html = document.documentElement;
+  const clamp = (px) => Math.min(MAX, Math.max(MIN, px));
+  const width = () => Number(handle.getAttribute('aria-valuenow')) || DEFAULT;
+  const live = (px) => html.style.setProperty('--sidebar-w', `${px}px`);
+  const save = (px) => {
+    px = clamp(Math.round(px / STEP) * STEP);
+    handle.setAttribute('aria-valuenow', px);
+    for (const c of [...html.classList]) if (c.startsWith('sw-')) html.classList.remove(c);
+    html.classList.add(`sw-${px}`);
+    html.style.removeProperty('--sidebar-w');
+    fetch('/account/preferences', { method: 'POST', body: new URLSearchParams({ sidebar_width: px }), headers: { 'X-Requested-With': 'fetch' } }).catch(() => {});
+  };
+  let drag = null;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, w: width() };
+    html.classList.add('resizing');
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (drag) live(clamp(drag.w + e.clientX - drag.x));
+  });
+  const end = (e, cancel) => {
+    if (!drag) return;
+    const w = drag.w + e.clientX - drag.x;
+    const start = drag.w;
+    drag = null;
+    html.classList.remove('resizing');
+    if (cancel || w < FOLD) html.style.removeProperty('--sidebar-w');
+    if (cancel) return;
+    if (w < FOLD) sidebarForm.requestSubmit();
+    else if (clamp(w) !== start) save(w);
+  };
+  handle.addEventListener('pointerup', (e) => end(e, false));
+  handle.addEventListener('pointercancel', (e) => end(e, true));
+  handle.addEventListener('dblclick', () => save(DEFAULT));
+  handle.addEventListener('keydown', (e) => {
+    const next = { ArrowLeft: width() - STEP, ArrowRight: width() + STEP, Home: MIN, End: MAX }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    save(next);
+  });
+}
 
 // Administration › Appearance: preview the color and corner radius before saving.
 const appearanceForm = document.querySelector('form[data-appearance]');

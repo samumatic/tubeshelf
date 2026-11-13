@@ -36,6 +36,7 @@ var UserDefaults = map[string]string{
 	"watched_percent": "90",
 	"open_on_youtube": "0",
 	"sidebar":         "expanded", // expanded | collapsed (from 1024px)
+	"sidebar_width":   "256",      // px, 208 to 400 in steps of 16
 }
 
 type querier interface {
