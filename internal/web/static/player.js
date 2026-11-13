@@ -36,7 +36,6 @@ function setup(box) {
   let segments = [];
   let savedAt = now.t;
   let captions = false;
-  let started = false;
   // Set when the browser refused to start with sound and the video started muted instead; the stored choice stays.
   let forcedMute = false;
 
@@ -193,11 +192,9 @@ function setup(box) {
       now.state = info.playerState;
       now.at = performance.now();
       drawState();
-      // YouTube turns captions on by itself for a muted start and does not report it; start from a known "off".
-      if (now.state === PLAYING && !started) {
-        started = true;
-        command('unloadModule', 'captions');
-      }
+      // YouTube turns captions on by itself (a muted start, again after a seek) and does not report it;
+      // each settled state puts back the choice made here.
+      if (now.state === PLAYING || now.state === PAUSED) command(captions ? 'loadModule' : 'unloadModule', 'captions');
       if (now.state === PAUSED) save();
       if (now.state === ENDED) save(true);
     }
