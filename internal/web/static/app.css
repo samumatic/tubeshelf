@@ -575,6 +575,8 @@ details > form, details > div { display: grid; gap: 14px; padding: 14px 0 4px; }
 .auth-page { display: grid; place-items: center; min-height: 100dvh; max-width: none; padding: 24px; }
 /* The sign-in pages show the background photo as it is; the app shows it blurred behind the glass. */
 .auth-bg { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; }
+/* Without its own stacking context, body's background would paint over the photo at z-index -1. */
+body:has(> .auth-bg) { isolation: isolate; }
 .auth { width: min(464px, 100%); display: grid; gap: 16px; padding: 44px; border-radius: var(--radius-3xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border), var(--elevation-overlay); animation: pop var(--dur-slow) var(--ease-out) backwards; }
 .auth .logo { width: 48px; height: 48px; border-radius: 14px; margin-bottom: 8px; }
 .auth .logo svg { width: 26px; height: 26px; fill: currentColor; }
