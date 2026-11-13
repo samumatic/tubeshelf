@@ -359,6 +359,30 @@ func (a *app) upload(path string, fields map[string]string, files map[string][]b
 	return res.StatusCode, string(b)
 }
 
+func TestWatchPage(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	_, body := a.get("/watch/video000001")
+	for _, want := range []string{
+		`class="rail sw-256"`, // the sidebar folds on the watch page, though the saved choice is "expanded"
+		`controls=0&amp;disablekb=1&amp;fs=0`,
+		`allow="autoplay; encrypted-media"`, // no picture-in-picture, no YouTube fullscreen
+		`data-act="fullscreen"`,
+		`class="up-next"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("watch page lacks %s", want)
+		}
+	}
+	if _, body := a.get("/"); strings.Contains(body, `class="rail `) {
+		t.Error("the feed is folded too")
+	}
+	a.post("/account/preferences", url.Values{"open_on_youtube": {"1"}})
+	if _, body := a.get("/"); !strings.Contains(body, `href="https://www.youtube.com/watch?v=video000001"`) {
+		t.Error("Play videos in YouTube does not link cards to youtube.com")
+	}
+}
+
 func TestSpeculationRules(t *testing.T) {
 	a := newApp(t)
 	a.signUp()

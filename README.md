@@ -56,14 +56,6 @@ Open **http://localhost:3000** and create the admin account. Refresh interval, r
 | `TUBESHELF_SECRET` | kept in `data/.secret` | Encrypts OIDC client secrets; set it before the first start or never |
 | `TRUST_PROXY_HEADERS` | unset | `1` rate-limits logins by `X-Forwarded-For` |
 
-## Upgrading from 1.x
-
-Keep the `./data` volume. The first 2.x start copies users, subscriptions, lists, history, watch later, settings, API keys and sign-in providers from `data/tubeshelf.db` into `data/shelf.db`; the 1.x file stays untouched, so you can go back.
-
-- Passwords, API keys and the OIDC redirect URI (`/api/auth/oidc/callback`) keep working.
-- Keep `BETTER_AUTH_SECRET` (or `OIDC_ENCRYPTION_KEY`) set for that first start so OIDC client secrets can be decrypted; 2.x stops and says so if they can't. `TUBESHELF_IMPORT_SKIP_OIDC=1` imports without them. Afterwards the key lives in `data/.secret`: back it up with the database.
-- Removed: video comments, SubRelay sync, the welcome wizard, the scraping fetcher.
-
 ## CLI and API
 
 ```bash

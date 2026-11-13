@@ -267,9 +267,12 @@ if (tip) {
   const showTip = (el) => {
     tip.replaceChildren(el.dataset.tip);
     if (el.dataset.tipKey) tip.append(Object.assign(document.createElement('kbd'), { textContent: el.dataset.tipKey }));
+    // Sidebar tips sit to the right, as in Pocket ID; the player's control bar has them above.
     const r = el.getBoundingClientRect();
-    tip.style.setProperty('left', `${r.right + 6}px`);
-    tip.style.setProperty('top', `${r.top + r.height / 2}px`);
+    const above = !!el.closest('.bar');
+    tip.classList.toggle('above', above);
+    tip.style.setProperty('left', `${above ? r.left + r.width / 2 : r.right + 6}px`);
+    tip.style.setProperty('top', `${above ? r.top - 6 : r.top + r.height / 2}px`);
     tip.showPopover();
     current = el;
   };

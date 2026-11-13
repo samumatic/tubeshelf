@@ -2,15 +2,61 @@
 {{define "head"}}<script type="module" src="/static/player.js?v={{.AssetV}}"></script>{{end}}
 {{define "main"}}
 <div class="watch">
-  <section>
-    <div id="player" class="player" data-id="{{.V.ID}}" data-duration="{{.V.Duration}}" data-sponsorblock="{{.Set.sponsorblock}}">
-      <iframe id="yt" title="{{.V.Title}}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"
-        src="https://www.youtube-nocookie.com/embed/{{.V.ID}}?enablejsapi=1&autoplay=1&rel=0{{if .Start}}&start={{.Start}}{{end}}"></iframe>
-      <p id="toast" class="toast" role="status" hidden></p>
+  {{/* The embed runs without YouTube's controls; TubeShelf's bar sits under the video, never over it, as YouTube's policy asks. */}}
+  <div id="player" class="player" tabindex="-1" data-id="{{.V.ID}}" data-duration="{{.V.Duration}}" data-sponsorblock="{{.Set.sponsorblock}}" data-start="{{.Start}}">
+    <div class="screen">
+      <iframe id="yt" title="{{.V.Title}}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"
+        data-src="https://www.youtube-nocookie.com/embed/{{.V.ID}}?enablejsapi=1&amp;autoplay=1&amp;controls=0&amp;disablekb=1&amp;fs=0&amp;rel=0&amp;iv_load_policy=3&amp;playsinline=1{{if .Start}}&amp;start={{.Start}}{{end}}"></iframe>
     </div>
+    <div class="bar" role="group" aria-label="Player controls">
+      <div class="track" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="{{.V.Duration}}" aria-valuenow="{{.Start}}" aria-valuetext="0:00">
+        <div class="loaded"></div><div class="segments"></div><div class="played"></div><div class="knob"></div>
+        <span class="hover-time" hidden></span>
+      </div>
+      <div class="buttons">
+        <button type="button" class="icon-button" data-act="play" aria-label="Play (k)" data-tip="Play" data-tip-key="K">{{template "i-play"}}{{template "i-pause"}}</button>
+        <button type="button" class="icon-button" data-act="back" aria-label="Back 10 seconds (j)" data-tip="Back 10s" data-tip-key="J">{{template "i-back"}}</button>
+        <button type="button" class="icon-button" data-act="forward" aria-label="Forward 10 seconds (l)" data-tip="Forward 10s" data-tip-key="L">{{template "i-forward"}}</button>
+        <div class="volume">
+          <button type="button" class="icon-button" data-act="mute" aria-label="Mute (m)" data-tip="Mute" data-tip-key="M">{{template "i-volume"}}{{template "i-muted"}}</button>
+          <input type="range" min="0" max="100" value="100" aria-label="Volume">
+        </div>
+        <span class="time"><span class="now">0:00</span> / <span class="total">{{if .V.Duration}}{{dur .V.Duration}}{{else}}0:00{{end}}</span></span>
+        <span class="grow"></span>
+        <button type="button" class="icon-button" data-act="captions" aria-label="Captions (c)" aria-pressed="false" data-tip="Captions" data-tip-key="C">{{template "i-captions"}}</button>
+        <button type="button" class="speed" popovertarget="speed-menu" aria-haspopup="menu" aria-label="Playback speed" data-tip="Speed" data-tip-key="&lt; &gt;">1×</button>
+        <button type="button" class="icon-button" data-act="keys" aria-label="Keyboard shortcuts (?)" data-tip="Shortcuts" data-tip-key="?">{{template "i-keyboard"}}</button>
+        <button type="button" class="icon-button" data-act="fullscreen" aria-label="Fullscreen (f)" data-tip="Fullscreen" data-tip-key="F">{{template "i-expand"}}{{template "i-shrink"}}</button>
+      </div>
+      <div id="speed-menu" class="popmenu speed-menu" popover role="menu" aria-label="Playback speed">
+        {{range list "0.5" "0.75" "1" "1.25" "1.5" "1.75" "2"}}<button type="button" role="menuitemradio" aria-checked="{{if eq . "1"}}true{{else}}false{{end}}" data-rate="{{.}}">{{.}}×</button>{{end}}
+      </div>
+    </div>
+    <p id="toast" class="toast" role="status" hidden></p>
+    <dialog id="keys" class="keys-dialog" aria-label="Keyboard shortcuts">
+      <h2>Keyboard shortcuts</h2>
+      <dl>
+        <dt><kbd>k</kbd> <kbd>space</kbd></dt><dd>Play or pause</dd>
+        <dt><kbd>j</kbd> <kbd>l</kbd></dt><dd>Back or forward 10 seconds</dd>
+        <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Back or forward 5 seconds</dd>
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Volume</dd>
+        <dt><kbd>0</kbd>–<kbd>9</kbd></dt><dd>Jump to 0–90%</dd>
+        <dt><kbd>m</kbd></dt><dd>Mute</dd>
+        <dt><kbd>c</kbd></dt><dd>Captions</dd>
+        <dt><kbd>&lt;</kbd> <kbd>&gt;</kbd></dt><dd>Slower or faster</dd>
+        <dt><kbd>f</kbd></dt><dd>Fullscreen</dd>
+        <dt><kbd>w</kbd></dt><dd>Mark as watched</dd>
+        <dt><kbd>?</kbd></dt><dd>This list</dd>
+      </dl>
+      <form method="dialog"><button class="button">Close</button></form>
+    </dialog>
+  </div>
+
+  <div class="watch-info">
     <h1>{{.V.Title}}</h1>
     <div class="watch-meta">
-      <p>{{if .V.ChannelID}}<a href="/?channel={{.V.ChannelID}}">{{.V.Channel}}</a>{{else}}{{.V.Channel}}{{end}}{{if .V.Published}} · <time datetime="{{iso .V.Published}}">{{date .V.Published}}</time>{{end}}</p>
+      {{if .V.ChannelID}}<a class="channel" href="/?channel={{.V.ChannelID}}"><span class="avatar" data-initial="{{initial .V.Channel}}">{{if .V.HasAvatar}}<img src="/avatar/{{.V.ChannelID}}" alt="" width="36" height="36">{{end}}</span><span><strong>{{.V.Channel}}</strong>{{if .V.Published}}<time datetime="{{iso .V.Published}}" title="{{date .V.Published}}">{{ago .V.Published}}</time>{{end}}</span></a>
+      {{else}}<p>{{.V.Channel}}</p>{{end}}
       <div class="row">
         <form method="post" action="/videos/{{.V.ID}}/watched" data-toggle="watched">
           <input type="hidden" name="on" value="{{if .V.Watched}}0{{else}}1{{end}}">
@@ -20,19 +66,16 @@
           <input type="hidden" name="on" value="{{if .V.Later}}0{{else}}1{{end}}">
           <button class="button" aria-pressed="{{.V.Later}}">{{template "i-clock"}} Later</button>
         </form>
-        <a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">Open on YouTube</a>
+        <a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a>
       </div>
     </div>
-    <details class="keys">
-      <summary>Keyboard shortcuts</summary>
-      <p><kbd>k</kbd>/<kbd>space</kbd> play · <kbd>j</kbd> <kbd>l</kbd> ±10s · <kbd>←</kbd> <kbd>→</kbd> ±5s · <kbd>0</kbd>–<kbd>9</kbd> seek · <kbd>m</kbd> mute · <kbd>f</kbd> fullscreen · <kbd>&lt;</kbd> <kbd>&gt;</kbd> speed · <kbd>w</kbd> watched</p>
-    </details>
-  </section>
+  </div>
+
   {{if .UpNext}}
-  <aside>
-    <h2>Up next</h2>
-    <div class="videos compact">{{range .UpNext}}{{template "card" (card . $.Set)}}{{end}}</div>
-  </aside>
+  <section class="up-next" aria-labelledby="up-next">
+    <h2 id="up-next" class="day">Up next</h2>
+    <div class="videos">{{range .UpNext}}{{template "card" (card . $.Set)}}{{end}}</div>
+  </section>
   {{end}}
 </div>
 {{end}}
