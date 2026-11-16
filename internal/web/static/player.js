@@ -34,6 +34,9 @@ function setup(box) {
   const now = { t: Number(box.dataset.start) || 0, at: performance.now(), d: Number(box.dataset.duration) || 0, state: -1, rate: 1, loaded: 0 };
   let connected = false;
   let segments = [];
+  // Segments skipped once already, or sought into: these play. Going back to one is how a skip is undone.
+  const watchAnyway = new Set();
+  let lastSkip = null; // Enter goes back to its start, as in the SponsorBlock extension
   let savedAt = now.t;
   let captions = false;
   // Set when the browser refused to start with sound and the video started muted instead; the stored choice stays.
@@ -181,10 +184,12 @@ function setup(box) {
     if (typeof info.currentTime === 'number') {
       now.t = info.currentTime;
       now.at = performance.now();
-      const hit = segments.find(([from, to]) => now.t >= from && now.t < to - 0.5);
+      const hit = segments.find((s) => !watchAnyway.has(s) && now.t >= s[0] && now.t < s[1] - 0.5);
       if (hit) {
-        seek(hit[1]);
-        say('Skipped sponsor');
+        watchAnyway.add(hit);
+        lastSkip = hit;
+        seek(hit[1], true);
+        say('Skipped sponsor · Enter to undo');
       }
       if (now.state === PLAYING && Math.abs(now.t - savedAt) >= 10) save();
     }
@@ -205,8 +210,10 @@ function setup(box) {
   }
 
   // ---------- Actions ----------
-  function seek(to) {
+  // auto: the sponsor skip itself. Any other seek into a segment means the viewer wants to see it.
+  function seek(to, auto = false) {
     to = Math.max(0, Math.min(to, now.d ? now.d - 0.5 : to));
+    if (!auto) for (const s of segments) if (to >= s[0] && to < s[1] - 0.5) watchAnyway.add(s);
     now.t = to;
     now.at = performance.now();
     command('seekTo', to, true);
@@ -343,6 +350,12 @@ function setup(box) {
         if (e.target.closest('button, a, summary')) return; // space presses the focused control
         toggle(); break;
       case 'k': toggle(); break;
+      case 'Enter':
+        if (!lastSkip || e.target.closest('button, a, summary')) return; // Enter presses the focused control
+        seek(lastSkip[0]);
+        lastSkip = null;
+        say('Playing sponsor');
+        break;
       case 'j': seek(position() - 10); break;
       case 'l': seek(position() + 10); break;
       case 'ArrowLeft': seek(position() - 5); break;
