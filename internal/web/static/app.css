@@ -97,6 +97,10 @@ main { view-transition-name: content; }
 /* First page after signing in: the shell settles into place. */
 @keyframes reveal-fill { from { background-color: var(--surface); } }
 @keyframes reveal-slide { from { opacity: 0; translate: calc(var(--rise) * -1) 0; } }
+/* No transitions while the page loads: a browser that styles the page once before the stylesheet applies
+   (Zen, some extensions) would otherwise fade links from its own link color and slide padding in from zero.
+   app.js lifts this after the first frame. */
+.preload *, .preload *::before, .preload *::after { transition: none !important; }
 .app-reveal :is(.sidebar, .phone-bar) { animation: reveal-fill var(--dur-slow) var(--ease-out) backwards; }
 .app-reveal :is(.sidebar, .phone-bar) > * { animation: reveal-slide var(--dur-slow) var(--ease-out) backwards; }
 .app-reveal :is(main, .phone-nav, .phone-search) { animation: rise var(--dur-slow) var(--ease-out) 40ms backwards; }

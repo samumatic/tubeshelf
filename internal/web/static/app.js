@@ -18,6 +18,9 @@ try {
   }
 } catch { /* storage blocked: no reveal */ }
 
+// Transitions stay off until the loaded page has been drawn once (see .preload in app.css).
+requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('preload')));
+
 const post = (form, submitter) =>
   fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form, submitter)), headers: { 'X-Requested-With': 'fetch' } });
 
@@ -475,7 +478,7 @@ async function openWatch(url) {
     const swap = () => {
       playerModule.unmount();
       document.title = next.title;
-      document.documentElement.className = next.documentElement.className;
+      document.documentElement.className = next.documentElement.className.replace(/\bpreload\b ?/, '');
       document.body.className = next.body.className;
       document.querySelector('main#main').replaceChildren(...main.childNodes);
       for (const el of document.querySelectorAll('.sidebar nav [aria-current]')) el.removeAttribute('aria-current');

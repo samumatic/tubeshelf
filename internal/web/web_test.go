@@ -364,7 +364,7 @@ func TestWatchPage(t *testing.T) {
 	a.signUp()
 	_, body := a.get("/watch/video000001")
 	for _, want := range []string{
-		`class="rail sw-256"`, // the sidebar folds on the watch page, though the saved choice is "expanded"
+		`class="preload rail sw-256"`, // the sidebar folds on the watch page, though the saved choice is "expanded"
 		`controls=0&amp;disablekb=1&amp;fs=0`,
 		`allow="autoplay; encrypted-media"`, // no picture-in-picture, no YouTube fullscreen
 		`data-act="fullscreen"`,
@@ -374,7 +374,7 @@ func TestWatchPage(t *testing.T) {
 			t.Errorf("watch page lacks %s", want)
 		}
 	}
-	if _, body := a.get("/"); strings.Contains(body, `class="rail `) {
+	if _, body := a.get("/"); strings.Contains(body, `class="preload rail `) {
 		t.Error("the feed is folded too")
 	}
 	a.post("/account/preferences", url.Values{"open_on_youtube": {"1"}})
@@ -454,13 +454,13 @@ func TestChannelPage(t *testing.T) {
 func TestSidebarWidth(t *testing.T) {
 	a := newApp(t)
 	a.signUp()
-	if _, body := a.get("/"); !strings.Contains(body, `class="sw-256"`) {
+	if _, body := a.get("/"); !strings.Contains(body, `class="preload sw-256"`) {
 		t.Fatal("default width class missing")
 	}
 	a.post("/account/preferences", url.Values{"sidebar_width": {"304"}})
 	a.post("/account/preferences", url.Values{"sidebar_width": {"300"}}) // not a 16px step: ignored
 	a.post("/account/preferences", url.Values{"sidebar": {"collapsed"}})
-	if _, body := a.get("/"); !strings.Contains(body, `class="rail sw-304"`) || !strings.Contains(body, `aria-valuenow="304"`) {
+	if _, body := a.get("/"); !strings.Contains(body, `class="preload rail sw-304"`) || !strings.Contains(body, `aria-valuenow="304"`) {
 		t.Fatalf("width not kept: %.400s", body)
 	}
 }
