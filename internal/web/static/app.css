@@ -423,7 +423,7 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .view-list #feed .card { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 16px; align-items: center; padding: 8px; margin: 0 -8px; border-radius: var(--radius-lg); transition: background-color var(--dur-fast) var(--ease-out); }
 .view-list #feed .card:hover { background: var(--fill-row-hover); }
 .view-list #feed .meta { margin-top: 0; }
-.view-list #feed .actions { top: 16px; right: auto; left: 136px; }
+.view-list #feed .actions { top: 16px; right: auto; left: 136px; flex-direction: row-reverse; }
 
 .empty { max-width: 420px; margin: 14vh auto; display: grid; gap: 8px; justify-items: center; text-align: center; color: var(--fg-muted); animation: rise var(--dur-slow) var(--ease-out) backwards; }
 .empty h2 { font: 400 22px/30px var(--font-display); letter-spacing: -0.01em; color: var(--fg); }

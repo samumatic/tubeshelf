@@ -119,6 +119,7 @@ func TestPassFetchesAndEnriches(t *testing.T) {
 func TestChannelFailureBacksOff(t *testing.T) {
 	d, src, f, now := setup(t)
 	src.feedErr = errors.New("youtube: 500")
+	db.SetSetting(d, "refresh_minutes", "5")
 	var prev time.Duration
 	for i := 1; i <= 3; i++ {
 		f.Pass(context.Background())
@@ -131,6 +132,16 @@ func TestChannelFailureBacksOff(t *testing.T) {
 			t.Fatalf("attempt %d: fails=%d wait=%v prev=%v err=%q", i, fails, wait, prev, msg)
 		}
 		prev = wait
+		*now = time.Unix(next, 0).Add(time.Second)
+	}
+	// Further failures wait no longer than an hour.
+	for range 6 {
+		f.Pass(context.Background())
+		var next int64
+		d.QueryRow(`SELECT next_fetch_at FROM channels WHERE id = ?`, chanID).Scan(&next)
+		if wait := time.Unix(next, 0).Sub(*now); wait > time.Hour {
+			t.Fatalf("wait %v after many failures, want at most 1h", wait)
+		}
 		*now = time.Unix(next, 0).Add(time.Second)
 	}
 	// Recovery resets the failure state.

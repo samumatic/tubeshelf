@@ -169,14 +169,15 @@
       <p>{{if $v.ChannelID}}<a href="/?channel={{$v.ChannelID}}">{{$v.Channel}}</a>{{else}}{{$v.Channel}}{{end}} · <time datetime="{{iso $v.Published}}">{{ago $v.Published}}</time>{{if $v.Members}} · Members only{{end}}</p>
     </div>
   </div>
+  {{/* Watched sits in the corner: a watched mark stays shown, and the unset Later beside it is invisible. */}}
   <div class="actions">
-    <form method="post" action="/videos/{{$v.ID}}/watched" data-toggle="watched">
-      <input type="hidden" name="on" value="{{if $v.Watched}}0{{else}}1{{end}}">
-      <button title="{{if $v.Watched}}Mark as not watched{{else}}Mark as watched{{end}} (w)" aria-pressed="{{$v.Watched}}">{{template "i-check"}}<span class="sr">Watched</span></button>
-    </form>
     <form method="post" action="/videos/{{$v.ID}}/later" data-toggle="later">
       <input type="hidden" name="on" value="{{if $v.Later}}0{{else}}1{{end}}">
       <button title="{{if $v.Later}}Remove from Later{{else}}Save for later{{end}} (l)" aria-pressed="{{$v.Later}}">{{template "i-clock"}}<span class="sr">Later</span></button>
+    </form>
+    <form method="post" action="/videos/{{$v.ID}}/watched" data-toggle="watched">
+      <input type="hidden" name="on" value="{{if $v.Watched}}0{{else}}1{{end}}">
+      <button title="{{if $v.Watched}}Mark as not watched{{else}}Mark as watched{{end}} (w)" aria-pressed="{{$v.Watched}}">{{template "i-check"}}<span class="sr">Watched</span></button>
     </form>
   </div>
 </article>{{end}}

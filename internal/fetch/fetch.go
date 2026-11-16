@@ -23,6 +23,9 @@ const (
 	liveRecheck     = 15 * time.Minute
 	upcomingRecheck = 30 * time.Minute
 	maxBackoff      = 24 * time.Hour
+	// YouTube's RSS answers 404 or 500 in bursts that pass within the hour; a longer
+	// wait (beyond the refresh interval) would leave a channel stale long after.
+	maxFeedBackoff = time.Hour
 )
 
 // Source is the part of yt.Client the fetcher needs.
@@ -156,7 +159,7 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 		}
 		var fails int
 		f.DB.QueryRow(`SELECT fail_count FROM channels WHERE id = ?`, id).Scan(&fails)
-		next := now.Add(backoff(interval, fails+1))
+		next := now.Add(min(backoff(interval, fails+1), max(maxFeedBackoff, interval)))
 		f.DB.Exec(`UPDATE channels SET fail_count = fail_count + 1, last_error = ?, next_fetch_at = ? WHERE id = ?`,
 			err.Error(), next.Unix(), id)
 		slog.Warn("fetch: channel failed", "channel", id, "err", err)
