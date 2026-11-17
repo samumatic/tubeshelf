@@ -4,7 +4,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY VERSION main.go ./
+COPY VERSION *.go ./
 COPY internal ./internal
 
 # Only the dev-container workflow sets these; release images report the plain VERSION.
