@@ -48,12 +48,14 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "/login", errors.New("password login is disabled"))
 		return
 	}
-	if !s.logins.allow(clientIP(r)) {
+	// Only wrong passwords count: a household behind one IP signs in often.
+	if s.logins.blocked(clientIP(r)) {
 		fail(w, r, "/login", errors.New("too many attempts, wait a few minutes"))
 		return
 	}
 	u, err := auth.Login(s.DB, r.FormValue("email"), r.FormValue("password"))
 	if err != nil {
+		s.logins.record(clientIP(r))
 		fail(w, r, "/login", err)
 		return
 	}

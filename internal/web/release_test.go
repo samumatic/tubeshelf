@@ -234,6 +234,18 @@ func TestLoginLimitIgnoresSpoofedForwardedFor(t *testing.T) {
 	}
 }
 
+// Everyone behind one proxy shares an IP: successful sign-ins must not lock the others out.
+func TestSuccessfulLoginsAreNotLimited(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	for i := range 15 {
+		anon := &app{t: t, db: a.db, url: a.url, c: &http.Client{}}
+		if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); strings.Contains(body, "too many attempts") {
+			t.Fatalf("sign-in %d refused as too many attempts", i+1)
+		}
+	}
+}
+
 // The player posts its position; garbage must neither be stored nor break pages.
 func TestProgressRejectsNonFiniteValues(t *testing.T) {
 	a := newApp(t)

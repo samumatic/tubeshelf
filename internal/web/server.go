@@ -396,34 +396,53 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// limiter allows a few login attempts per client in a time window.
+// limiter allows a few attempts per client in a time window.
 type limiter struct {
 	mu   sync.Mutex
 	hits map[string][]time.Time
 }
 
-func (l *limiter) allow(key string) bool {
-	const max, window = 10, 5 * time.Minute
-	l.mu.Lock()
-	defer l.mu.Unlock()
+const limiterMax, limiterWindow = 10, 5 * time.Minute
+
+// recent drops hits older than the window and returns the rest. Call with mu held.
+func (l *limiter) recent(key string) []time.Time {
 	if l.hits == nil {
 		l.hits = map[string][]time.Time{}
 	}
 	now := time.Now()
-	recent := l.hits[key][:0]
+	kept := l.hits[key][:0]
 	for _, t := range l.hits[key] {
-		if now.Sub(t) < window {
-			recent = append(recent, t)
+		if now.Sub(t) < limiterWindow {
+			kept = append(kept, t)
 		}
 	}
-	if len(recent) >= max {
-		l.hits[key] = recent
-		return false
-	}
-	l.hits[key] = append(recent, now)
+	l.hits[key] = kept
+	return kept
+}
+
+// blocked reports whether key used up its attempts, without counting one.
+func (l *limiter) blocked(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.recent(key)) >= limiterMax
+}
+
+// record counts one attempt for key.
+func (l *limiter) record(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.hits[key] = append(l.recent(key), time.Now())
 	if len(l.hits) > 10000 {
 		l.hits = map[string][]time.Time{}
 	}
+}
+
+// allow counts an attempt and reports whether it is within the limit.
+func (l *limiter) allow(key string) bool {
+	if l.blocked(key) {
+		return false
+	}
+	l.record(key)
 	return true
 }
 
