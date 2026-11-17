@@ -451,6 +451,8 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (!feed || document.getElementById('player')) return;
+  // Enter on a focused link or button (Tab navigation) keeps its own meaning.
+  if (e.key === 'Enter' && e.target.closest?.('a, button, summary')) return;
   const cards = [...feed.querySelectorAll('.card')];
   const i = cards.indexOf(current);
   switch (e.key) {
