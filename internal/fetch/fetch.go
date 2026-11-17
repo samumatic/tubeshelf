@@ -210,8 +210,8 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 		if v.Published.Unix() < cutoff {
 			continue
 		}
-		if _, err := tx.Exec(`INSERT INTO videos (id, channel_id, channel_title, title, published_at, enrich_after)
-			VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+		if _, err := tx.Exec(`INSERT INTO videos (id, channel_id, channel_title, title, published_at, enrich_after, date_approx)
+			VALUES (?, ?, ?, ?, ?, ?, 1) ON CONFLICT(id) DO NOTHING`,
 			v.ID, id, feed.Title, v.Title, v.Published.Unix(), now.Unix()); err != nil {
 			slog.Error("fetch: insert backlog video", "video", v.ID, "err", err)
 			return
@@ -281,6 +281,10 @@ func (f *Fetcher) enrich(ctx context.Context, id string) {
 	f.DB.Exec(`UPDATE videos SET duration_seconds = ?, members_only = ?, enrich_after = ?, enrich_attempts = 0,
 		kind = CASE WHEN kind = 'short' THEN 'short' ELSE ? END WHERE id = ?`,
 		secs, d.MembersOnly, next, state, id)
+	// A channel-page row only had "3 weeks ago"; the player knows the real date.
+	if !d.Published.IsZero() {
+		f.DB.Exec(`UPDATE videos SET published_at = ?, date_approx = 0 WHERE id = ? AND date_approx = 1`, d.Published.Unix(), id)
+	}
 }
 
 // prune deletes videos past retention that no user saved or has progress on.

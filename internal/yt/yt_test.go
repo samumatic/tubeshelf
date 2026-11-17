@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestParseFeed(t *testing.T) {
@@ -47,6 +48,9 @@ func TestParseDetails(t *testing.T) {
 		{"video refused but length known",
 			`{"playabilityStatus":{"status":"UNPLAYABLE"},"videoDetails":{"lengthSeconds":"916"}}`,
 			Details{Seconds: 916}, false},
+		{"publish date",
+			`{"videoDetails":{"lengthSeconds":"3955"},"microformat":{"playerMicroformatRenderer":{"publishDate":"2026-11-04T07:52:59-08:00"}}}`,
+			Details{Seconds: 3955, Published: time.Date(2026, 11, 4, 15, 52, 59, 0, time.UTC)}, false},
 		{"live", `{"videoDetails":{"lengthSeconds":"0","isLive":true}}`, Details{Live: true}, false},
 		{"upcoming", `{"videoDetails":{"lengthSeconds":"0","isUpcoming":true}}`, Details{Upcoming: true}, false},
 		{"members only",

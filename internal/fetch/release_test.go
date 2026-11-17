@@ -119,3 +119,26 @@ func TestBacklogFailureFallsBackToRSS(t *testing.T) {
 		t.Error("a failing channel page marked the whole fetch as failed")
 	}
 }
+
+// The page only says "3 weeks ago"; the duration lookup brings the exact upload
+// date for those rows, and leaves RSS dates alone.
+func TestBacklogGetsExactDate(t *testing.T) {
+	d, src, f, now := setup(t)
+	rssAt := now.Add(-90 * time.Minute)
+	exact := now.AddDate(0, 0, -22).Add(5 * time.Hour)
+	src.feed = &yt.Feed{Title: "T", Videos: []yt.FeedVideo{{ID: "rssvideo001", Title: "From RSS", Published: rssAt}}}
+	src.uploads = []yt.FeedVideo{{ID: "oldvideo001", Title: "Older", Published: now.AddDate(0, 0, -21)}}
+	src.details["rssvideo001"] = &yt.Details{Seconds: 60, Published: rssAt.Add(-time.Hour)}
+	src.details["oldvideo001"] = &yt.Details{Seconds: 60, Published: exact}
+	f.Pass(context.Background())
+
+	var rss, old int64
+	d.QueryRow(`SELECT published_at FROM videos WHERE id = 'rssvideo001'`).Scan(&rss)
+	d.QueryRow(`SELECT published_at FROM videos WHERE id = 'oldvideo001'`).Scan(&old)
+	if rss != rssAt.Unix() {
+		t.Errorf("RSS date changed: %v", time.Unix(rss, 0).UTC())
+	}
+	if old != exact.Unix() {
+		t.Errorf("backlog date = %v, want %v", time.Unix(old, 0).UTC(), exact)
+	}
+}

@@ -135,6 +135,7 @@ type Details struct {
 	Live        bool
 	Upcoming    bool
 	MembersOnly bool
+	Published   time.Time // zero when YouTube does not say
 }
 
 type playerResponse struct {
@@ -147,6 +148,11 @@ type playerResponse struct {
 		IsLive        bool   `json:"isLive"`
 		IsUpcoming    bool   `json:"isUpcoming"`
 	} `json:"videoDetails"`
+	Microformat struct {
+		Renderer struct {
+			PublishDate string `json:"publishDate"`
+		} `json:"playerMicroformatRenderer"`
+	} `json:"microformat"`
 }
 
 // Details asks the Innertube player endpoint about a video. It needs no key;
@@ -177,7 +183,9 @@ func parseDetails(body []byte) (*Details, error) {
 		return nil, fmt.Errorf("youtube: player has no video details (%s)", p.PlayabilityStatus.Status)
 	}
 	secs, _ := strconv.Atoi(p.VideoDetails.LengthSeconds)
+	published, _ := time.Parse(time.RFC3339, p.Microformat.Renderer.PublishDate)
 	return &Details{
+		Published:   published.UTC(),
 		Seconds:     secs,
 		Live:        p.VideoDetails.IsLive,
 		Upcoming:    p.VideoDetails.IsUpcoming,
