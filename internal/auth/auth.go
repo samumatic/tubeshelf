@@ -96,6 +96,10 @@ func CreateUser(d *sql.DB, email, name, pw string, admin bool) (*User, error) {
 	if !strings.Contains(email, "@") {
 		return nil, errors.New("enter a valid email address")
 	}
+	// The same limit as the profile page; longer names break the users table.
+	if name = strings.TrimSpace(name); len(name) > 80 {
+		return nil, errors.New("name is too long")
+	}
 	var hash any
 	if pw != "" {
 		h, err := HashPassword(pw)
@@ -104,7 +108,7 @@ func CreateUser(d *sql.DB, email, name, pw string, admin bool) (*User, error) {
 		}
 		hash = h
 	}
-	u := &User{ID: NewID(), Email: email, Name: strings.TrimSpace(name), IsAdmin: admin, HasPass: pw != ""}
+	u := &User{ID: NewID(), Email: email, Name: name, IsAdmin: admin, HasPass: pw != ""}
 	_, err := d.Exec(`INSERT INTO users (id, email, name, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		u.ID, u.Email, u.Name, hash, admin, time.Now().Unix())
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ func TestLoginAndSessions(t *testing.T) {
 	}
 	if _, err := CreateUser(d, "a@example.com", "", "another password", false); !errors.Is(err, ErrEmailTaken) {
 		t.Errorf("duplicate email (other case): err = %v", err)
+	}
+	if _, err := CreateUser(d, "c@example.com", strings.Repeat("x", 81), "correct horse", false); err == nil {
+		t.Error("an 81-character name was accepted")
 	}
 	if _, err := CreateUser(d, "b@example.com", "", "short", false); err == nil {
 		t.Error("7-character password accepted")

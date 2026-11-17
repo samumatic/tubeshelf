@@ -24,7 +24,7 @@
       <form method="post" action="/admin/users">
         <div class="fields">
           <label>Email <input type="email" name="email" required autocomplete="off"></label>
-          <label>Name <input name="name" autocomplete="off"></label>
+          <label>Name <input name="name" maxlength="80" autocomplete="off"></label>
           <label>Initial password <input type="password" name="password" minlength="8" required autocomplete="new-password"></label>
         </div>
         <label class="check"><input type="checkbox" name="admin" value="1"> Admin</label>
