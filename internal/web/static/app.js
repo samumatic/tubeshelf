@@ -21,6 +21,16 @@ try {
 // Transitions stay off until the loaded page has been drawn once (see .preload in app.css).
 requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('preload')));
 
+// A flash message rides in the URL once: drop it, so a reload or a shared link does not repeat it.
+{
+  const u = new URL(location.href);
+  if (u.searchParams.has('msg') || u.searchParams.has('err')) {
+    u.searchParams.delete('msg');
+    u.searchParams.delete('err');
+    history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+  }
+}
+
 const post = (form, submitter) =>
   fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form, submitter)), headers: { 'X-Requested-With': 'fetch' } });
 
