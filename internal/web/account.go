@@ -82,10 +82,13 @@ func (s *Server) setupSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	u, err := auth.CreateUser(s.DB, r.FormValue("email"), r.FormValue("name"), r.FormValue("password"), true)
-	if err == nil && r.FormValue("password") == "" {
-		err = errors.New("choose a password")
+	// Checked before creating the user: an admin without a password would
+	// close setup for good with nobody able to sign in.
+	if r.FormValue("password") == "" {
+		fail(w, r, "/setup", errors.New("choose a password"))
+		return
 	}
+	u, err := auth.CreateUser(s.DB, r.FormValue("email"), r.FormValue("name"), r.FormValue("password"), true)
 	if err != nil {
 		fail(w, r, "/setup", err)
 		return

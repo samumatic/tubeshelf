@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -44,8 +45,9 @@ type DayGroup struct {
 func dayLabel(ts int64, now time.Time) string {
 	t := time.Unix(ts, 0).In(now.Location())
 	y, m, d := now.Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
-	switch days := int(today.Sub(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())).Hours() / 24); {
+	// Calendar days, counted in UTC so a 23- or 25-hour day (DST) still counts as one.
+	day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	switch days := int(time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Sub(day).Hours() / 24); {
 	case days < 0:
 		return "Upcoming"
 	case days == 0:
@@ -332,7 +334,7 @@ func (s *Server) setProgress(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	t, _ := strconv.ParseFloat(r.FormValue("t"), 64)
 	d, _ := strconv.ParseFloat(r.FormValue("d"), 64)
-	if !reVideoID.MatchString(id) || t < 0 {
+	if !reVideoID.MatchString(id) || !(t >= 0) || !(d >= 0) || math.IsInf(t, 0) || math.IsInf(d, 0) {
 		http.Error(w, "bad progress", http.StatusBadRequest)
 		return
 	}

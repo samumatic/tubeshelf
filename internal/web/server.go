@@ -381,8 +381,10 @@ func isFetch(r *http.Request) bool { return r.Header.Get("X-Requested-With") == 
 
 func clientIP(r *http.Request) string {
 	if os.Getenv("TRUST_PROXY_HEADERS") != "" {
+		// The last entry is the one the proxy added; earlier ones come from the client.
 		if f := r.Header.Get("X-Forwarded-For"); f != "" {
-			return strings.TrimSpace(strings.Split(f, ",")[0])
+			parts := strings.Split(f, ",")
+			return strings.TrimSpace(parts[len(parts)-1])
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
