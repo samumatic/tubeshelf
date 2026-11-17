@@ -510,7 +510,7 @@ main:has(> .watch) { padding-top: 16px; }
 .comment .avatar { width: 36px; height: 36px; }
 .comment-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; color: var(--fg-muted); font-size: 13px; }
 .comment-head strong { color: var(--fg); font-weight: 600; }
-.comment-head .badge { padding: 0 6px; border-radius: var(--radius-xs); background: var(--fill-selected); color: var(--fg); font-size: 12px; }
+.comment-head .badge { position: static; padding: 0 6px; border-radius: var(--radius-xs); background: var(--fill-selected); color: var(--fg); font-size: 12px; }
 .comment-text { white-space: pre-line; overflow-wrap: anywhere; }
 .comment-foot { display: flex; gap: 12px; margin-top: 2px; color: var(--fg-muted); font-size: 13px; }
 .comments-more { justify-self: start; }
