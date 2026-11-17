@@ -281,6 +281,11 @@ function setup(box) {
     play: toggle, back: () => seek(position() - 10), forward: () => seek(position() + 10), mute,
     captions: toggleCaptions, fullscreen, keys: showKeys,
   };
+  // A clicked control gives focus back to the player, so Enter and space stay player keys
+  // (keyboard users who tab to a control still press it with Enter).
+  box.querySelector('.bar').addEventListener('pointerup', (e) => {
+    if (e.target.closest('button') && !e.target.closest('[popover], [popovertarget]')) setTimeout(() => box.focus({ preventScroll: true }), 0);
+  }, { signal });
   box.querySelector('.buttons').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (b) actions[b.dataset.act]();
@@ -350,12 +355,21 @@ function setup(box) {
         if (e.target.closest('button, a, summary')) return; // space presses the focused control
         toggle(); break;
       case 'k': toggle(); break;
-      case 'Enter':
-        if (!lastSkip || e.target.closest('button, a, summary')) return; // Enter presses the focused control
-        seek(lastSkip[0]);
-        lastSkip = null;
-        say('Playing sponsor');
+      case 'Enter': {
+        if (e.target.closest('button, a, summary')) return; // Enter presses the focused control
+        // As in the SponsorBlock extension: inside a sponsor Enter skips it, after a skip Enter undoes it.
+        const t = position();
+        const inside = segments.find((s) => t >= s[0] && t < s[1] - 0.5);
+        if (inside) {
+          lastSkip = inside;
+          seek(inside[1], true);
+          say('Skipped sponsor · Enter to undo');
+        } else if (lastSkip) {
+          seek(lastSkip[0]);
+          say('Playing sponsor · Enter to skip');
+        } else return;
         break;
+      }
       case 'j': seek(position() - 10); break;
       case 'l': seek(position() + 10); break;
       case 'ArrowLeft': seek(position() - 5); break;
