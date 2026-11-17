@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/samumatic/tubeshelf/internal/yt"
 )
@@ -248,11 +249,13 @@ func parseImport(data []byte) ([]imported, error) {
 				}
 				if id := reAnyChannelID.FindString(o.XMLURL); id != "" {
 					out = append(out, imported{ID: id, Title: name, List: list})
+				} else if o.XMLURL != "" {
+					out = append(out, imported{Ref: o.XMLURL, Bad: true}) // a feed that is not a YouTube channel
 				}
 				if len(o.Children) > 0 {
 					// Folders that just wrap everything are not real lists.
-					child := name
-					if o.XMLURL != "" || strings.EqualFold(name, "YouTube Subscriptions") || strings.EqualFold(name, "Subscriptions") {
+					child := listName(name)
+					if child == "" || o.XMLURL != "" || strings.EqualFold(name, "YouTube Subscriptions") || strings.EqualFold(name, "Subscriptions") {
 						child = list
 					}
 					walk(o.Children, child)
@@ -459,4 +462,15 @@ func (s *Server) apiDeleteSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// listName applies the rules of the Create list form to a folder name from an
+// import: trimmed, at most 60 bytes, cut at a character boundary.
+func listName(s string) string {
+	s = strings.TrimSpace(s)
+	for len(s) > 60 {
+		_, size := utf8.DecodeLastRuneInString(s)
+		s = s[:len(s)-size]
+	}
+	return strings.TrimSpace(s)
 }

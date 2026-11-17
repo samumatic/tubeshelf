@@ -264,6 +264,15 @@ func TestParseImport(t *testing.T) {
 		t.Errorf("folder not read as list: %+v", got[1])
 	}
 
+	// Folder names follow the Create list rules; feeds that are not channels count as failed.
+	opmlFile = `<opml><body><outline text="   "><outline text="A" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCaaaaaaaaaaaaaaaaaaaaaa"/></outline>
+		<outline text="` + strings.Repeat("é", 40) + `"><outline text="B" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=UCbbbbbbbbbbbbbbbbbbbbbb"/>
+		<outline text="X" xmlUrl="https://example.com/feed"/></outline></body></opml>`
+	got, err = parseImport([]byte(opmlFile))
+	if err != nil || len(got) != 3 || got[0].List != "" || got[1].List != strings.Repeat("é", 30) || !got[2].Bad {
+		t.Errorf("folder names and foreign feeds: %+v, %v", got, err)
+	}
+
 	csvFile := "Channel Id,Channel Url,Channel Title\nUCaaaaaaaaaaaaaaaaaaaaaa,http://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa,\"A, with comma\"\n"
 	got, err = parseImport([]byte("\xef\xbb\xbf" + csvFile))
 	if err != nil || len(got) != 1 || got[0].Title != "A, with comma" {
