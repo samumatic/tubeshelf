@@ -20,6 +20,10 @@ type fake struct {
 	details  map[string]*yt.Details
 	avatar   string
 	resolves int
+
+	uploads     []yt.FeedVideo
+	uploadsErr  error
+	uploadCalls int
 }
 
 func (f *fake) Feed(context.Context, string) (*yt.Feed, error) { return f.feed, f.feedErr }
@@ -29,6 +33,10 @@ func (f *fake) Resolve(_ context.Context, id string) (*yt.Channel, error) {
 		return nil, errors.New("no page")
 	}
 	return &yt.Channel{ID: id, Thumbnail: f.avatar}, nil
+}
+func (f *fake) Uploads(context.Context, string) ([]yt.FeedVideo, error) {
+	f.uploadCalls++
+	return f.uploads, f.uploadsErr
 }
 func (f *fake) Details(_ context.Context, id string) (*yt.Details, error) {
 	if d, ok := f.details[id]; ok {

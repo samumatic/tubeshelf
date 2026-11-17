@@ -33,6 +33,7 @@ type Source interface {
 	Feed(ctx context.Context, channelID string) (*yt.Feed, error)
 	Details(ctx context.Context, videoID string) (*yt.Details, error)
 	Resolve(ctx context.Context, input string) (*yt.Channel, error)
+	Uploads(ctx context.Context, channelID string) ([]yt.FeedVideo, error)
 }
 
 // noAvatar marks a channel whose avatar lookup failed, so it is not retried forever.
@@ -166,6 +167,18 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 		return
 	}
 
+	// A channel's first fetch also reads its Videos tab once, for the uploads
+	// older than the RSS feed's 15. If that fails the RSS feed is enough.
+	var first bool
+	f.DB.QueryRow(`SELECT last_success_at IS NULL FROM channels WHERE id = ?`, id).Scan(&first)
+	var backlog []yt.FeedVideo
+	if first {
+		var err error
+		if backlog, err = f.YT.Uploads(ctx, id); err != nil {
+			slog.Info("fetch: channel page not readable, using RSS only", "channel", id, "err", err)
+		}
+	}
+
 	tx, err := f.DB.Begin()
 	if err != nil {
 		slog.Error("fetch: begin", "err", err)
@@ -189,6 +202,18 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 				kind = CASE WHEN excluded.kind = 'short' THEN 'short' ELSE kind END`,
 			v.ID, id, feed.Title, v.Title, v.Published.Unix(), kind, now.Unix()); err != nil {
 			slog.Error("fetch: upsert video", "video", v.ID, "err", err)
+			return
+		}
+	}
+	// RSS rows went in first and keep their exact dates; the page only adds what is missing.
+	for _, v := range backlog {
+		if v.Published.Unix() < cutoff {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO videos (id, channel_id, channel_title, title, published_at, enrich_after)
+			VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+			v.ID, id, feed.Title, v.Title, v.Published.Unix(), now.Unix()); err != nil {
+			slog.Error("fetch: insert backlog video", "video", v.ID, "err", err)
 			return
 		}
 	}

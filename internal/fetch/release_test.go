@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -65,5 +66,56 @@ func TestBackoffIsCapped(t *testing.T) {
 		if got := backoff(time.Minute, fails); got != want {
 			t.Errorf("backoff(1m, %d) = %v, want %v", fails, got, want)
 		}
+	}
+}
+
+// A channel's first fetch adds older uploads from its page, once. RSS dates
+// win over the page's approximate ones, and a failing page changes nothing.
+func TestFirstFetchAddsBacklogOnce(t *testing.T) {
+	d, src, f, now := setup(t)
+	src.feed = &yt.Feed{Title: "T", Videos: []yt.FeedVideo{{ID: "rssvideo001", Title: "From RSS", Published: now.Add(-90 * time.Minute)}}}
+	src.uploads = []yt.FeedVideo{
+		{ID: "rssvideo001", Title: "From page", Published: now.Add(-2 * time.Hour)},
+		{ID: "oldvideo001", Title: "Older", Published: now.AddDate(0, 0, -40)},
+		{ID: "ancient0001", Title: "Past retention", Published: now.AddDate(-2, 0, 0)},
+	}
+	f.Pass(context.Background())
+
+	var published int64
+	var title string
+	d.QueryRow(`SELECT published_at, title FROM videos WHERE id = 'rssvideo001'`).Scan(&published, &title)
+	if published != now.Add(-90*time.Minute).Unix() || title != "From RSS" {
+		t.Errorf("RSS data was overwritten by the page: %d %q", published, title)
+	}
+	if v := video(t, d, "oldvideo001"); v.enrich == 0 {
+		t.Error("backlog video not queued for duration lookup")
+	}
+	var n int
+	d.QueryRow(`SELECT count(*) FROM videos WHERE id = 'ancient0001'`).Scan(&n)
+	if n != 0 {
+		t.Error("backlog video past retention was stored")
+	}
+
+	*now = now.Add(time.Hour)
+	f.Pass(context.Background())
+	if src.uploadCalls != 1 {
+		t.Errorf("channel page read %d times, want once", src.uploadCalls)
+	}
+}
+
+func TestBacklogFailureFallsBackToRSS(t *testing.T) {
+	d, src, f, now := setup(t)
+	src.feed = &yt.Feed{Title: "T", Videos: []yt.FeedVideo{{ID: "rssvideo001", Title: "From RSS", Published: now.Add(-time.Hour)}}}
+	src.uploadsErr = errors.New("consent wall")
+	f.Pass(context.Background())
+	var n int
+	d.QueryRow(`SELECT count(*) FROM videos`).Scan(&n)
+	if n != 1 {
+		t.Errorf("got %d videos, want the RSS one", n)
+	}
+	var ok bool
+	d.QueryRow(`SELECT last_success_at IS NOT NULL FROM channels WHERE id = ?`, chanID).Scan(&ok)
+	if !ok {
+		t.Error("a failing channel page marked the whole fetch as failed")
 	}
 }

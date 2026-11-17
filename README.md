@@ -17,7 +17,8 @@ Your YouTube subscriptions in a clean, chronological feed, without a Google acco
 
 ## Features
 
-- **Chronological feed** from YouTube's public RSS feeds: no Google account, no API key
+- **Chronological feed** from YouTube's public RSS feeds: no Google account, no API key; a new channel also brings its recent uploads from its channel page
+- **Comments** under the player, loaded through TubeShelf
 - **Filters** for Shorts, live streams, members-only and watched videos; search; lists of channels
 - **Built-in player** that resumes, marks videos watched and skips sponsors (SponsorBlock)
 - **Watch later, history, import/export** (OPML, Google Takeout, plain lists)
