@@ -246,7 +246,7 @@ func (im *importer) subscriptions() error {
 	// dropped and only real lists are kept.
 	listID := map[string]int64{}
 	listUser := map[string]string{}
-	err := im.each(`SELECT id, name, user_id FROM subscription_lists`, func(c []string) error {
+	err := im.each(`SELECT id, name, user_id FROM subscription_lists WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
 		listUser[c[0]] = c[2]
 		if c[0] == "default" || strings.HasPrefix(c[0], "default-") {
 			return nil
@@ -326,7 +326,7 @@ func (im *importer) videos() error {
 func (im *importer) watchState() error {
 	if hasTable(im.src, "playback_history") {
 		err := im.each(`SELECT video_id, user_id, video_title, coalesce(channel_id, ''), channel_name, timestamp, progress, completed
-			FROM playback_history`, func(c []string) error {
+			FROM playback_history WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
 			at := im.unix(c[5])
 			if err := im.stubVideo(c[0], c[3], c[4], c[2], at); err != nil {
 				return err
@@ -347,7 +347,7 @@ func (im *importer) watchState() error {
 	if !hasTable(im.src, "watched_videos") {
 		return nil
 	}
-	return im.each(`SELECT video_id, user_id, watched_at FROM watched_videos`, func(c []string) error {
+	return im.each(`SELECT video_id, user_id, watched_at FROM watched_videos WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
 		var exists int
 		im.tx.QueryRow(`SELECT count(*) FROM watch_state WHERE user_id = ? AND video_id = ?`, c[1], c[0]).Scan(&exists)
 		_, err := im.tx.Exec(`INSERT INTO watch_state (user_id, video_id, watched, updated_at) VALUES (?, ?, 1, ?)
@@ -363,7 +363,7 @@ func (im *importer) watchLater() error {
 	if !hasTable(im.src, "watch_later") {
 		return nil
 	}
-	return im.each(`SELECT video_id, user_id, title, channel, added_at FROM watch_later`, func(c []string) error {
+	return im.each(`SELECT video_id, user_id, title, channel, added_at FROM watch_later WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
 		at := im.unix(c[4])
 		if err := im.stubVideo(c[0], "", c[3], c[2], at); err != nil {
 			return err
@@ -396,10 +396,36 @@ func (im *importer) settings() error {
 		"watchedThresholdPercent": "watched_percent", "theme": "theme", "defaultSortOrder": "sort",
 		"sponsorBlockEnabled": "sponsorblock",
 	}
+	// v1 kept the instance's defaults for per-user preferences in settings too;
+	// they apply to every user who did not choose otherwise.
+	userDefaults := map[string]string{}
 	if hasTable(im.src, "settings") {
 		err := im.each(`SELECT key, value FROM settings`, func(c []string) error {
-			if k, ok := instance[c[0]]; ok && plain(c[1]) != "null" {
-				_, err := im.tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT DO NOTHING`, k, plain(c[1]))
+			v := plain(c[1])
+			if v == "null" {
+				return nil
+			}
+			if k, ok := perUser[c[0]]; ok {
+				userDefaults[k] = v
+			}
+			k, ok := instance[c[0]]
+			if !ok {
+				return nil
+			}
+			if k == "retention_days" && v == "0" {
+				v = "3650" // v1's 0 meant "keep forever"; v2's longest is ten years
+			}
+			_, err := im.tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT DO NOTHING`, k, v)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if hasTable(im.src, "user_config") {
+		err := im.each(`SELECT user_id, key, value FROM user_config WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
+			if k, ok := perUser[c[1]]; ok && plain(c[2]) != "null" {
+				_, err := im.tx.Exec(`INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, c[0], k, plain(c[2]))
 				return err
 			}
 			return nil
@@ -408,16 +434,12 @@ func (im *importer) settings() error {
 			return err
 		}
 	}
-	if !hasTable(im.src, "user_config") {
-		return nil
-	}
-	return im.each(`SELECT user_id, key, value FROM user_config WHERE user_id IN (SELECT id FROM users)`, func(c []string) error {
-		if k, ok := perUser[c[1]]; ok && plain(c[2]) != "null" {
-			_, err := im.tx.Exec(`INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, c[0], k, plain(c[2]))
+	for k, v := range userDefaults {
+		if _, err := im.tx.Exec(`INSERT INTO user_settings (user_id, key, value) SELECT id, ?, ? FROM users WHERE true ON CONFLICT DO NOTHING`, k, v); err != nil {
 			return err
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 func (im *importer) apiKeys() error {

@@ -60,7 +60,12 @@ INSERT INTO playback_history VALUES ('vid00000001', 'u1', 'Known length', 'UCaaa
 INSERT INTO playback_history VALUES ('gone0000001', 'u1', 'Pruned video', NULL, 'Chan Z', '2026-03-03T00:00:00.000Z', 10, 1);
 INSERT INTO watched_videos VALUES ('vid00000001', 'u1', '2026-03-04T00:00:00.000Z'), ('vid00000002', 'u1', '2026-03-04T00:00:00.000Z');
 INSERT INTO watch_later VALUES ('later000001', 'u1', 'Saved', 'Chan Q', '2026-03-05T00:00:00.000Z');
-INSERT INTO settings VALUES ('videoRetentionDays', '120'), ('oidcOnly', 'false'), ('theme', '"dark"');
+INSERT INTO settings VALUES ('videoRetentionDays', '120'), ('oidcOnly', 'false'), ('theme', '"dark"'), ('hideShorts', 'true');
+-- rows of a user v1 deleted without cleaning up
+INSERT INTO subscription_lists VALUES ('999', 'Orphan', 'gone');
+INSERT INTO playback_history VALUES ('vid00000001', 'gone', 'Known length', NULL, 'Chan A', '2026-03-03T00:00:00.000Z', 5, 0);
+INSERT INTO watched_videos VALUES ('vid00000001', 'gone', '2026-03-04T00:00:00.000Z');
+INSERT INTO watch_later VALUES ('later000002', 'gone', 'Orphan', 'Chan Q', '2026-03-05T00:00:00.000Z');
 INSERT INTO user_config VALUES ('u1', 'hideShorts', 'false'), ('u1', 'watchedThresholdPercent', '80'), ('u1', 'videoRetentionDays', 'null');
 INSERT INTO api_keys VALUES ('k1', 'u1', 'script', 'abc123', '2026-03-01T00:00:00.000Z');
 `
@@ -126,7 +131,11 @@ func TestRun(t *testing.T) {
 		{"boolean setting", one(`SELECT value FROM settings WHERE key = 'oidc_only'`), "0"},
 		{"user setting", one(`SELECT value FROM user_settings WHERE user_id = 'u1' AND key = 'hide_shorts'`), "0"},
 		{"user number setting", one(`SELECT value FROM user_settings WHERE user_id = 'u1' AND key = 'watched_percent'`), "80"},
-		{"null settings skipped", one(`SELECT count(*) FROM user_settings WHERE user_id = 'u1'`), "2"},
+		{"null settings skipped", one(`SELECT count(*) FROM user_settings WHERE user_id = 'u1' AND key = 'retention_days'`), "0"},
+		{"instance default applies to users", one(`SELECT value FROM user_settings WHERE user_id = 'u2' AND key = 'theme'`), "dark"},
+		{"own choice beats instance default", one(`SELECT value FROM user_settings WHERE user_id = 'u1' AND key = 'hide_shorts'`), "0"},
+		{"instance default fills the rest", one(`SELECT value FROM user_settings WHERE user_id = 'u2' AND key = 'hide_shorts'`), "1"},
+		{"orphaned rows skipped", one(`SELECT (SELECT count(*) FROM lists) + (SELECT count(*) FROM watch_state WHERE user_id = 'gone') + (SELECT count(*) FROM watch_later WHERE user_id = 'gone')`), "1"},
 		{"api key hash kept", one(`SELECT key_hash FROM api_keys WHERE id = 'k1'`), "abc123"},
 		{"provider stays enabled", one(`SELECT enabled FROM oidc_providers`), "1"},
 	}
@@ -202,5 +211,28 @@ func TestDecryptV1LegacyDefaultKey(t *testing.T) {
 	d.QueryRow(`SELECT client_secret, enabled FROM oidc_providers`).Scan(&sealed, &enabled)
 	if plain, err := secret.Open(sealed); err != nil || plain != "legacy-secret" || !enabled {
 		t.Errorf("secret = %q, enabled = %v, err = %v", plain, enabled, err)
+	}
+}
+
+// v1 stored "keep videos forever" as 0 days; it must not become one day.
+func TestRunKeepsForeverRetention(t *testing.T) {
+	dir := t.TempDir()
+	v1Path := filepath.Join(dir, "tubeshelf.db")
+	v1, _ := sql.Open("sqlite", "file:"+v1Path)
+	if _, err := v1.Exec(v1Schema + `UPDATE settings SET value = '0' WHERE key = 'videoRetentionDays';`); err != nil {
+		t.Fatal(err)
+	}
+	v1.Close()
+	d, _ := db.Open(filepath.Join(dir, "shelf.db"))
+	defer d.Close()
+	t.Setenv("TUBESHELF_SECRET", "v2-secret")
+	secret, _ := auth.LoadSecret(dir)
+	if _, err := Run(d, v1Path, secret, []string{v1Secret}, false); err != nil {
+		t.Fatal(err)
+	}
+	var v string
+	d.QueryRow(`SELECT value FROM settings WHERE key = 'retention_days'`).Scan(&v)
+	if v != "3650" {
+		t.Errorf("retention_days = %q, want 3650", v)
 	}
 }
