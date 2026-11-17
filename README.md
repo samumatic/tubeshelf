@@ -64,6 +64,9 @@ docker exec -it tubeshelf /tubeshelf reset-password <email>
 
 ```bash
 docker exec tubeshelf /tubeshelf make-admin <email>
+docker exec tubeshelf /tubeshelf user-list
+docker exec tubeshelf /tubeshelf oidc-status
+docker exec tubeshelf /tubeshelf oidc-toggle [enable|disable]
 ```
 
 Create a key under **Account › API keys** and send it as `X-API-Key`:

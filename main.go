@@ -33,6 +33,9 @@ const usage = `tubeshelf [command]
   import-v1 [file]          import a TubeShelf v1 database (default: <data>/tubeshelf.db)
   reset-password <email>    set a new password for a user (read from stdin)
   make-admin <email>        give a user the admin role
+  user-list                 list users, their role and how they sign in
+  oidc-status               show whether only OIDC sign-in is allowed
+  oidc-toggle [enable|disable]  allow only OIDC sign-in, or allow passwords again
   health                    exit 0 if the local server answers (for container healthchecks)
   version
 
@@ -122,7 +125,7 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 			v1Path = args[0]
 		}
 		return importV1(v1Path)
-	case "reset-password", "make-admin":
+	case "reset-password", "user-reset-password", "make-admin":
 		if len(args) != 1 {
 			return errors.New("usage: tubeshelf " + cmd + " <email>")
 		}
@@ -137,6 +140,12 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 		fmt.Fprint(os.Stderr, "New password: ")
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		return auth.SetPassword(d, id, strings.TrimRight(line, "\r\n"))
+	case "oidc-toggle", "toggle-oidc-only":
+		return oidcToggle(d, args, os.Stdout)
+	case "oidc-status", "get-oidc-only":
+		return oidcStatus(d, os.Stdout)
+	case "user-list", "list-local-users":
+		return userList(d, os.Stdout)
 	case "serve":
 	default:
 		fmt.Print(usage)
