@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -223,10 +224,12 @@ type opml struct {
 // it sat in, if any. Ref is set instead of ID when only a handle or URL is known.
 type imported struct {
 	ID, Title, List, Ref string
+	Bad                  bool // a line that names no channel; counted as not found
 }
 
 // parseImport reads OPML (as exported by TubeShelf, NewPipe, FreeTube and
-// others), a Google Takeout subscriptions.csv, or one channel per line.
+// others), a Google Takeout subscriptions.csv, a JSON export (NewPipe,
+// FreeTube: every channel id in it), or one channel per line.
 func parseImport(data []byte) ([]imported, error) {
 	data = bytes.TrimSpace(bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")))
 	var out []imported
@@ -273,18 +276,31 @@ func parseImport(data []byte) ([]imported, error) {
 				out = append(out, it)
 			}
 		}
+	case bytes.HasPrefix(data, []byte("{")) || bytes.HasPrefix(data, []byte("[")):
+		// Read as text, every word would be looked up as a channel name.
+		seen := map[string]bool{}
+		for _, id := range reAnyChannelID.FindAll(data, -1) {
+			if !seen[string(id)] {
+				seen[string(id)] = true
+				out = append(out, imported{ID: string(id)})
+			}
+		}
 	default:
 		sc := bufio.NewScanner(bytes.NewReader(data))
 		for sc.Scan() {
 			line := strings.TrimSpace(sc.Text())
-			if id := reAnyChannelID.FindString(line); id != "" {
-				out = append(out, imported{ID: id})
-			} else if line != "" {
+			switch {
+			case line == "" || strings.HasPrefix(line, "#"):
+			case reAnyChannelID.MatchString(line):
+				out = append(out, imported{ID: reAnyChannelID.FindString(line)})
+			case strings.HasPrefix(line, "@") || strings.Contains(strings.ToLower(line), "youtube.com/"):
 				out = append(out, imported{Ref: line})
+			default:
+				out = append(out, imported{Ref: line, Bad: true})
 			}
 		}
 	}
-	if len(out) == 0 {
+	if !slices.ContainsFunc(out, func(it imported) bool { return !it.Bad }) {
 		return nil, errors.New("no channels found in that file")
 	}
 	return out, nil
@@ -310,6 +326,10 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 	// A channel can be in several folders (TubeShelf's own export lists it at the top and in each list).
 	channels := map[string]bool{}
 	for _, it := range items {
+		if it.Bad {
+			failed++
+			continue
+		}
 		ch := yt.Channel{ID: it.ID, Title: it.Title}
 		if it.Ref != "" {
 			ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)

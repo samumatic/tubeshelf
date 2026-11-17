@@ -277,6 +277,23 @@ func TestParseImport(t *testing.T) {
 	if _, err := parseImport([]byte("<opml><body></body></opml>")); err == nil {
 		t.Error("empty OPML accepted")
 	}
+
+	// NewPipe JSON: only the channel ids count, never the words around them.
+	newpipe := `{"app_version":"0.27","subscriptions":[{"service_id":0,"url":"https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa","name":"A"},
+		{"service_id":0,"url":"https://www.youtube.com/channel/UCbbbbbbbbbbbbbbbbbbbbbb","name":"B"},{"url":"https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa"}]}`
+	got, err = parseImport([]byte(newpipe))
+	if err != nil || len(got) != 2 || got[0].Ref != "" || got[1].Ref != "" {
+		t.Errorf("newpipe json: %+v, %v", got, err)
+	}
+
+	// Comments are skipped; a line that names no channel is not looked up.
+	got, err = parseImport([]byte("# mine\n@handle\nhello world\n"))
+	if err != nil || len(got) != 2 || got[0].Ref != "@handle" || !got[1].Bad {
+		t.Errorf("text with junk: %+v, %v", got, err)
+	}
+	if _, err := parseImport([]byte("just some words\n")); err == nil {
+		t.Error("a file without any channel was accepted")
+	}
 }
 
 func TestOPMLRoundTrip(t *testing.T) {
