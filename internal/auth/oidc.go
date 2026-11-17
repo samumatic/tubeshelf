@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -101,7 +104,7 @@ type flow struct {
 func (p *Provider) config(ctx context.Context, s Secret, baseURL string) (*oidc.Provider, *oauth2.Config, error) {
 	op, err := oidc.NewProvider(ctx, p.Issuer)
 	if err != nil {
-		return nil, nil, fmt.Errorf("oidc discovery for %s: %w", p.Name, err)
+		return nil, nil, providerFailed(fmt.Errorf("oidc discovery for %s: %w", p.Name, err))
 	}
 	secret, err := s.Open(p.ClientSecret)
 	if err != nil {
@@ -119,6 +122,8 @@ func (p *Provider) config(ctx context.Context, s Secret, baseURL string) (*oidc.
 // OIDCStart returns the provider URL to redirect to and the sealed cookie
 // value that OIDCFinish needs back.
 func OIDCStart(ctx context.Context, d *sql.DB, s Secret, providerID, baseURL string) (redirect, cookie string, err error) {
+	ctx, cancel := providerContext(ctx)
+	defer cancel()
 	p, err := providerByID(d, providerID)
 	if err != nil {
 		return "", "", errors.New("unknown login provider")
@@ -136,6 +141,8 @@ func OIDCStart(ctx context.Context, d *sql.DB, s Secret, providerID, baseURL str
 // OIDCFinish validates the callback and returns the matching local user,
 // creating one when the provider allows auto-provisioning.
 func OIDCFinish(ctx context.Context, d *sql.DB, s Secret, cookie, state, code, baseURL string) (*User, error) {
+	ctx, cancel := providerContext(ctx)
+	defer cancel()
 	raw, err := s.Open(cookie)
 	if err != nil {
 		return nil, errors.New("login expired, try again")
@@ -154,15 +161,15 @@ func OIDCFinish(ctx context.Context, d *sql.DB, s Secret, cookie, state, code, b
 	}
 	tok, err := cfg.Exchange(ctx, code, oauth2.VerifierOption(f.Verifier))
 	if err != nil {
-		return nil, fmt.Errorf("oidc code exchange: %w", err)
+		return nil, providerFailed(fmt.Errorf("oidc code exchange: %w", err))
 	}
 	rawID, _ := tok.Extra("id_token").(string)
 	idTok, err := op.Verifier(&oidc.Config{ClientID: p.ClientID}).Verify(ctx, rawID)
 	if err != nil {
-		return nil, fmt.Errorf("oidc id token: %w", err)
+		return nil, providerFailed(fmt.Errorf("oidc id token: %w", err))
 	}
 	if idTok.Nonce != f.Nonce {
-		return nil, errors.New("oidc nonce mismatch")
+		return nil, providerFailed(errors.New("oidc nonce mismatch"))
 	}
 	claims := map[string]any{}
 	if err := idTok.Claims(&claims); err != nil {
@@ -170,7 +177,8 @@ func OIDCFinish(ctx context.Context, d *sql.DB, s Secret, cookie, state, code, b
 	}
 	// Some providers only put profile claims on the userinfo endpoint.
 	if _, ok := claims["email"]; !ok {
-		if info, err := op.UserInfo(ctx, cfg.TokenSource(ctx, tok)); err == nil {
+		// Only when it describes the same person as the token.
+		if info, err := op.UserInfo(ctx, cfg.TokenSource(ctx, tok)); err == nil && info.Subject == idTok.Subject {
 			info.Claims(&claims)
 		}
 	}
@@ -222,10 +230,32 @@ func oidcUser(d *sql.DB, p *Provider, subject, email, name string, admin bool) (
 	if !p.AutoProvision {
 		return nil, errors.New("no account exists for " + email + "; ask an admin to create one")
 	}
+	// A long name from the provider is shortened rather than refusing the login.
+	for len(name) > 80 {
+		_, size := utf8.DecodeLastRuneInString(name)
+		name = name[:len(name)-size]
+	}
 	u, err := CreateUser(d, email, name, "", admin)
 	if err != nil {
 		return nil, err
 	}
 	d.Exec(`UPDATE users SET oidc_issuer = ?, oidc_subject = ? WHERE id = ?`, p.Issuer, subject, u.ID)
 	return u, nil
+}
+
+// providerContext bounds every call to the login provider, so one that accepts
+// connections but never answers cannot hang the login.
+func providerContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	ctx = context.WithValue(oidc.ClientContext(ctx, client), oauth2.HTTPClient, client)
+	return context.WithTimeout(ctx, 30*time.Second)
+}
+
+// errProviderFailed is what people who are not signed in see; the details
+// (addresses, issuers, token times) only go to the server log.
+var errProviderFailed = errors.New("sign-in with the login provider failed; an admin can find the reason in the server log")
+
+func providerFailed(err error) error {
+	slog.Warn("oidc login failed", "err", err)
+	return errProviderFailed
 }

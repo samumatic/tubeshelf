@@ -27,6 +27,7 @@ type idp struct {
 	nonce     string // echoed into the id token
 	challenge string // PKCE challenge from the authorization request
 	claims    map[string]any
+	userinfo  map[string]any // served at /userinfo
 }
 
 func newIDP(t *testing.T) *idp {
@@ -45,12 +46,16 @@ func newIDP(t *testing.T) *idp {
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"issuer": p.srv.URL, "authorization_endpoint": p.srv.URL + "/authorize",
-			"token_endpoint": p.srv.URL + "/token", "jwks_uri": p.srv.URL + "/jwks",
+			"token_endpoint": p.srv.URL + "/token", "jwks_uri": p.srv.URL + "/jwks", "userinfo_endpoint": p.srv.URL + "/userinfo",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		})
 	})
 	mux.HandleFunc("/jwks", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "k1", Algorithm: "RS256", Use: "sig"}}})
+	})
+	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(p.userinfo)
 	})
 	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
@@ -148,6 +153,20 @@ func TestOIDCLogin(t *testing.T) {
 	// A different subject must not take over an already linked account.
 	if other, err := p.login(t, env, map[string]any{"sub": "sub-3", "email": "local@example.com"}); err == nil && other.ID == local.ID {
 		t.Error("a second OIDC subject took over a linked account")
+	}
+
+	// Userinfo fills a missing email only when it describes the same subject.
+	p.userinfo = map[string]any{"sub": "someone-else", "email": "mixed@example.com"}
+	if got, err := p.login(t, env, map[string]any{"sub": "sub-5"}); err == nil {
+		t.Errorf("userinfo of another subject was used: %+v", got)
+	}
+	p.userinfo = map[string]any{"sub": "sub-6", "email": "info@example.com"}
+	if got, err := p.login(t, env, map[string]any{"sub": "sub-6"}); err != nil || got.Email != "info@example.com" {
+		t.Errorf("userinfo email: %+v, %v", got, err)
+	}
+	// A provider's overlong display name is shortened instead of blocking the login.
+	if got, err := p.login(t, env, map[string]any{"sub": "sub-7", "email": "long@example.com", "name": strings.Repeat("ü", 50)}); err != nil || got.Name != strings.Repeat("ü", 40) {
+		t.Errorf("long name: %+v, %v", got, err)
 	}
 
 	// Without auto-provisioning, unknown people are turned away.
