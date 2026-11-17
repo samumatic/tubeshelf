@@ -670,6 +670,11 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
 /* Under 640px: a top bar, and the navigation floats above the page as a pill next to the search button. */
 @media (max-width: 639px) {
   .sidebar, .backdrop { display: none; }
+  /* No keyboard on a phone: the shortcuts button pushed Fullscreen off the bar. */
+  .buttons [data-act="keys"] { display: none; }
+  .player .bar { padding-inline: 4px; }
+  .buttons { gap: 0; }
+  .buttons .time { margin-left: 4px; }
   .shell { flex-direction: column; gap: 0; padding: 0; }
   .content { border-radius: 0; box-shadow: none; }
   main { padding: var(--s5) var(--s4) 104px; }
