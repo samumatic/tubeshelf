@@ -140,6 +140,11 @@ func TestOIDCLogin(t *testing.T) {
 	if err != nil || linked.ID != local.ID || !linked.HasPass {
 		t.Errorf("linking: %+v, %v", linked, err)
 	}
+	// An address the provider marks unverified opens no local account.
+	victim, _ := CreateUser(d, "victim@example.com", "Victim", "correct horse", false)
+	if got, err := p.login(t, env, map[string]any{"sub": "sub-4", "email": "victim@example.com", "email_verified": false}); err == nil && got.ID == victim.ID {
+		t.Error("an unverified email address was linked to an existing account")
+	}
 	// A different subject must not take over an already linked account.
 	if other, err := p.login(t, env, map[string]any{"sub": "sub-3", "email": "local@example.com"}); err == nil && other.ID == local.ID {
 		t.Error("a second OIDC subject took over a linked account")

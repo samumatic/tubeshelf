@@ -175,6 +175,11 @@ func OIDCFinish(ctx context.Context, d *sql.DB, s Secret, cookie, state, code, b
 		}
 	}
 	email, _ := claims["email"].(string)
+	// A provider that lets people type any address marks it unverified; such an
+	// address must not open the local account that has it. No claim: trust the provider.
+	if v, ok := claims["email_verified"].(bool); ok && !v {
+		email = ""
+	}
 	name, _ := claims["name"].(string)
 	admin := p.AdminGroup != "" && hasGroup(claims[p.GroupClaim], p.AdminGroup)
 	return oidcUser(d, p, idTok.Subject, email, name, admin)
@@ -207,7 +212,7 @@ func oidcUser(d *sql.DB, p *Provider, subject, email, name string, admin bool) (
 		return sync(id)
 	}
 	if email == "" {
-		return nil, errors.New("the login provider did not share an email address")
+		return nil, errors.New("the login provider did not share a verified email address")
 	}
 	// First OIDC login of an existing local account links it by email.
 	if d.QueryRow(`SELECT id FROM users WHERE email = ? AND oidc_subject IS NULL`, email).Scan(&id) == nil {
