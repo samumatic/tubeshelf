@@ -210,17 +210,36 @@ function setup(box) {
   const comments = document.querySelector('details[data-comments]');
   if (comments) {
     const body = comments.querySelector('.comments-body');
+    // A failed load leaves a Try again button that repeats it (YouTube refuses now and then; trains lose signal).
+    const failed = (token, sort, text) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'comments-error';
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = text;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'button';
+      b.textContent = 'Try again';
+      b.dataset.commentsRetry = token;
+      if (sort) b.dataset.sort = '1';
+      wrap.append(p, b);
+      const f = document.createDocumentFragment();
+      f.append(wrap);
+      return f;
+    };
     const load = async (token, sort) => {
       const q = new URLSearchParams();
       if (token) q.set('t', token);
       if (sort) q.set('sort', '1');
       try {
         const r = await fetch(`${comments.dataset.comments}?${q}`, { signal });
+        if (!r.ok) return failed(token, sort, 'Comments could not be loaded from YouTube.');
         const html = await r.text();
         return document.createRange().createContextualFragment(html);
       } catch (err) {
         if (err.name === 'AbortError') throw err;
-        return document.createRange().createContextualFragment('<p class="muted">Comments could not be loaded.</p>');
+        return failed(token, sort, 'Comments could not be loaded. Check your connection.');
       }
     };
     let started = false;
@@ -230,6 +249,12 @@ function setup(box) {
       load('').then((f) => body.replaceChildren(f)).catch(() => {});
     }, { signal });
     body.addEventListener('click', async (e) => {
+      const retry = e.target.closest('[data-comments-retry]');
+      if (retry) {
+        retry.disabled = true;
+        retry.closest('.comments-error').replaceWith(await load(retry.dataset.commentsRetry, retry.dataset.sort === '1').catch(() => ''));
+        return;
+      }
       const more = e.target.closest('[data-comments-more]');
       const sort = e.target.closest('[data-comments-sort]');
       if (more) {
