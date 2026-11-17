@@ -175,7 +175,8 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go fetcher.Run(ctx)
+	fetched := make(chan struct{})
+	go func() { fetcher.Run(ctx); close(fetched) }()
 
 	httpSrv := &http.Server{
 		Addr:              net.JoinHostPort(env("TUBESHELF_HOST", ""), port),
@@ -183,7 +184,9 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
+	shutDown := make(chan struct{})
 	go func() {
+		defer close(shutDown)
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -193,6 +196,11 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 	if err := httpSrv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	// ListenAndServe returns as soon as Shutdown starts: let requests in flight and
+	// the fetcher finish before the deferred Close takes the database away.
+	<-shutDown
+	<-fetched
+	slog.Info("tubeshelf stopped")
 	return nil
 }
 
