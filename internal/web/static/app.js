@@ -51,8 +51,12 @@ document.addEventListener('submit', async (e) => {
   const form = e.target.closest('form[data-toggle]');
   if (!form) return;
   e.preventDefault();
+  // One request at a time: a second click before the reply would send the same value and flip the button back.
+  if (form.dataset.busy) return;
+  form.dataset.busy = '1';
   const on = form.elements.on;
   const res = await post(form).catch(() => null);
+  delete form.dataset.busy;
   // Offline: a reload would replace the page with the browser's error page and lose the scroll position.
   if (!res) return offline();
   if (!res.ok) return location.reload();
@@ -428,7 +432,8 @@ const pager = new IntersectionObserver(async ([entry]) => {
   const link = entry.target;
   pager.unobserve(link);
   const res = await fetch(link.href + '&fragment=1', { headers: { 'X-Requested-With': 'fetch' } }).catch(() => null);
-  if (!res || !res.ok) return;
+  // A failed page is tried again a little later instead of ending the feed there.
+  if (!res || !res.ok) return setTimeout(() => link.isConnected && pager.observe(link), 3000);
   link.insertAdjacentHTML('afterend', await res.text());
   link.remove();
   watchPager();
@@ -492,7 +497,10 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   openWatch(a.href);
 });
+let opening = 0;
 async function openWatch(url) {
+  // Only the video clicked last may be shown, whichever reply arrives last.
+  const mine = ++opening;
   try {
     const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
     if (!res.ok || res.redirected) throw new Error(`watch page: ${res.status}`);
@@ -501,6 +509,7 @@ async function openWatch(url) {
     const src = next.querySelector('script[src*="/static/player.js"]')?.getAttribute('src');
     if (!main || !src || !next.querySelector('.shell')) throw new Error('watch page: unexpected markup');
     playerModule ??= await import(src);
+    if (mine !== opening) return;
     const swap = () => {
       playerModule.unmount();
       document.title = next.title;
@@ -524,7 +533,7 @@ async function openWatch(url) {
     if (document.startViewTransition && !still.matches) document.startViewTransition(swap);
     else swap();
   } catch {
-    location.href = url;
+    if (mine === opening) location.href = url;
   }
 }
 addEventListener('popstate', () => {

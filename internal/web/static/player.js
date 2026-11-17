@@ -71,7 +71,7 @@ function setup(box) {
 
   // ---------- Progress ----------
   function save(ended = false, beacon = false) {
-    if (!now.t && !ended) return;
+    if (!now.t && !ended && !savedAt) return; // nothing played yet; a rewind to 0:00 is still saved
     savedAt = now.t;
     const body = new URLSearchParams({ t: now.t.toFixed(1), d: now.d.toFixed(1), ended: ended ? '1' : '0' });
     const url = `/videos/${id}/progress`;
@@ -397,8 +397,17 @@ function setup(box) {
 
   // ---------- Keyboard: one owner ----------
   // A click on the video moves focus into the embed, which ignores keys (disablekb); take focus back.
+  // Tab also lands in the embed; then focus moves on past it, so the controls stay reachable.
+  let tabbed = null;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') tabbed = { back: e.shiftKey, at: performance.now() };
+  }, { signal });
   addEventListener('blur', () => setTimeout(() => {
-    if (document.activeElement === frame) box.focus({ preventScroll: true });
+    if (document.activeElement !== frame) return;
+    const tab = tabbed && performance.now() - tabbed.at < 500 && tabbed;
+    tabbed = null;
+    if (tab && !tab.back) (box.querySelector('.bar button') ?? box).focus({ preventScroll: true });
+    else box.focus({ preventScroll: true });
   }, 0), { signal });
 
   document.addEventListener('keydown', (e) => {
