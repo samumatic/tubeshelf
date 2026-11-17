@@ -73,6 +73,13 @@
     </div>
   </div>
 
+  <section class="comments" aria-label="Comments">
+    <details data-comments="/videos/{{.V.ID}}/comments">
+      <summary>Comments</summary>
+      <div class="comments-body" aria-live="polite"><p class="muted">Loading comments…</p></div>
+    </details>
+  </section>
+
   {{if .UpNext}}
   <section class="up-next" aria-labelledby="up-next">
     <h2 id="up-next" class="day">Up next</h2>

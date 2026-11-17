@@ -205,6 +205,46 @@ function setup(box) {
     }
   }, { signal });
 
+  // ---------- Comments ----------
+  // Loaded when first opened, through the server, so the browser still only contacts YouTube for the video.
+  const comments = document.querySelector('details[data-comments]');
+  if (comments) {
+    const body = comments.querySelector('.comments-body');
+    const load = async (token, sort) => {
+      const q = new URLSearchParams();
+      if (token) q.set('t', token);
+      if (sort) q.set('sort', '1');
+      try {
+        const r = await fetch(`${comments.dataset.comments}?${q}`, { signal });
+        const html = await r.text();
+        return document.createRange().createContextualFragment(html);
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        return document.createRange().createContextualFragment('<p class="muted">Comments could not be loaded.</p>');
+      }
+    };
+    let started = false;
+    comments.addEventListener('toggle', () => {
+      if (!comments.open || started) return;
+      started = true;
+      load('').then((f) => body.replaceChildren(f)).catch(() => {});
+    }, { signal });
+    body.addEventListener('click', async (e) => {
+      const more = e.target.closest('[data-comments-more]');
+      const sort = e.target.closest('[data-comments-sort]');
+      if (more) {
+        more.disabled = true;
+        more.replaceWith(await load(more.dataset.commentsMore).catch(() => ''));
+      } else if (sort && sort.getAttribute('aria-pressed') !== 'true') {
+        for (const b of body.querySelectorAll('[data-comments-sort]')) b.setAttribute('aria-pressed', b === sort);
+        const f = await load(sort.dataset.commentsSort, true).catch(() => null);
+        if (!f) return;
+        for (const n of [...body.children]) if (!n.matches('.comments-sort')) n.remove();
+        body.append(f);
+      }
+    }, { signal });
+  }
+
   if (box.dataset.sponsorblock === '1') {
     fetch(`/videos/${id}/segments`).then((r) => r.json()).then((s) => { segments = s || []; drawSegments(); }).catch(() => {});
   }

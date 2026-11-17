@@ -30,6 +30,7 @@ type app struct {
 	db  *sql.DB
 	url string
 	c   *http.Client
+	yt  *yt.Client
 }
 
 func newApp(t *testing.T) *app {
@@ -50,7 +51,7 @@ func newApp(t *testing.T) *app {
 	srv := httptest.NewServer(h)
 	t.Cleanup(func() { srv.Close(); d.Close() })
 	jar, _ := cookiejar.New(nil)
-	return &app{t: t, db: d, url: srv.URL, c: &http.Client{Jar: jar}}
+	return &app{t: t, db: d, url: srv.URL, c: &http.Client{Jar: jar}, yt: client}
 }
 
 func (a *app) get(path string) (int, string) {

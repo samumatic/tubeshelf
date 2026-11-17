@@ -42,11 +42,12 @@ type Server struct {
 	DataDir string
 	Version string
 
-	pages    map[string]*template.Template
-	assetVer string
-	logins   limiter
-	segments segmentCache
-	media    *http.Client
+	pages         map[string]*template.Template
+	assetVer      string
+	logins        limiter
+	segments      segmentCache
+	commentsCache commentCache
+	media         *http.Client
 }
 
 type ctxKey struct{}
@@ -94,6 +95,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("POST /videos/{id}/later", s.setLater)
 	page("POST /videos/{id}/progress", s.setProgress)
 	page("GET /videos/{id}/segments", s.sponsorSegments)
+	page("GET /videos/{id}/comments", s.comments)
 	page("GET /thumb/{id}", s.thumb)
 	page("GET /avatar/{id}", s.avatar)
 	page("POST /logout", s.logout)

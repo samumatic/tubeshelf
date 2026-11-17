@@ -438,7 +438,7 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 /* The video's height sets its width: the viewport minus the page's top padding, the control bar and a peek at the title. */
 main:has(> .watch) { padding-top: 16px; }
 .watch { --video-w: min(100%, calc((100dvh - 144px) * 16 / 9)); display: flex; flex-direction: column; gap: var(--s6); }
-.player, .watch-info { width: var(--video-w); margin-inline: auto; }
+.player, .watch-info, .comments { width: var(--video-w); margin-inline: auto; }
 /* The player is a dark island in both themes, as on YouTube. */
 .player { --fg: #f2f2f2; --fg-muted: #a3a3a3; --fill-hover: rgb(255 255 255 / 0.1); --fill-selected: rgb(255 255 255 / 0.16); --surface-raised: #232323; --border: rgb(255 255 255 / 0.1);
   --seek: #e5484d; position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-lg); background: #000; color: var(--fg); color-scheme: dark; outline: none; box-shadow: 0 0 0 1px var(--border); }
@@ -504,6 +504,16 @@ main:has(> .watch) { padding-top: 16px; }
 .watch-meta .channel time { display: block; font-size: 13px; }
 .watch-meta .channel:hover strong { text-decoration: underline; text-underline-offset: 3px; }
 .up-next .day { margin: 0 0 var(--s4); }
+.comments { margin-top: calc(-1 * var(--s3)); }
+.comments-body { display: grid; gap: var(--s4); margin-top: var(--s4); }
+.comment { display: grid; grid-template-columns: 36px 1fr; gap: 12px; font-size: 14px; line-height: 21px; }
+.comment .avatar { width: 36px; height: 36px; }
+.comment-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; color: var(--fg-muted); font-size: 13px; }
+.comment-head strong { color: var(--fg); font-weight: 600; }
+.comment-head .badge { padding: 0 6px; border-radius: var(--radius-xs); background: var(--fill-selected); color: var(--fg); font-size: 12px; }
+.comment-text { white-space: pre-line; overflow-wrap: anywhere; }
+.comment-foot { display: flex; gap: 12px; margin-top: 2px; color: var(--fg-muted); font-size: 13px; }
+.comments-more { justify-self: start; }
 summary { cursor: pointer; width: fit-content; font-size: 14px; font-weight: 500; color: var(--fg-muted); border-radius: var(--radius-xs); transition: color var(--dur-fast) var(--ease-out); }
 summary:hover { color: var(--fg); }
 

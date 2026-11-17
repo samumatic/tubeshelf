@@ -6,8 +6,10 @@ package web
 import (
 	"fmt"
 	"html"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
@@ -358,5 +360,57 @@ func TestBackIgnoresForeignReferer(t *testing.T) {
 	res.Body.Close()
 	if loc := res.Header.Get("Location"); strings.Contains(loc, "evil.example") || !strings.HasPrefix(loc, "/") {
 		t.Errorf("redirect after form goes to %q", loc)
+	}
+}
+
+// Comments come through the server: HTML-escaped, cached, and a failure at
+// YouTube shows a message instead of breaking the watch page.
+func TestComments(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	if _, body := a.get("/watch/video000001"); !strings.Contains(body, `data-comments="/videos/video000001/comments"`) {
+		t.Fatal("watch page has no comments section")
+	}
+	if code, body := a.get("/videos/video000001/comments"); code != http.StatusBadGateway || !strings.Contains(body, "could not be loaded") {
+		t.Errorf("YouTube unreachable: %d %q", code, body)
+	}
+
+	calls := 0
+	yt := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		b, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(b), `"videoId"`) {
+			io.WriteString(w, `{"contents":{"twoColumnWatchNextResults":{"results":{"results":{"contents":[{"itemSectionRenderer":{"targetId":"comments-section","contents":[{"continuationItemRenderer":{"continuationEndpoint":{"continuationCommand":{"token":"FIRST"}}}}]}}]}}}}}`)
+			return
+		}
+		io.WriteString(w, `{"onResponseReceivedEndpoints":[{"appendContinuationItemsAction":{"continuationItems":[
+			{"sortFilterSubMenuRenderer":{"subMenuItems":[{"title":"Top","serviceEndpoint":{"continuationCommand":{"token":"TOP"}}},{"title":"Newest first","serviceEndpoint":{"continuationCommand":{"token":"NEW"}}}]}},
+			{"commentThreadRenderer":{"comment":{"commentRenderer":{"commentId":"c1","authorText":{"simpleText":"@mallory"},"contentText":{"simpleText":"<script>alert(1)</script>"}}}}},
+			{"continuationItemRenderer":{"continuationEndpoint":{"continuationCommand":{"token":"MORE"}}}}]}}]}`)
+	}))
+	defer yt.Close()
+	a.yt.BaseURL = yt.URL
+	a.db.Exec(`DELETE FROM videos WHERE id = 'video000002'`) // nothing cached for this id yet
+	code, body := a.get("/videos/video000002/comments")
+	if code != http.StatusOK || !strings.Contains(body, "@mallory") || !strings.Contains(body, `data-comments-more="MORE"`) || !strings.Contains(body, `data-comments-sort="NEW"`) {
+		t.Fatalf("comments: %d %s", code, body)
+	}
+	if strings.Contains(body, "<script>") {
+		t.Error("comment text is not escaped")
+	}
+	before := calls
+	a.get("/videos/video000002/comments")
+	if calls != before {
+		t.Error("the same page was fetched from YouTube again instead of the cache")
+	}
+	if _, body := a.get("/videos/video000002/comments?t=MORE"); strings.Contains(body, "data-comments-sort") {
+		t.Error("a 'more' page repeats the sort buttons")
+	}
+	if code, _ := a.get("/videos/bad/comments"); code != http.StatusNotFound {
+		t.Errorf("invalid id: status %d", code)
+	}
+	anon := &app{t: t, db: a.db, url: a.url, c: &http.Client{}}
+	if _, body := anon.get("/videos/video000002/comments"); strings.Contains(body, "@mallory") {
+		t.Error("comments are served to signed-out visitors")
 	}
 }
