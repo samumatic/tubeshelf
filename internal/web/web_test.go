@@ -450,6 +450,11 @@ func TestChannelPage(t *testing.T) {
 	if n != 0 {
 		t.Error("still subscribed")
 	}
+	// No longer followed: the page offers Subscribe, not Unsubscribe.
+	_, body = a.get("/?channel=" + chanA)
+	if strings.Contains(body, `/delete"`) || !strings.Contains(body, `name="channel" value="`+chanA+`"`) {
+		t.Errorf("page of an unfollowed channel does not offer Subscribe: %.300s", body)
+	}
 }
 
 func TestSidebarWidth(t *testing.T) {

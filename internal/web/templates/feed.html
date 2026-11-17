@@ -7,7 +7,8 @@
   </div>
   <div class="row">
     <a class="button" href="https://www.youtube.com/channel/{{.ChannelID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a>
-    <form method="post" action="/channels/{{.ChannelID}}/delete"><input type="hidden" name="next" value="/"><button class="button" data-confirm="Unsubscribe from {{or .ChannelTitle .ChannelID}}?">Unsubscribe</button></form>
+    {{if .Subscribed}}<form method="post" action="/channels/{{.ChannelID}}/delete"><input type="hidden" name="next" value="/"><button class="button" data-confirm="Unsubscribe from {{or .ChannelTitle .ChannelID}}?">Unsubscribe</button></form>
+    {{else}}<form method="post" action="/channels"><input type="hidden" name="channel" value="{{.ChannelID}}"><button class="button primary">Subscribe</button></form>{{end}}
   </div>
   {{else}}
   <div><p class="eyebrow">{{if .Search}}Search results{{else}}Your subscriptions{{end}}</p>

@@ -218,9 +218,12 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"]}
 	if q["channel"] != "" {
 		var title string
-		var avatar bool
-		s.DB.QueryRow(`SELECT title, coalesce(thumbnail LIKE 'https://%', 0) FROM channels WHERE id = ?`, q["channel"]).Scan(&title, &avatar)
-		data["ChannelTitle"], data["ChannelAvatar"] = title, avatar
+		var avatar, subscribed bool
+		s.DB.QueryRow(`SELECT title, coalesce(thumbnail LIKE 'https://%', 0),
+			EXISTS (SELECT 1 FROM subscriptions WHERE user_id = ? AND channel_id = c.id)
+			FROM channels c WHERE id = ?`, u.ID, q["channel"]).Scan(&title, &avatar, &subscribed)
+		// A saved video's channel can be one the viewer does not follow (any more): offer to subscribe.
+		data["ChannelTitle"], data["ChannelAvatar"], data["Subscribed"] = title, avatar, subscribed
 	}
 	if len(vids) == 0 && q["before"] == "" {
 		var subs, pending int
