@@ -341,6 +341,24 @@ func TestImportIsIdempotentAndKeepsTitles(t *testing.T) {
 	}
 }
 
+// TubeShelf's own export lists a channel at the top and again in each of its
+// lists; importing it back counts each channel once.
+func TestExportReimportCountsChannelsOnce(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	opml := `<?xml version="1.0"?><opml version="2.0"><body>
+		<outline text="Music"><outline text="A" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=` + chanA + `"/></outline>
+	</body></opml>`
+	a.upload("/channels/import", nil, map[string][]byte{"file": []byte(opml)})
+	_, export := a.get("/channels/export.opml")
+	if strings.Count(export, chanA) != 2 {
+		t.Fatalf("export should list the channel at the top and in its list:\n%s", export)
+	}
+	if _, body := a.upload("/channels/import", nil, map[string][]byte{"file": []byte(export)}); !strings.Contains(body, "Imported 0 new of 1 channels") {
+		t.Error("re-importing the export did not count the channel once")
+	}
+}
+
 // Day headings count calendar days, also across a daylight saving change.
 func TestDayLabelAcrossDST(t *testing.T) {
 	loc, err := time.LoadLocation("Europe/Berlin")

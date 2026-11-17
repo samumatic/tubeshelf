@@ -307,6 +307,8 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 	}
 	added, failed := 0, 0
 	listIDs := map[string]int64{}
+	// A channel can be in several folders (TubeShelf's own export lists it at the top and in each list).
+	channels := map[string]bool{}
 	for _, it := range items {
 		ch := yt.Channel{ID: it.ID, Title: it.Title}
 		if it.Ref != "" {
@@ -324,6 +326,7 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 			failed++
 			continue
 		}
+		channels[ch.ID] = true
 		if isNew {
 			added++
 		}
@@ -339,7 +342,7 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 		s.DB.Exec(`INSERT INTO list_channels (list_id, channel_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, id, ch.ID)
 	}
 	s.Fetcher.Wake()
-	msg := fmt.Sprintf("Imported %d new of %d channels", added, len(items))
+	msg := fmt.Sprintf("Imported %d new of %d channels", added, len(channels)+failed)
 	if failed > 0 {
 		msg += fmt.Sprintf(", %d could not be found", failed)
 	}
