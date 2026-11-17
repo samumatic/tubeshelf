@@ -34,6 +34,18 @@ requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement
 const post = (form, submitter) =>
   fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form, submitter)), headers: { 'X-Requested-With': 'fetch' } });
 
+function offline() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.querySelector('.flash.offline')?.remove();
+  const p = document.createElement('p');
+  p.className = 'flash error offline';
+  p.setAttribute('role', 'alert');
+  p.textContent = 'No connection: nothing was changed. Try again when you are back online.';
+  main.prepend(p);
+  addEventListener('online', () => p.remove(), { once: true });
+}
+
 // Toggle buttons (watched, later, list membership) update in place.
 document.addEventListener('submit', async (e) => {
   const form = e.target.closest('form[data-toggle]');
@@ -41,7 +53,9 @@ document.addEventListener('submit', async (e) => {
   e.preventDefault();
   const on = form.elements.on;
   const res = await post(form).catch(() => null);
-  if (!res || !res.ok) return location.reload();
+  // Offline: a reload would replace the page with the browser's error page and lose the scroll position.
+  if (!res) return offline();
+  if (!res.ok) return location.reload();
   const active = on.value === '1';
   on.value = active ? '0' : '1';
   const button = form.querySelector('button');
