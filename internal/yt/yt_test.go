@@ -51,6 +51,7 @@ func TestParseDetails(t *testing.T) {
 		{"publish date",
 			`{"videoDetails":{"lengthSeconds":"3955"},"microformat":{"playerMicroformatRenderer":{"publishDate":"2026-11-04T07:52:59-08:00"}}}`,
 			Details{Seconds: 3955, Published: time.Date(2026, 11, 4, 15, 52, 59, 0, time.UTC)}, false},
+		{"ended stream without recording", `{"playabilityStatus":{"status":"UNPLAYABLE"},"videoDetails":{"lengthSeconds":"121601512"}}`, Details{}, false},
 		{"live", `{"videoDetails":{"lengthSeconds":"0","isLive":true}}`, Details{Live: true}, false},
 		{"upcoming", `{"videoDetails":{"lengthSeconds":"0","isUpcoming":true}}`, Details{Upcoming: true}, false},
 		{"members only",
@@ -82,13 +83,18 @@ func TestChannelPath(t *testing.T) {
 		"https://m.youtube.com/c/SomeName":                          "/c/SomeName",
 		"https://www.youtube.com/user/SomeUser?feature=share":       "/user/SomeUser",
 		"https://www.youtube.com/channel/UCdC0An4ZPNr_YiFiYoVbwaw/": "/channel/UCdC0An4ZPNr_YiFiYoVbwaw",
+		"@MKBHD/videos": "/@MKBHD",
+		"@%E3%83%92":    "/@%E3%83%92",
+		"@ヒカキン":         "/@%E3%83%92%E3%82%AB%E3%82%AD%E3%83%B3",
+		"https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ": "/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ",
+		"youtube.com/marquesbrownlee":                                "/marquesbrownlee",
 	}
 	for in, want := range ok {
 		if got, err := channelPath(in); err != nil || got != want {
 			t.Errorf("channelPath(%q) = %q, %v; want %q", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"https://evil.example/@x", "https://www.youtube.com/watch?v=abc", "veritasium", "https://youtube.com.evil.example/@x"} {
+	for _, in := range []string{"https://evil.example/@x", "https://www.youtube.com/watch?v=abc", "veritasium", "https://youtube.com.evil.example/@x", "https://www.youtube.com/results?search_query=x", "https://www.youtube.com/"} {
 		if got, err := channelPath(in); err == nil {
 			t.Errorf("channelPath(%q) = %q, want error", in, got)
 		}

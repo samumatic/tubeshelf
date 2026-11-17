@@ -183,6 +183,9 @@ func parseDetails(body []byte) (*Details, error) {
 		return nil, fmt.Errorf("youtube: player has no video details (%s)", p.PlayabilityStatus.Status)
 	}
 	secs, _ := strconv.Atoi(p.VideoDetails.LengthSeconds)
+	if secs > 7*24*3600 {
+		secs = 0 // an ended stream without a recording reports the time since it began
+	}
 	published, _ := time.Parse(time.RFC3339, p.Microformat.Renderer.PublishDate)
 	return &Details{
 		Published:   published.UTC(),
@@ -212,13 +215,20 @@ func IsChannelID(s string) bool { return reChannelID.MatchString(s) }
 
 // channelPath turns user input (channel id, @handle, or any youtube.com
 // channel URL) into the path of that channel's page.
+var reVanity = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,100}$`)
+
+// youtubePages are top-level paths that are not channels.
+var youtubePages = map[string]bool{"watch": true, "results": true, "feed": true, "shorts": true, "playlist": true,
+	"live": true, "embed": true, "hashtag": true, "redirect": true, "account": true, "premium": true, "gaming": true,
+	"about": true, "t": true, "signin": true, "logout": true, "upload": true, "post": true, "channel": true, "c": true, "user": true}
+
 func channelPath(input string) (string, error) {
 	s := strings.TrimSpace(input)
 	if IsChannelID(s) {
 		return "/channel/" + s, nil
 	}
 	if strings.HasPrefix(s, "@") {
-		return "/" + url.PathEscape(s), nil
+		s = "youtube.com/" + s // read like a pasted URL, so "@x/videos" and encoded handles work
 	}
 	if !strings.Contains(s, "://") {
 		s = "https://" + s
@@ -227,7 +237,8 @@ func channelPath(input string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("not a channel: %q", input)
 	}
-	host := strings.TrimPrefix(strings.TrimPrefix(u.Hostname(), "www."), "m.")
+	host := strings.TrimPrefix(u.Hostname(), "www.")
+	host = strings.TrimPrefix(strings.TrimPrefix(host, "m."), "music.")
 	if host != "youtube.com" {
 		return "", fmt.Errorf("not a YouTube channel: %q", input)
 	}
@@ -237,6 +248,8 @@ func channelPath(input string) (string, error) {
 		return "/" + parts[0], nil
 	case len(parts) >= 2 && (parts[0] == "channel" || parts[0] == "c" || parts[0] == "user"):
 		return "/" + parts[0] + "/" + parts[1], nil
+	case len(parts) >= 1 && reVanity.MatchString(parts[0]) && !youtubePages[parts[0]]:
+		return "/" + parts[0], nil // legacy custom URL, e.g. youtube.com/marquesbrownlee
 	}
 	return "", fmt.Errorf("not a YouTube channel: %q", input)
 }
