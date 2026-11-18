@@ -167,10 +167,14 @@ if (palette) {
   const select = (li) => {
     list.querySelector('[aria-selected="true"]')?.removeAttribute('aria-selected');
     li?.setAttribute('aria-selected', 'true');
+    if (li?.id) input.setAttribute('aria-activedescendant', li.id); else input.removeAttribute('aria-activedescendant');
     li?.scrollIntoView({ block: 'nearest' });
   };
+  let seq = 0;
   const item = (href, label, kind, keywords) => {
     const li = document.createElement('li');
+    li.role = 'option';
+    li.id = 'pal-' + ++seq;
     const a = document.createElement('a');
     const small = document.createElement('small');
     a.href = href;
@@ -182,16 +186,33 @@ if (palette) {
     li.dataset.k = keywords;
     return li;
   };
+  let videoTimer, videoReq = 0;
   const filter = () => {
-    const q = input.value.trim().toLowerCase();
-    list.querySelector('[data-search-item]')?.remove();
+    const raw = input.value.trim();
+    const q = raw.toLowerCase();
+    for (const el of list.querySelectorAll('[data-search-item], [data-video-item]')) el.remove();
     for (const li of list.children) li.hidden = q !== '' && (li.classList.contains('group') || !(li.dataset.k + ' ' + li.textContent).toLowerCase().includes(q));
     if (q) {
-      const li = item('/?q=' + encodeURIComponent(input.value.trim()), `Search the feed for “${input.value.trim()}”`, 'Search', '');
+      const li = item('/?q=' + encodeURIComponent(raw), `Search the feed for “${raw}”`, 'Search', '');
       li.dataset.searchItem = '';
-      list.append(li);
+      // With no page or channel matching, Enter searches (the phone's search button relies on this).
+      visible().length ? list.append(li) : list.prepend(li);
     }
     select(visible()[0]);
+    clearTimeout(videoTimer);
+    if (raw.length < 2) return;
+    const mine = ++videoReq;
+    videoTimer = setTimeout(async () => {
+      const vids = await fetch('/api/videos?q=' + encodeURIComponent(raw)).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      if (mine !== videoReq || !vids.length) return;
+      const g = group('Videos');
+      g.dataset.videoItem = '';
+      const anchor = list.querySelector('[data-search-item]');
+      const rows = vids.map((v) => item('/watch/' + v.id, v.title, v.channel, ''));
+      for (const r of rows) r.dataset.videoItem = '';
+      anchor ? anchor.after(g, ...rows) : list.append(g, ...rows);
+      if (!list.querySelector('[aria-selected="true"]')) select(visible()[0]);
+    }, 180);
   };
   const open = async () => {
     input.value = '';
@@ -204,6 +225,15 @@ if (palette) {
     for (const c of channels) list.append(item('/?channel=' + encodeURIComponent(c.channelId), c.title, 'Channel', 'channel'));
     filter();
   };
+  for (const li of list.children) if (!li.classList.contains('group')) { li.role = 'option'; li.id = 'pal-' + ++seq; }
+  // Actions run as a POST, then show the page they belong to.
+  list.addEventListener('click', async (e) => {
+    const a = e.target.closest('a[data-post]');
+    if (!a) return;
+    e.preventDefault();
+    const res = await fetch(a.dataset.post, { method: 'POST', headers: { 'X-Requested-With': 'fetch' } }).catch(() => null);
+    location.href = res?.url || a.href;
+  });
   openPalette = open;
   for (const b of document.querySelectorAll('[data-palette]')) b.addEventListener('click', open);
   input.addEventListener('input', filter);

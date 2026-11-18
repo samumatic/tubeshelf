@@ -157,6 +157,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	api("DELETE /api/subscriptions/{id}", s.apiDeleteSubscription)
 	api("DELETE /api/subscriptions", s.apiDeleteSubscription)
 	api("GET /api/subscriptions/export", s.exportOPML)
+	api("GET /api/videos", s.apiVideos)
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
 	})

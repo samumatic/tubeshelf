@@ -866,3 +866,29 @@ tr.paused td:not(.end) { opacity: .6; }
 .provider { margin-top: var(--s3); }
 .keys-item kbd { margin-left: auto; }
 @media (hover: none) { .keys-item { display: none; } }
+
+/* Phone: the video stays in view while Up next and comments scroll under it. */
+@media (max-width: 639px) {
+  .page-watch .player { position: sticky; top: 52px; z-index: 20; width: calc(100% + 2 * var(--s4)); max-width: none; margin-inline: calc(-1 * var(--s4)); border-radius: 0; }
+  .page-watch .player .screen, .page-watch .player .bar { border-radius: 0; }
+  .page-watch main { padding-top: 0; }
+  /* Channels: one line per channel, unsubscribe on the right; the counts move under the name. */
+  .channel-table tr { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px var(--s3); padding: var(--s3); margin-bottom: var(--s2); }
+  .channel-table td:first-child { grid-column: 1; }
+  .channel-table td.end { grid-column: 2; grid-row: 1; }
+  .channel-table td[data-label] { grid-column: 1 / -1; min-height: 0; font-size: 13px; justify-content: flex-start; }
+  .channel-table td[data-label="Videos"] { display: none; }
+  .channel-table td[data-label]::before { font-size: 13px; }
+}
+/* Phone on its side: the video takes the screen, the app chrome steps aside. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .page-watch .phone-bar, .page-watch .phone-nav, .page-watch .phone-search { display: none; }
+  .page-watch main { padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  .page-watch .player { position: static; margin: 0; }
+  .page-watch .watch { --video-w: 100%; }
+  .page-watch .screen { height: calc(100dvh - 68px); aspect-ratio: auto; }
+  .page-watch .player { border-radius: 0; }
+  .page-watch .sidebar { display: none; }
+  .page-watch .shell { padding: 0; }
+  .page-watch .content { border-radius: 0; }
+}

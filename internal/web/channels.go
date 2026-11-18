@@ -20,6 +20,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/samumatic/tubeshelf/internal/db"
 	"github.com/samumatic/tubeshelf/internal/yt"
 )
 
@@ -515,4 +516,26 @@ func listName(s string) string {
 		s = s[:len(s)-size]
 	}
 	return strings.TrimSpace(s)
+}
+
+// apiVideos searches the caller's feed: the palette's video results, and a small API for scripts.
+func (s *Server) apiVideos(w http.ResponseWriter, r *http.Request) {
+	u := s.user(r)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "q is required"})
+		return
+	}
+	set := db.UserSettings(s.DB, u.ID)
+	set["hide_watched"], set["hide_shorts"], set["hide_members"], set["hide_live"] = "0", "0", "0", "0"
+	vids, _, err := s.feedVideos(u.ID, set, map[string]string{"q": q}, 8)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	out := make([]map[string]any, 0, len(vids))
+	for _, v := range vids {
+		out = append(out, map[string]any{"id": v.ID, "title": v.Title, "channel": v.Channel, "published": v.Published, "watched": v.Watched})
+	}
+	writeJSON(w, http.StatusOK, out)
 }

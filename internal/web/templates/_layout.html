@@ -87,8 +87,8 @@
   </div>
 </div>
 <dialog class="palette" id="palette" aria-label="Command palette">
-  <input type="text" placeholder="Go to a page, list or channel, or search the feed" aria-label="Command" autocomplete="off">
-  <ul role="listbox">
+  <input type="text" placeholder="Go to a page, list or channel, or search videos" aria-label="Search and jump" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list">
+  <ul role="listbox" id="palette-list" aria-label="Results">
     <li class="group" role="presentation">Watch</li>
     <li data-k="feed home"><a href="/">{{template "i-feed"}}Feed</a></li>
     <li data-k="later saved"><a href="/later">{{template "i-clock"}}Watch later</a></li>
@@ -106,7 +106,9 @@
     <li data-k="admin users accounts"><a href="/admin/users">{{template "i-users"}}Users</a></li>
     <li data-k="admin sign-in login oidc providers registration"><a href="/admin/sign-in">{{template "i-key"}}Sign-in</a></li>
     <li data-k="admin instance refresh retention fetch"><a href="/admin/instance">{{template "i-server"}}Instance</a></li>
-    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Branding</a></li>{{end}}
+    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Branding</a></li>
+    <li data-k="admin refresh check fetch update all channels now"><a href="/admin" data-post="/admin/refresh">{{template "i-pulse"}}Check all channels now<small>Action</small></a></li>
+    <li data-k="admin add user invite account"><a href="/admin/users?add=1#add">{{template "i-users"}}Add a user<small>Action</small></a></li>{{end}}
     {{if .NavLists}}<li class="group" role="presentation">Lists</li>{{end}}
     {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
   </ul>
