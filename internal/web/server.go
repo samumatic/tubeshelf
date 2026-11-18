@@ -298,7 +298,7 @@ func securityHeaders(h http.Handler) http.Handler {
 }
 
 func isHTTPS(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" || strings.HasPrefix(os.Getenv("TUBESHELF_URL"), "https://")
 }
 
 // baseURL is the public origin, used for OIDC redirects.

@@ -31,6 +31,10 @@ const (
 // ErrNotFound means YouTube answered 404: the channel or video is gone.
 var ErrNotFound = errors.New("not found on YouTube")
 
+// ErrBlocked means YouTube asked to sign in to confirm this is not a bot: the
+// server's address is rate limited, not the video. Retrying later works.
+var ErrBlocked = errors.New("YouTube is asking this server to confirm it is not a bot")
+
 // Client fetches from YouTube. BaseURL is overridable for tests.
 type Client struct {
 	HTTP    *http.Client
@@ -186,6 +190,9 @@ func parseDetails(body []byte) (*Details, error) {
 	if p.VideoDetails == nil {
 		if p.PlayabilityStatus.Status == "ERROR" {
 			return nil, ErrNotFound
+		}
+		if p.PlayabilityStatus.Status == "LOGIN_REQUIRED" && strings.Contains(strings.ToLower(p.PlayabilityStatus.Reason), "bot") {
+			return nil, ErrBlocked
 		}
 		return nil, fmt.Errorf("youtube: player has no video details (%s)", p.PlayabilityStatus.Status)
 	}

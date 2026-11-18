@@ -53,7 +53,8 @@ Open **http://localhost:3000** and create the admin account. Refresh interval, r
 |---|---|---|
 | `PORT` | `3000` | Listen port |
 | `TUBESHELF_DATA` | `/app/data` | Database, cached images, generated secret |
-| `TUBESHELF_URL` | from the request | Public URL, for OIDC behind a proxy that rewrites `Host` |
+| `TUBESHELF_URL` | from the request | Public URL, for OIDC behind a proxy that rewrites `Host`; an `https://` URL also marks cookies Secure |
+| `TUBESHELF_HOST` | all addresses | Listen address |
 | `TUBESHELF_SECRET` | kept in `data/.secret` | Encrypts OIDC client secrets; set it before the first start or never |
 | `TRUST_PROXY_HEADERS` | unset | `1` rate-limits logins by `X-Forwarded-For` |
 
@@ -78,6 +79,35 @@ Create a key under **Account › API keys** and send it as `X-API-Key`:
 | `POST /api/subscriptions` with `{"channel": "<url, @handle or id>"}` | Subscribe |
 | `DELETE /api/subscriptions/<channel id>` | Unsubscribe |
 | `GET /api/subscriptions/export` | OPML export |
+| `GET /api/videos?q=<text>` | Search your feed (up to 8 videos) |
+
+## Sign-in with OIDC
+
+Under **Administration › Sign-in**, add a provider (Pocket ID, Authentik, Authelia, Keycloak, Google and others):
+
+1. At the provider, create an OIDC client with the redirect URI shown on that page (`<your URL>/api/auth/oidc/callback`).
+2. Enter the issuer URL, client ID and secret. The issuer is checked when you save.
+3. To manage admins at the provider, add `groups` to the scopes and set the group claim and admin group. People signing in through that provider without the group lose admin rights; the last admin always keeps them.
+
+Behind a reverse proxy, set `TUBESHELF_URL` so the redirect URI uses your public address.
+
+## Backup and upgrade
+
+```bash
+docker exec tubeshelf /tubeshelf backup /app/data/backup-$(date +%F).db
+```
+
+The backup is consistent while TubeShelf runs. Keep it with `data/.secret` (unless you set `TUBESHELF_SECRET`) and `data/branding`; thumbnails and avatars are fetched again.
+
+To upgrade, pull the new image and run `docker compose up -d`. Database changes apply on start. A TubeShelf 1.x database (`data/tubeshelf.db`) is imported on the first start of 2.x and left untouched.
+
+## Troubleshooting
+
+- **No videos after adding channels**: the first fetch takes a minute. **Administration › Status** lists channels that fail, with the reason, and lets you retry or remove them.
+- **Lengths missing, logs mention bot checks**: YouTube is rate-limiting this server's address. TubeShelf waits and tries again on its own; lower *Channels checked at once* under **Administration › Instance**.
+- **Videos do not play**: YouTube may be blocked on your network, or the video was removed. The player offers *Open on YouTube*.
+- **Locked out**: `docker exec -it tubeshelf /tubeshelf reset-password <email>`; `oidc-toggle disable` allows passwords again.
+- **OIDC sign-in fails**: the reason is in the server log (`docker logs tubeshelf`). Usually the redirect URI differs from the one registered at the provider; set `TUBESHELF_URL`.
 
 ## Development
 

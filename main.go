@@ -3,6 +3,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -36,13 +37,15 @@ const usage = `tubeshelf [command]
   user-list                 list users, their role and how they sign in
   oidc-status               show whether only OIDC sign-in is allowed
   oidc-toggle [enable|disable]  allow only OIDC sign-in, or allow passwords again
+  backup <file>             write a consistent copy of the database to <file>, safe while running
   health                    exit 0 if the local server answers (for container healthchecks)
-  version
+  version, --version
 
 Environment:
   TUBESHELF_DATA    data directory (default ./data)
   PORT              listen port (default 3000)
-  TUBESHELF_URL     public URL, needed for OIDC behind a proxy that rewrites Host
+  TUBESHELF_URL     public URL (https://… also marks cookies Secure); needed for OIDC behind a proxy that rewrites Host
+  TUBESHELF_HOST    listen address (default: all)
   TUBESHELF_SECRET  secret for encrypting OIDC client secrets (default: kept in <data>/.secret)
   TRUST_PROXY_HEADERS=1  use X-Forwarded-For for login rate limiting
   TUBESHELF_IMPORT_SKIP_OIDC=1  import v1 data even if an OIDC client secret cannot be decrypted
@@ -69,7 +72,7 @@ func main() {
 func run(cmd string, args []string) error {
 	port := env("PORT", "3000")
 	switch cmd {
-	case "version":
+	case "version", "--version", "-v":
 		fmt.Println(version)
 		return nil
 	case "help", "-h", "--help":
@@ -77,7 +80,11 @@ func run(cmd string, args []string) error {
 		return nil
 	case "health":
 		c := http.Client{Timeout: 3 * time.Second}
-		res, err := c.Get("http://127.0.0.1:" + port + "/healthz")
+		host := env("TUBESHELF_HOST", "127.0.0.1")
+		if host == "0.0.0.0" || host == "::" {
+			host = "127.0.0.1"
+		}
+		res, err := c.Get("http://" + net.JoinHostPort(host, port) + "/healthz")
 		if err != nil {
 			return err
 		}
@@ -146,6 +153,18 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 		return oidcStatus(d, os.Stdout)
 	case "user-list", "list-local-users":
 		return userList(d, os.Stdout)
+	case "backup":
+		if len(args) != 1 {
+			return errors.New("usage: tubeshelf backup <file>")
+		}
+		if _, err := os.Stat(args[0]); err == nil {
+			return fmt.Errorf("%s already exists; choose a new file name", args[0])
+		}
+		if _, err := d.Exec(`VACUUM INTO ?`, args[0]); err != nil {
+			return fmt.Errorf("backup: %w", err)
+		}
+		fmt.Println("Backed up to", args[0]+". Keep it with", filepath.Join(dataDir, ".secret"), "(unless you set TUBESHELF_SECRET) and the branding folder; thumbnails and avatars are fetched again.")
+		return nil
 	case "serve":
 	default:
 		fmt.Print(usage)
@@ -193,6 +212,9 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 		httpSrv.Shutdown(shut)
 	}()
 	slog.Info("tubeshelf listening", "addr", httpSrv.Addr, "version", version, "data", dataDir)
+	if auth.UserCount(d) == 0 {
+		slog.Info("no accounts yet: open " + cmp.Or(strings.TrimRight(os.Getenv("TUBESHELF_URL"), "/"), "http://localhost:"+port) + "/setup to create the admin account")
+	}
 	if err := httpSrv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -200,6 +222,8 @@ To import anyway and re-enter the client secret under Admin later, set TUBESHELF
 	// the fetcher finish before the deferred Close takes the database away.
 	<-shutDown
 	<-fetched
+	// Fold the write-ahead log into the database, so a copy of shelf.db alone is complete.
+	d.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 	slog.Info("tubeshelf stopped")
 	return nil
 }

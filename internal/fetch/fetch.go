@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/samumatic/tubeshelf/internal/db"
@@ -46,7 +47,15 @@ type Fetcher struct {
 	// OnPrune, if set, runs after old videos were deleted.
 	OnPrune func()
 	wake    chan struct{}
+	// Counted per pass for the summary log line.
+	failed, fetched, blocked atomic.Int64
 }
+
+// blockedRetry is how long enrichment waits after a bot check.
+const blockedRetry = 30 * time.Minute
+
+// jitter is a random extra of up to a tenth of d, so channels that failed together do not retry together.
+func jitter(d time.Duration) time.Duration { return rand.N(d/10 + 1) }
 
 func New(d *sql.DB, src Source) *Fetcher {
 	return &Fetcher{DB: d, YT: src, Now: time.Now, wake: make(chan struct{}, 1)}
@@ -98,11 +107,25 @@ func (f *Fetcher) Pass(ctx context.Context) {
 	due := f.column(`SELECT id FROM channels
 		WHERE next_fetch_at <= ? AND id IN (SELECT channel_id FROM subscriptions)
 		ORDER BY next_fetch_at`, f.Now().Unix())
+	var videosBefore int
+	f.DB.QueryRow(`SELECT count(*) FROM videos`).Scan(&videosBefore)
+	f.failed.Store(0)
+	f.fetched.Store(0)
+	f.blocked.Store(0)
 	parallel(ctx, workers, due, f.fetchChannel)
 
 	pending := f.column(`SELECT id FROM videos WHERE enrich_after > 0 AND enrich_after <= ?
 		ORDER BY published_at DESC LIMIT ?`, f.Now().Unix(), enrichBatch)
 	parallel(ctx, workers, pending, f.enrich)
+	if len(due) > 0 {
+		var videosAfter int
+		f.DB.QueryRow(`SELECT count(*) FROM videos`).Scan(&videosAfter)
+		slog.Info("fetch: pass done", "channels", len(due), "ok", f.fetched.Load(), "failed", f.failed.Load(),
+			"new_videos", videosAfter-videosBefore, "details", len(pending), "bot_checks", f.blocked.Load())
+	}
+	if f.blocked.Load() > 0 {
+		return // no point asking for more details right away
+	}
 	if len(pending) == enrichBatch {
 		f.Wake() // more waiting
 	}
@@ -166,12 +189,17 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 		}
 		var fails int
 		f.DB.QueryRow(`SELECT fail_count FROM channels WHERE id = ?`, id).Scan(&fails)
-		next := now.Add(min(backoff(interval, fails+1), max(maxFeedBackoff, interval)))
+		wait := min(backoff(interval, fails+1), max(maxFeedBackoff, interval))
+		next := now.Add(wait - jitter(wait)) // earlier, never past the cap
 		f.DB.Exec(`UPDATE channels SET fail_count = fail_count + 1, last_error = ?, next_fetch_at = ? WHERE id = ?`,
 			err.Error(), next.Unix(), id)
-		slog.Warn("fetch: channel failed", "channel", id, "err", err)
+		var title string
+		f.DB.QueryRow(`SELECT title FROM channels WHERE id = ?`, id).Scan(&title)
+		slog.Warn("fetch: channel failed", "channel", title, "id", id, "tries", fails+1, "retry_at", next.Format(time.Kitchen), "err", err)
+		f.failed.Add(1)
 		return
 	}
+	f.fetched.Add(1)
 
 	// A channel's first fetch also reads its Videos tab once, for the uploads
 	// older than the RSS feed's 15. If that fails the RSS feed is enough.
@@ -257,6 +285,12 @@ func (f *Fetcher) enrich(ctx context.Context, id string) {
 		}
 		if errors.Is(err, yt.ErrNotFound) {
 			f.DB.Exec(`UPDATE videos SET enrich_after = 0 WHERE id = ?`, id)
+			return
+		}
+		// A bot check says nothing about the video: try again later without using up its tries.
+		if errors.Is(err, yt.ErrBlocked) {
+			f.DB.Exec(`UPDATE videos SET enrich_after = ? WHERE id = ?`, now.Add(blockedRetry+jitter(blockedRetry)).Unix(), id)
+			f.blocked.Add(1)
 			return
 		}
 		// Retry with backoff, then give up and leave the duration unknown.

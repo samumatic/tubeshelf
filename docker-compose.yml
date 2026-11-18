@@ -15,3 +15,8 @@ services:
     #   TUBESHELF_SECRET: "replace-with-a-random-32+-char-secret"
     volumes:
       - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "/tubeshelf", "health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
