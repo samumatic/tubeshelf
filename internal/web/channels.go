@@ -10,8 +10,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"log/slog"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -90,7 +90,13 @@ func (s *Server) listsPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "lists", M{"Lists": s.lists(s.user(r).ID)})
 }
 
-func (s *Server) importPage(w http.ResponseWriter, r *http.Request) { s.render(w, r, "import", nil) }
+func (s *Server) importPage(w http.ResponseWriter, r *http.Request) {
+	var failed []string
+	if f := r.URL.Query().Get("failed"); f != "" {
+		failed = strings.Split(f, "\n")
+	}
+	s.render(w, r, "import", M{"Failed": failed, "FailedN": r.URL.Query().Get("failedn")})
+}
 
 // libraryPage is the phone's way into the Library and Administration pages,
 // which the sidebar shows on wider screens.
@@ -216,16 +222,54 @@ func (s *Server) addList(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "/lists", errors.New("A list name needs 1 to 60 characters"))
 		return
 	}
-	if _, err := s.DB.Exec(`INSERT INTO lists (user_id, name) VALUES (?, ?)`, s.user(r).ID, name); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO lists (user_id, name, position) VALUES (?, ?,
+		(SELECT coalesce(max(position), 0) + 1 FROM lists WHERE user_id = ?))`, s.user(r).ID, name, s.user(r).ID); err != nil {
 		fail(w, r, "/lists", fmt.Errorf("You already have a list called “%s”", name))
 		return
 	}
-	ok(w, r, "/lists", "List created")
+	okThen(w, r, "/lists", "Created “"+name+"”. Now pick its channels with the list buttons on Channels.", "/channels", "Open Channels")
+}
+
+// renameList also moves a list up or down: lists keep the order their owner gives them.
+func (s *Server) updateList(w http.ResponseWriter, r *http.Request) {
+	u := s.user(r)
+	id := r.PathValue("id")
+	switch r.FormValue("action") {
+	case "rename":
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" || len(name) > 60 {
+			fail(w, r, "/lists", errors.New("a list name needs 1 to 60 characters"))
+			return
+		}
+		if _, err := s.DB.Exec(`UPDATE lists SET name = ? WHERE id = ? AND user_id = ?`, name, id, u.ID); err != nil {
+			fail(w, r, "/lists", fmt.Errorf("you already have a list called “%s”", name))
+			return
+		}
+		ok(w, r, "/lists", "Renamed to “"+name+"”.")
+	case "up", "down":
+		lists := s.lists(u.ID)
+		i := slices.IndexFunc(lists, func(l List) bool { return fmt.Sprint(l.ID) == id })
+		j := i - 1
+		if r.FormValue("action") == "down" {
+			j = i + 1
+		}
+		if i < 0 || j < 0 || j >= len(lists) {
+			s.done(w, r)
+			return
+		}
+		lists[i], lists[j] = lists[j], lists[i]
+		for pos, l := range lists {
+			s.DB.Exec(`UPDATE lists SET position = ? WHERE id = ?`, pos+1, l.ID)
+		}
+		http.Redirect(w, r, "/lists", http.StatusSeeOther)
+	default:
+		http.Error(w, "unknown action", http.StatusBadRequest)
+	}
 }
 
 func (s *Server) deleteList(w http.ResponseWriter, r *http.Request) {
 	s.DB.Exec(`DELETE FROM lists WHERE id = ? AND user_id = ?`, r.PathValue("id"), s.user(r).ID)
-	ok(w, r, "/lists", "List deleted")
+	ok(w, r, "/lists", "List deleted. Its channels stay subscribed.")
 }
 
 func (s *Server) setListChannel(w http.ResponseWriter, r *http.Request) {
@@ -362,18 +406,29 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 	data, _ := io.ReadAll(file)
+	if len(bytes.TrimSpace(data)) == 0 {
+		fail(w, r, "/channels/import", errors.New("that file is empty; export your subscriptions again and choose the new file"))
+		return
+	}
 	items, err := parseImport(data)
 	if err != nil {
 		fail(w, r, "/channels/import", err)
 		return
 	}
 	added, failed := 0, 0
+	var failedNames []string
+	miss := func(it imported) {
+		failed++
+		if len(failedNames) < 20 {
+			failedNames = append(failedNames, cmp.Or(it.Title, it.Ref, it.ID))
+		}
+	}
 	listIDs := map[string]int64{}
 	// A channel can be in several folders (TubeShelf's own export lists it at the top and in each list).
 	channels := map[string]bool{}
 	for _, it := range items {
 		if it.Bad {
-			failed++
+			miss(it)
 			continue
 		}
 		ch := yt.Channel{ID: it.ID, Title: it.Title}
@@ -382,14 +437,14 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 			res, err := s.YT.Resolve(ctx, it.Ref)
 			cancel()
 			if err != nil {
-				failed++
+				miss(it)
 				continue
 			}
 			ch = *res
 		}
 		isNew, err := s.subscribe(u.ID, ch)
 		if err != nil {
-			failed++
+			miss(it)
 			continue
 		}
 		channels[ch.ID] = true
@@ -408,11 +463,16 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 		s.DB.Exec(`INSERT INTO list_channels (list_id, channel_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, id, ch.ID)
 	}
 	s.Fetcher.Wake()
-	msg := fmt.Sprintf("Imported %d new of %d channels", added, len(channels)+failed)
-	if failed > 0 {
-		msg += fmt.Sprintf(", %d could not be found", failed)
+	msg := fmt.Sprintf("Imported %d new of %d channels. Their videos arrive over the next minutes.", added, len(channels)+failed)
+	if added == 0 && len(channels) > 0 {
+		msg = fmt.Sprintf("You already follow every channel in that file (%d).", len(channels))
 	}
-	ok(w, r, "/channels/import", msg)
+	q := url.Values{"msg": {msg}, "go": {"/"}, "golabel": {"Open the feed"}}
+	if failed > 0 {
+		q.Set("failed", strings.Join(failedNames, "\n"))
+		q.Set("failedn", fmt.Sprint(failed))
+	}
+	http.Redirect(w, r, "/channels/import?"+q.Encode(), http.StatusSeeOther)
 }
 
 func feedURL(id string) string { return "https://www.youtube.com/feeds/videos.xml?channel_id=" + id }

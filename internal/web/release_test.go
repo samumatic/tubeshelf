@@ -327,7 +327,7 @@ func TestImportIsIdempotentAndKeepsTitles(t *testing.T) {
 	</body></opml>`
 	for i := range 2 {
 		_, body := a.upload("/channels/import", nil, map[string][]byte{"file": []byte(opml)})
-		if i == 1 && !strings.Contains(body, "Imported 0 new of 1 channels") {
+		if i == 1 && !strings.Contains(body, "You already follow every channel in that file (1)") {
 			t.Errorf("second import did not report 0 new")
 		}
 	}
@@ -354,7 +354,7 @@ func TestExportReimportCountsChannelsOnce(t *testing.T) {
 	if strings.Count(export, chanA) != 2 {
 		t.Fatalf("export should list the channel at the top and in its list:\n%s", export)
 	}
-	if _, body := a.upload("/channels/import", nil, map[string][]byte{"file": []byte(export)}); !strings.Contains(body, "Imported 0 new of 1 channels") {
+	if _, body := a.upload("/channels/import", nil, map[string][]byte{"file": []byte(export)}); !strings.Contains(body, "You already follow every channel in that file (1)") {
 		t.Error("re-importing the export did not count the channel once")
 	}
 }

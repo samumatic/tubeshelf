@@ -3,10 +3,23 @@
 <p class="eyebrow">Library</p>
 <h1 class="page-title">Import &amp; export</h1>
 <div class="stack">
+  {{if .Failed}}<div class="panel notice">
+    <p><strong>{{.FailedN}} could not be found.</strong> They may have been deleted or renamed. Add them by name on <a class="text-link" href="/channels">Channels</a> if you still want them.</p>
+    <ul class="failed-list">{{range .Failed}}<li>{{.}}</li>{{end}}</ul>
+  </div>{{end}}
   <form class="panel" method="post" action="/channels/import" enctype="multipart/form-data">
     <h2>Import</h2>
     <label for="file"><span>OPML, Google Takeout <code>subscriptions.csv</code>, a NewPipe or FreeTube export, or a text file with one channel per line</span></label>
     <div class="row"><input id="file" type="file" name="file" accept=".opml,.xml,.csv,.json,.db,.txt" required><button class="button primary">Import</button></div>
+    <p class="hint">Channels you already follow are skipped, so importing twice is safe.</p>
+    <details class="howto"><summary>How to get your YouTube subscriptions</summary>
+      <ol>
+        <li>Open <a class="text-link" href="https://takeout.google.com/" target="_blank" rel="noopener">Google Takeout</a> and click <em>Deselect all</em>.</li>
+        <li>Tick <em>YouTube and YouTube Music</em>, click <em>All YouTube data included</em>, and leave only <em>subscriptions</em> ticked.</li>
+        <li>Create the export. Google emails a link, usually within minutes.</li>
+        <li>Unzip it and choose <code>Takeout/YouTube and YouTube Music/subscriptions/subscriptions.csv</code> here.</li>
+      </ol>
+    </details>
   </form>
   <div class="panel">
     <h2>Export</h2>

@@ -99,6 +99,8 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("POST /videos/{id}/watched", s.setWatched)
 	page("POST /videos/{id}/later", s.setLater)
 	page("POST /later/clear-watched", s.clearWatchedLater)
+	page("POST /history/{id}/remove", s.forget)
+	page("POST /history/clear", s.clearHistory)
 	page("POST /videos/{id}/progress", s.setProgress)
 	page("GET /videos/{id}/segments", s.sponsorSegments)
 	page("GET /videos/{id}/comments", s.comments)
@@ -116,6 +118,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("POST /channels/{id}/delete", s.deleteChannel)
 	page("POST /lists", s.addList)
 	page("POST /lists/{id}/delete", s.deleteList)
+	page("POST /lists/{id}", s.updateList)
 	page("POST /lists/{id}/channels", s.setListChannel)
 
 	page("GET /account", s.accountPage)
@@ -182,6 +185,7 @@ func (s *Server) loadTemplates() error {
 		"list":        func(items ...string) []string { return items },
 		"split":       strings.Split,
 		"hasPrefix":   strings.HasPrefix,
+		"inc":         func(i int) int { return i + 1 },
 		"linkify":     linkify,
 		"newProvider": func() auth.Provider { return auth.Provider{} },
 	}

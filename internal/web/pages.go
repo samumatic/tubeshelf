@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -31,6 +32,7 @@ type Video struct {
 	Progress  float64
 	Watched   bool
 	Later     bool
+	SeenAt    int64 // when the user last played or marked it
 }
 
 // Cursor identifies this video's position in the newest-first feed order.
@@ -134,7 +136,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 const videoCols = `v.id, v.title, v.channel_id, coalesce(c.title, v.channel_title), v.published_at, v.kind,
 	coalesce(v.duration_seconds, 0), v.members_only, coalesce(ws.progress, 0), coalesce(ws.watched, 0), wl.video_id IS NOT NULL,
-	coalesce(c.thumbnail LIKE 'https://%', 0)`
+	coalesce(c.thumbnail LIKE 'https://%', 0), coalesce(ws.updated_at, 0)`
 
 // videoJoins needs the user id twice.
 const videoJoins = ` LEFT JOIN channels c ON c.id = v.channel_id
@@ -151,7 +153,7 @@ func (s *Server) videos(query string, args ...any) ([]Video, error) {
 	for rows.Next() {
 		var v Video
 		if err := rows.Scan(&v.ID, &v.Title, &v.ChannelID, &v.Channel, &v.Published, &v.Kind,
-			&v.Duration, &v.Members, &v.Progress, &v.Watched, &v.Later, &v.HasAvatar); err != nil {
+			&v.Duration, &v.Members, &v.Progress, &v.Watched, &v.Later, &v.HasAvatar, &v.SeenAt); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -161,7 +163,7 @@ func (s *Server) videos(query string, args ...any) ([]Video, error) {
 
 func (s *Server) lists(userID string) []List {
 	rows, err := s.DB.Query(`SELECT id, name, (SELECT count(*) FROM list_channels WHERE list_id = lists.id)
-		FROM lists WHERE user_id = ? ORDER BY name COLLATE NOCASE`, userID)
+		FROM lists WHERE user_id = ? ORDER BY position, name COLLATE NOCASE`, userID)
 	if err != nil {
 		return nil
 	}
@@ -260,6 +262,10 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	data := M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"], "Subs": -1, "HiddenShorts": "",
 		"Ctx": watchContext(q)}
+	// Videos started and not finished come first, on the plain feed only.
+	if q["before"] == "" && q["q"] == "" && q["channel"] == "" && q["list"] == "" && r.URL.Query().Get("fragment") != "1" {
+		data["Continue"] = s.continueWatching(u.ID)
+	}
 	// Shorts are hidden by default; say how many, so they are not simply missing.
 	if set["hide_shorts"] == "1" && q["before"] == "" {
 		var n int
@@ -270,6 +276,19 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if q["channel"] != "" {
+		// Which of the user's lists hold this channel, for the list buttons in the header.
+		inList := map[int64]bool{}
+		if rows, err := s.DB.Query(`SELECT lc.list_id FROM list_channels lc JOIN lists l ON l.id = lc.list_id
+			WHERE l.user_id = ? AND lc.channel_id = ?`, u.ID, q["channel"]); err == nil {
+			for rows.Next() {
+				var id int64
+				if rows.Scan(&id) == nil {
+					inList[id] = true
+				}
+			}
+			rows.Close()
+		}
+		data["InList"] = inList
 		var title string
 		var avatar, subscribed bool
 		s.DB.QueryRow(`SELECT title, coalesce(thumbnail LIKE 'https://%', 0),
@@ -364,7 +383,42 @@ func (s *Server) historyPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "history", M{"Videos": vids})
+	// Grouped by when it was watched, not when it was published.
+	now := time.Now()
+	var groups []DayGroup
+	for _, v := range vids {
+		label := dayLabel(v.SeenAt, now)
+		if n := len(groups); n > 0 && groups[n-1].Label == label {
+			groups[n-1].Videos = append(groups[n-1].Videos, v)
+			continue
+		}
+		groups = append(groups, DayGroup{Label: label, Videos: []Video{v}})
+	}
+	s.render(w, r, "history", M{"Videos": vids, "Groups": groups})
+}
+
+// forget removes one video from the user's history (its progress and watched mark go with it).
+func (s *Server) forget(w http.ResponseWriter, r *http.Request) {
+	s.DB.Exec(`DELETE FROM watch_state WHERE user_id = ? AND video_id = ?`, s.user(r).ID, r.PathValue("id"))
+	ok(w, r, "/history", "Removed from your history.")
+}
+
+func (s *Server) clearHistory(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("confirm") != "1" {
+		fail(w, r, "/history", errors.New("tick the box to confirm first"))
+		return
+	}
+	res, _ := s.DB.Exec(`DELETE FROM watch_state WHERE user_id = ?`, s.user(r).ID)
+	n, _ := res.RowsAffected()
+	ok(w, r, "/history", fmt.Sprintf("Cleared %d %s from your history.", n, plural(int(n), "video", "videos")))
+}
+
+// continueWatching lists videos started recently and not finished: the feed's first row.
+func (s *Server) continueWatching(userID string) []Video {
+	vids, _ := s.videos(`SELECT `+videoCols+` FROM watch_state h JOIN videos v ON v.id = h.video_id`+videoJoins+`
+		WHERE h.user_id = ? AND h.watched = 0 AND h.progress > 30 AND h.updated_at > ?
+		ORDER BY h.updated_at DESC LIMIT 4`, userID, userID, userID, time.Now().Add(-14*24*time.Hour).Unix())
+	return vids
 }
 
 func (s *Server) watchPage(w http.ResponseWriter, r *http.Request) {

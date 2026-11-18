@@ -30,6 +30,7 @@
       <h2 class="nav-heading">Library</h2>
       <a class="nav-item" data-tip="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
       <a class="nav-item" data-tip="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
+      {{range .NavLists}}<a class="nav-item nav-sub" href="/?list={{.ID}}" {{if and (eq $.Page "feed") (eq (print .ID) (print $.ListID))}}aria-current="page"{{end}}>{{.Name}}<small>{{.Channels}}</small></a>{{end}}
       <a class="nav-item" data-tip="Import &amp; export" href="/channels/import" {{if eq .Page "import"}}aria-current="page"{{end}}>{{template "i-import"}}Import &amp; export</a>
       {{if .User.IsAdmin}}<h2 class="nav-heading">Administration</h2>
       <a class="nav-item" data-tip="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status{{if .AdminAlert}}<span class="nav-dot" title="{{.AdminAlert}} channels keep failing"><span class="sr">, {{.AdminAlert}} channels keep failing</span></span>{{end}}</a>

@@ -10,6 +10,11 @@
     {{if .Subscribed}}<form method="post" action="/channels/{{.ChannelID}}/delete"><input type="hidden" name="next" value="/"><button class="button" data-confirm="Unsubscribe from {{or .ChannelTitle .ChannelID}}?">Unsubscribe</button></form>
     {{else}}<form method="post" action="/channels"><input type="hidden" name="channel" value="{{.ChannelID}}"><button class="button primary">Subscribe</button></form>{{end}}
   </div>
+  {{if and .Subscribed .Lists}}<div class="chips channel-lists" role="group" aria-label="Lists with this channel"><span class="muted">In lists:</span>{{range .Lists}}
+    <form method="post" action="/lists/{{.ID}}/channels" data-toggle="list">
+      <input type="hidden" name="channel" value="{{$.ChannelID}}"><input type="hidden" name="on" value="{{if index $.InList .ID}}0{{else}}1{{end}}">
+      <button class="chip small list-chip" aria-pressed="{{index $.InList .ID}}" title="{{if index $.InList .ID}}In {{.Name}}: click to take out{{else}}Add to {{.Name}}{{end}}">{{.Name}}</button>
+    </form>{{end}}</div>{{end}}
   {{else}}
   <div><p class="eyebrow">{{if .Search}}Search results{{else}}Your subscriptions{{end}}</p>
   <h1 class="page-title">{{if .Search}}“{{.Search}}”{{else}}Feed{{end}}</h1></div>
@@ -43,6 +48,10 @@
 </div>
 {{end}}
 {{if .Videos}}
+{{with .Continue}}<section class="continue" aria-labelledby="continue-h">
+  <h2 class="day" id="continue-h">Continue watching</h2>
+  <div class="videos">{{range .}}{{template "card" (card . $.Set)}}{{end}}</div>
+</section>{{end}}
 <div id="feed" class="videos">{{template "items" .}}</div>
 {{else}}
 <div class="empty" {{if .Pending}}data-reload="4"{{end}}>

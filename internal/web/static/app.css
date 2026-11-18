@@ -892,3 +892,18 @@ tr.paused td:not(.end) { opacity: .6; }
   .page-watch .shell { padding: 0; }
   .page-watch .content { border-radius: 0; }
 }
+.continue { margin-bottom: var(--s6); }
+.continue .day { margin-bottom: var(--s4); }
+.continue .videos { grid-template-rows: auto; }
+.history-item { display: grid; align-content: start; gap: 2px; }
+.history-item form { justify-self: start; }
+
+.list-rows { list-style: none; margin: var(--s4) 0; padding: 0; }
+.list-rows li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--border); }
+.list-name { font-weight: 500; }
+.channel-lists { flex-basis: 100%; align-items: center; }
+.nav-sub { padding-left: 34px; font-size: 13px; }
+.nav-sub small { margin-left: auto; color: var(--fg-muted); }
+.failed-list { margin: var(--s2) 0 0; padding-left: 1.2em; max-height: 240px; overflow: auto; color: var(--fg-muted); font-size: 14px; overflow-wrap: anywhere; }
+.howto { margin-top: var(--s4); }
+.howto ol { margin: var(--s3) 0 0; padding-left: 1.3em; display: grid; gap: var(--s2); color: var(--fg-muted); font-size: 14px; }

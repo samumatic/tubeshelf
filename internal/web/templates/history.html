@@ -1,10 +1,17 @@
 {{define "title"}}History · {{.Brand.Name}}{{end}}
 {{define "main"}}
-<p class="eyebrow">Library</p>
-<h1 class="page-title">History</h1>
+<div class="page-head">
+  <div><p class="eyebrow">Watch</p><h1 class="page-title">History</h1></div>
+  {{if .Videos}}<details class="menu"><summary>Clear history</summary><div>
+    <form class="stack-sm" method="post" action="/history/clear"><label class="check"><input type="checkbox" name="confirm" value="1" required> Forget every video I played, with its progress and watched mark</label><button class="button danger">Clear history</button></form>
+  </div></details>{{end}}
+</div>
 {{if .Videos}}
-<div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}</div>
+<div class="videos history">{{range .Groups}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>
+  {{range .Videos}}<div class="history-item">{{template "card" (card . $.Set)}}
+    <form method="post" action="/history/{{.ID}}/remove"><button class="link small" aria-label="Remove {{.Title}} from history">Remove from history</button></form></div>{{end}}{{end}}
+</div>
 {{else}}
-<div class="empty"><h2>No history yet</h2><p>Videos you play or mark as watched show up here.</p></div>
+<div class="empty"><h2>No history yet</h2><p>Videos you play or mark as watched show up here, newest first.</p><p><a class="button primary" href="/">Open the feed</a></p></div>
 {{end}}
 {{end}}
