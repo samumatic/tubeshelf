@@ -225,6 +225,20 @@ func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
 	ok(w, r, "/channels", "Unsubscribed")
 }
 
+// scrapeChannel reads a followed channel's Videos tab again on its next fetch,
+// for uploads older than the RSS feed's 15 that the first read missed.
+func (s *Server) scrapeChannel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var title string
+	if s.DB.QueryRow(`SELECT c.title FROM channels c JOIN subscriptions s ON s.channel_id = c.id
+		WHERE c.id = ? AND s.user_id = ?`, id, s.user(r).ID).Scan(&title) != nil {
+		fail(w, r, "/channels", errors.New("You don't follow that channel"))
+		return
+	}
+	s.Fetcher.Rescrape(id)
+	ok(w, r, "/channels", "Reading "+title+"'s channel page now. Older uploads show up in a minute.")
+}
+
 func (s *Server) addList(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name == "" || len(name) > 60 {

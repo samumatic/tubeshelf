@@ -103,6 +103,30 @@ func TestFirstFetchAddsBacklogOnce(t *testing.T) {
 	}
 }
 
+// Rescrape reads the page again on the next pass only, even for a channel
+// that already had its first fetch.
+func TestRescrapeReadsPageOnce(t *testing.T) {
+	d, src, f, now := setup(t)
+	src.feed = &yt.Feed{Title: "T"}
+	f.Pass(context.Background())
+	src.uploads = []yt.FeedVideo{{ID: "oldvideo001", Title: "Older", Published: now.AddDate(0, 0, -3)}}
+	f.Rescrape(chanID)
+	f.Pass(context.Background())
+	if src.uploadCalls != 2 {
+		t.Fatalf("channel page read %d times, want twice", src.uploadCalls)
+	}
+	var n int
+	d.QueryRow(`SELECT count(*) FROM videos WHERE id = 'oldvideo001'`).Scan(&n)
+	if n != 1 {
+		t.Error("rescraped video not stored")
+	}
+	f.Retry(chanID)
+	f.Pass(context.Background())
+	if src.uploadCalls != 2 {
+		t.Errorf("a plain retry read the page again (%d reads)", src.uploadCalls)
+	}
+}
+
 func TestBacklogFailureFallsBackToRSS(t *testing.T) {
 	d, src, f, now := setup(t)
 	src.feed = &yt.Feed{Title: "T", Videos: []yt.FeedVideo{{ID: "rssvideo001", Title: "From RSS", Published: now.Add(-time.Hour)}}}

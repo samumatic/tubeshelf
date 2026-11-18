@@ -86,6 +86,27 @@ func TestFailingChannelActions(t *testing.T) {
 	}
 }
 
+func TestScrapeChannelButton(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	a.db.Exec(`UPDATE channels SET next_fetch_at = 999999999999`)
+	if _, body := a.get("/channels"); !strings.Contains(body, `action="/channels/`+chanA+`/scrape"`) {
+		t.Fatal("no scrape button on the channels page")
+	}
+	if code, _ := a.post("/channels/"+chanA+"/scrape", nil); code != 200 {
+		t.Fatalf("scrape: status %d", code)
+	}
+	if a.count(`SELECT next_fetch_at FROM channels WHERE id = ?`, chanA) != 0 {
+		t.Error("scrape does not make the channel due")
+	}
+	a.db.Exec(`DELETE FROM subscriptions`)
+	a.db.Exec(`UPDATE channels SET next_fetch_at = 5`)
+	a.post("/channels/"+chanA+"/scrape", nil)
+	if a.count(`SELECT next_fetch_at FROM channels WHERE id = ?`, chanA) != 5 {
+		t.Error("scraping a channel you don't follow touched it")
+	}
+}
+
 // A link with ?err= or ?msg= made elsewhere must not put its text on the page.
 func TestFlashCannotBeSpoofed(t *testing.T) {
 	a := newApp(t)

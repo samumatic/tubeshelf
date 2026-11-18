@@ -667,6 +667,8 @@ details > form, details > div { display: grid; gap: 14px; padding: 14px 0 4px; }
 .table tbody tr:hover { background: var(--fill-row-hover); }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .table .end { text-align: right; padding-right: 0; white-space: nowrap; }
+.table .end form { display: inline-block; }
+.table .end form + form { margin-left: var(--s3); }
 .channel { display: flex; align-items: center; gap: 12px; font-weight: 500; }
 .channel:hover { text-decoration: underline; text-underline-offset: 3px; }
 

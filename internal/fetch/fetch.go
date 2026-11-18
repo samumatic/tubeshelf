@@ -47,6 +47,8 @@ type Fetcher struct {
 	// OnPrune, if set, runs after old videos were deleted.
 	OnPrune func()
 	wake    chan struct{}
+	// rescrape holds channels whose next fetch reads the Videos tab again, as asked for by hand.
+	rescrape sync.Map
 	// Counted per pass for the summary log line.
 	failed, fetched, blocked atomic.Int64
 }
@@ -79,6 +81,13 @@ func (f *Fetcher) RefreshAll() {
 func (f *Fetcher) Retry(id string) {
 	f.DB.Exec(`UPDATE channels SET next_fetch_at = 0, fail_count = 0 WHERE id = ?`, id)
 	f.Wake()
+}
+
+// Rescrape makes one channel due now and has that fetch read its Videos tab
+// again, like its first fetch did. A failed read falls back to RSS as before.
+func (f *Fetcher) Rescrape(id string) {
+	f.rescrape.Store(id, struct{}{})
+	f.Retry(id)
 }
 
 // Run loops until ctx is cancelled.
@@ -202,11 +211,13 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 	f.fetched.Add(1)
 
 	// A channel's first fetch also reads its Videos tab once, for the uploads
-	// older than the RSS feed's 15. If that fails the RSS feed is enough.
+	// older than the RSS feed's 15, and so does one asked for by hand. If that
+	// fails the RSS feed is enough.
 	var first bool
 	f.DB.QueryRow(`SELECT last_success_at IS NULL FROM channels WHERE id = ?`, id).Scan(&first)
+	_, asked := f.rescrape.LoadAndDelete(id)
 	var backlog []yt.FeedVideo
-	if first {
+	if first || asked {
 		var err error
 		if backlog, err = f.YT.Uploads(ctx, id); err != nil {
 			slog.Info("fetch: channel page not readable, using RSS only", "channel", id, "err", err)
