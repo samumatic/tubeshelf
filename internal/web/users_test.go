@@ -51,3 +51,36 @@ func TestPauseAndMustChange(t *testing.T) {
 	a.post("/admin/users/"+id, url.Values{"action": {"resume"}})
 	a.as("lee@example.com", "temporary pw")
 }
+
+func TestInstanceDefaults(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	a.post("/admin/defaults", url.Values{"view": {"list"}, "hide_shorts": {"0"}})
+	if code, _ := a.post("/admin/defaults", url.Values{"view": {"bogus"}}); code == 200 {
+		if v := a.count(`SELECT count(*) FROM settings WHERE key = 'default.view' AND value = 'bogus'`); v != 0 {
+			t.Error("an unknown default value was stored")
+		}
+	}
+	a.post("/admin/users", url.Values{"email": {"new@example.com"}, "password": {"new password"}})
+	n := a.as("new@example.com", "new password")
+	if _, body := n.get("/account/preferences"); !strings.Contains(body, `value="list" checked`) && !strings.Contains(body, `value="list" selected`) {
+		t.Error("an instance default does not reach a new user")
+	}
+}
+
+func TestFailingChannelActions(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	a.db.Exec(`UPDATE channels SET fail_count = 4, last_error = 'gone'`)
+	if _, body := a.get("/admin"); !strings.Contains(body, `id="failing"`) || !strings.Contains(body, "nav-dot") {
+		t.Fatal("failing channels are not listed on Status")
+	}
+	a.post("/admin/channels/"+chanA+"/retry", nil)
+	if a.count(`SELECT fail_count FROM channels WHERE id = ?`, chanA) != 0 {
+		t.Error("retry does not reset the backoff")
+	}
+	a.post("/admin/channels/"+chanA+"/remove", url.Values{"confirm": {"1"}})
+	if a.count(`SELECT count(*) FROM channels WHERE id = ?`, chanA) != 0 {
+		t.Error("remove leaves the channel")
+	}
+}

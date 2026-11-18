@@ -1,24 +1,28 @@
-{{define "title"}}Appearance · {{.Brand.Name}}{{end}}
+{{define "title"}}Branding · {{.Brand.Name}}{{end}}
 {{define "main"}}
 <p class="eyebrow">Administration</p>
-<h1 class="page-title">Appearance</h1>
+<h1 class="page-title">Branding</h1>
+<p class="lead muted">How {{.Brand.Name}} looks for everyone. Each person still picks light or dark mode for themselves.</p>
 <div class="stack">
   <form class="stack" method="post" action="/admin/appearance" enctype="multipart/form-data" data-appearance>
     <div class="panel">
-      <h2>Branding</h2>
+      <h2>Name and images</h2>
       <div class="fields">
         <label>Application name <input name="app_name" value="{{.Brand.Name}}" maxlength="40" required autocomplete="off"></label>
       </div>
       <div class="image-tiles">
         <div class="image-tile">
           <span class="tile-preview logo-preview">{{template "logo" .}}</span>
-          <label>Logo <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+          <label>Logo <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif" data-square-check></label>
           <small>Square, 1 MB at most. Also the browser tab icon.</small>
+          <small class="warn-text" hidden data-square-warning>This image is not square, so its edges will be cut off.</small>
+          {{if .Brand.Logo}}<button class="link" form="reset-logo">Use the default logo</button>{{end}}
         </div>
         <div class="image-tile">
           <img class="tile-preview" src="{{.Brand.Background}}" alt="">
           <label>Background <input type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif"></label>
           <small>8 MB at most. Shown on the sign-in page and, blurred, behind the app.</small>
+          {{if .Brand.CustomBackground}}<button class="link" form="reset-background">Use the default background</button>{{end}}
         </div>
       </div>
     </div>
@@ -37,8 +41,9 @@
       <div class="swatches" role="radiogroup" aria-label="Primary color">
         {{range .Primaries}}<label class="swatch {{.Class}}" title="{{.Label}}"><input type="radio" name="primary" value="{{.Value}}" aria-label="{{.Label}}" {{if and (eq .Value $.Brand.Primary) (not $.CustomPrimary)}}checked{{end}}></label>{{end}}
         <label class="swatch sw-custom" title="Custom color"><input type="radio" name="primary" value="custom" aria-label="Custom color" {{if .CustomPrimary}}checked{{end}}></label>
-        <input type="color" name="primary_custom" value="{{or .CustomPrimary "#0090ff"}}" aria-label="Custom primary color">
+        <input type="color" name="primary_custom" value="{{or .CustomPrimary "#0090ff"}}" aria-label="Custom primary color" class="custom-color">
       </div>
+      <p class="warn-text" hidden data-contrast-warning>This colour is very light: buttons will be hard to spot on white. Pick a darker one.</p>
     </div>
 
     <div class="panel">
@@ -48,15 +53,9 @@
       </div>
     </div>
 
-    <p><button class="button primary">Save appearance</button></p>
+    <p><button class="button primary">Save branding</button></p>
   </form>
-
-  {{if or .Brand.Logo .Brand.CustomBackground}}<div class="panel">
-    <h2>Uploaded images</h2>
-    <div class="row">
-      {{if .Brand.Logo}}<form method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="logo"><button class="button">Use the default logo</button></form>{{end}}
-      {{if .Brand.CustomBackground}}<form method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="background"><button class="button">Use the default background</button></form>{{end}}
-    </div>
-  </div>{{end}}
+  <form id="reset-logo" method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="logo"></form>
+  <form id="reset-background" method="post" action="/admin/appearance/reset"><input type="hidden" name="kind" value="background"></form>
 </div>
 {{end}}

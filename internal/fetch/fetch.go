@@ -66,6 +66,12 @@ func (f *Fetcher) RefreshAll() {
 	f.Wake()
 }
 
+// Retry makes one channel due now, clearing its failure backoff.
+func (f *Fetcher) Retry(id string) {
+	f.DB.Exec(`UPDATE channels SET next_fetch_at = 0, fail_count = 0 WHERE id = ?`, id)
+	f.Wake()
+}
+
 // Run loops until ctx is cancelled.
 func (f *Fetcher) Run(ctx context.Context) {
 	t := time.NewTicker(tick)

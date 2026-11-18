@@ -330,7 +330,7 @@ func TestPagesRender(t *testing.T) {
 		"/channels": "Channels", "/lists": "Lists", "/channels/import": "Import &amp; export",
 		"/account": "My account", "/account/preferences": "Preferences", "/account/keys": "API keys",
 		"/admin": "Status", "/admin/users": "Users", "/admin/sign-in": "Sign-in", "/admin/instance": "Instance",
-		"/admin/appearance": "Appearance",
+		"/admin/appearance": "Branding",
 	}
 	for path, title := range pages {
 		code, body := a.get(path)
@@ -511,7 +511,7 @@ func TestAppearance(t *testing.T) {
 	fields := map[string]string{"app_name": "MyTube", "layout": "plain", "primary": "custom", "primary_custom": "#E5484D", "radius": "0.5"}
 
 	_, body := a.upload("/admin/appearance", fields, map[string][]byte{"logo": pngData.Bytes()})
-	if !strings.Contains(body, "Appearance saved") {
+	if !strings.Contains(body, "Branding saved") {
 		t.Fatalf("save did not succeed: %.300s", body)
 	}
 	_, body = a.get("/")

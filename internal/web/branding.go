@@ -240,7 +240,7 @@ func (s *Server) saveAppearance(w http.ResponseWriter, r *http.Request) {
 	db.SetSetting(s.DB, "layout", layout)
 	db.SetSetting(s.DB, "primary", primary)
 	db.SetSetting(s.DB, "radius", radius)
-	ok(w, r, back, "Appearance saved")
+	ok(w, r, back, "Branding saved. Everyone sees it on their next page load.")
 }
 
 func (s *Server) storeBrandImage(kind string, data []byte) error {

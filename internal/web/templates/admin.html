@@ -3,16 +3,51 @@
 <p class="eyebrow">Administration</p>
 <h1 class="page-title">Status</h1>
 <div class="stack">
+  {{with .Checklist}}<div class="panel">
+    <div class="row between"><h2>Getting started</h2><form method="post" action="/admin/checklist/hide"><button class="link">Hide</button></form></div>
+    <ol class="checklist">{{range .}}
+      <li{{if .Done}} class="done"{{end}}><span class="check-mark" aria-hidden="true">{{if .Done}}✓{{end}}</span>
+        <span><strong>{{.Label}}</strong>{{if .Done}}<span class="sr"> (done)</span>{{end}}<br><small class="muted">{{.Hint}}</small></span>
+        {{if not .Done}}<a class="button small" href="{{.URL}}">{{.Action}}</a>{{end}}</li>{{end}}
+    </ol>
+  </div>{{end}}
   <div class="panel">
-    <h2>Fetcher</h2>
+    <h2>Channels and videos</h2>
     <dl class="stats">
       <div><dt>Channels</dt><dd>{{.Health.Channels}}</dd></div>
-      <div><dt>Failing</dt><dd {{if .Health.Failing}}class="bad"{{end}}>{{.Health.Failing}}</dd></div>
+      <div><dt>Failing</dt><dd {{if .Health.Failing}}class="bad"{{end}}>{{if .Health.Failing}}<a href="#failing">{{.Health.Failing}}</a>{{else}}0{{end}}</dd></div>
       <div><dt>Videos</dt><dd>{{.Health.Videos}}</dd></div>
-      <div><dt>Awaiting details</dt><dd>{{.Health.Pending}}</dd></div>
-      <div><dt>Last fetch</dt><dd>{{if .Health.LastFetch}}{{ago .Health.LastFetch}}{{else}}never{{end}}</dd></div>
+      <div><dt>Waiting for length and details</dt><dd>{{.Health.Pending}}</dd></div>
+      <div><dt>Last new videos fetched</dt><dd>{{if .Health.LastFetch}}<time title="{{date .Health.LastFetch}}">{{ago .Health.LastFetch}}</time>{{else}}never{{end}}</dd></div>
     </dl>
-    <form method="post" action="/admin/refresh"><button class="button">Refresh all channels now</button></form>
+    <div class="row"><form method="post" action="/admin/refresh"><button class="button">Check all channels now</button></form>
+      <span class="muted">They are also checked every {{.Instance.refresh_minutes}} minutes on their own.</span></div>
   </div>
+  <div class="panel">
+    <h2>People</h2>
+    <dl class="stats">
+      <div><dt>Accounts</dt><dd><a href="/admin/users">{{.Health.Users}}</a></dd></div>
+      <div><dt>Signed in this week</dt><dd>{{.Health.ActiveUsers}}</dd></div>
+      <div><dt>Admins</dt><dd>{{.Health.Admins}}</dd></div>
+    </dl>
+  </div>
+  {{if .Failing}}<div class="panel" id="failing">
+    <h2>Channels that fail to update</h2>
+    <p class="muted">They are retried on their own, less often each time. A channel that was deleted or renamed on YouTube keeps failing: remove it.</p>
+    <table class="table">
+      <thead><tr><th>Channel</th><th>Problem</th><th class="num">Tries</th><th>Last worked</th><th></th></tr></thead>
+      <tbody>{{range .Failing}}<tr>
+        <td><a href="/channel/{{.ID}}">{{.Title}}</a><br><small class="muted">{{.Subscribers}} following</small></td>
+        <td data-label="Problem"><small>{{or .Error "unknown"}}</small></td>
+        <td class="num" data-label="Tries">{{.Fails}}</td>
+        <td data-label="Last worked">{{if .LastOK}}{{ago .LastOK}}{{else}}never{{end}}</td>
+        <td class="end"><form method="post" action="/admin/channels/{{.ID}}/retry"><button class="button small">Retry now</button></form>
+          <details class="menu"><summary>Remove</summary><div>
+            <form class="stack-sm" method="post" action="/admin/channels/{{.ID}}/remove"><label class="check"><input type="checkbox" name="confirm" value="1" required> Unfollow {{.Title}} for all {{.Subscribers}} people and delete its videos</label><button class="button danger">Remove channel</button></form>
+          </div></details></td>
+      </tr>{{end}}</tbody>
+    </table>
+  </div>{{end}}
+  <p class="muted">{{.Brand.Name}} {{.Version}}</p>
 </div>
 {{end}}

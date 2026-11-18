@@ -32,11 +32,11 @@
       <a class="nav-item" data-tip="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
       <a class="nav-item" data-tip="Import &amp; export" href="/channels/import" {{if eq .Page "import"}}aria-current="page"{{end}}>{{template "i-import"}}Import &amp; export</a>
       {{if .User.IsAdmin}}<h2 class="nav-heading">Administration</h2>
-      <a class="nav-item" data-tip="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status</a>
+      <a class="nav-item" data-tip="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status{{if .AdminAlert}}<span class="nav-dot" title="{{.AdminAlert}} channels keep failing"><span class="sr">, {{.AdminAlert}} channels keep failing</span></span>{{end}}</a>
       <a class="nav-item" data-tip="Users" href="/admin/users" {{if eq .Page "admin-users"}}aria-current="page"{{end}}>{{template "i-users"}}Users</a>
       <a class="nav-item" data-tip="Sign-in" href="/admin/sign-in" {{if eq .Page "admin-signin"}}aria-current="page"{{end}}>{{template "i-key"}}Sign-in</a>
       <a class="nav-item" data-tip="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>
-      <a class="nav-item" data-tip="Appearance" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Appearance</a>{{end}}
+      <a class="nav-item" data-tip="Branding" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Branding</a>{{end}}
     </nav>
     <div class="sidebar-foot">
       <div class="foot-slot">
@@ -103,7 +103,7 @@
     <li data-k="admin users accounts"><a href="/admin/users">{{template "i-users"}}Users</a></li>
     <li data-k="admin sign-in login oidc providers registration"><a href="/admin/sign-in">{{template "i-key"}}Sign-in</a></li>
     <li data-k="admin instance refresh retention fetch"><a href="/admin/instance">{{template "i-server"}}Instance</a></li>
-    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Appearance</a></li>{{end}}
+    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Branding</a></li>{{end}}
     {{if .NavLists}}<li class="group" role="presentation">Lists</li>{{end}}
     {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
   </ul>

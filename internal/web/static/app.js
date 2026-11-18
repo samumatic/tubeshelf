@@ -393,6 +393,14 @@ if (appearanceForm) {
     const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     return (l + 0.05) / 0.05 > 1.05 / (l + 0.05) ? '#000000' : '#ffffff';
   };
+  appearanceForm.querySelector('[data-square-check]')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    const warn = appearanceForm.querySelector('[data-square-warning]');
+    if (!file || !warn) return;
+    const img = new Image();
+    img.onload = () => { warn.hidden = Math.abs(img.naturalWidth - img.naturalHeight) <= 2; URL.revokeObjectURL(img.src); };
+    img.src = URL.createObjectURL(file);
+  });
   appearanceForm.addEventListener('input', (e) => {
     const t = e.target;
     if (t.name === 'radius') for (const [k, px] of Object.entries(radii)) root.setProperty(`--radius-${k}`, `${px * t.value}px`);
@@ -400,6 +408,8 @@ if (appearanceForm) {
     if (t.name !== 'primary' && t.name !== 'primary_custom') return;
     const picked = appearanceForm.querySelector('input[name="primary"]:checked').value;
     const color = picked === 'custom' ? appearanceForm.elements.primary_custom.value : picked;
+    const warn = appearanceForm.querySelector('[data-contrast-warning]');
+    if (warn) warn.hidden = !(color && readable(color) === '#000000' && parseInt(color.slice(1, 3), 16) + parseInt(color.slice(3, 5), 16) + parseInt(color.slice(5, 7), 16) > 600);
     for (const k of ['--primary', '--primary-fg', '--primary-hover']) root.removeProperty(k);
     if (color) {
       root.setProperty('--primary', color);
@@ -573,6 +583,17 @@ document.addEventListener('input', (e) => {
     const text = row.dataset.filterText.toLowerCase();
     row.hidden = !words.every((w) => text.includes(w));
   }
+});
+
+// Login provider presets fill the usual name, scopes and group claim.
+document.addEventListener('change', (e) => {
+  if (!e.target.matches('[data-preset]') || !e.target.value) return;
+  const f = e.target.form;
+  const [name, scopes, claim] = e.target.value.split('|');
+  f.elements.name.value = name;
+  f.elements.scopes.value = scopes;
+  f.elements.group_claim.value = claim;
+  if (name === 'Google') f.elements.issuer.value = 'https://accounts.google.com';
 });
 
 // Copy buttons: copy the nearest [data-copy-source] input.

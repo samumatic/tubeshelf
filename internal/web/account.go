@@ -349,19 +349,6 @@ type AdminUser struct {
 	Subs                              int
 }
 
-type Health struct {
-	Channels, Failing, Videos, Pending int
-	LastFetch                          int64
-}
-
-func (s *Server) adminStatusPage(w http.ResponseWriter, r *http.Request) {
-	var h Health
-	s.DB.QueryRow(`SELECT count(*), coalesce(sum(fail_count > 0), 0), coalesce(max(last_success_at), 0) FROM channels`).
-		Scan(&h.Channels, &h.Failing, &h.LastFetch)
-	s.DB.QueryRow(`SELECT count(*), coalesce(sum(enrich_after > 0), 0) FROM videos`).Scan(&h.Videos, &h.Pending)
-	s.render(w, r, "admin", M{"Health": h})
-}
-
 func (s *Server) adminUsersPage(w http.ResponseWriter, r *http.Request) {
 	var users []AdminUser
 	order := map[string]string{
@@ -390,7 +377,7 @@ func (s *Server) adminUsersPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	data := M{"Users": users, "Sort": sort, "Add": r.URL.Query().Get("add") == "1", "Typed": r.URL.Query().Get("typed"),
-		"SignIn": baseURL(r) + "/login"}
+		"SignIn": baseURL(r) + "/login", "NoPasswords": db.Setting(s.DB, "oidc_only") == "1"}
 	// Right after adding someone: what to hand them.
 	if id := r.URL.Query().Get("invite"); id != "" {
 		if t, err := auth.UserByID(s.DB, id); err == nil && !t.HasPass {
@@ -415,11 +402,14 @@ func (s *Server) instance() map[string]string {
 
 func (s *Server) adminSignInPage(w http.ResponseWriter, r *http.Request) {
 	providers, _ := auth.Providers(s.DB, false)
-	s.render(w, r, "admin-signin", M{"Instance": s.instance(), "Providers": providers, "Callback": baseURL(r) + auth.CallbackPath})
+	base := baseURL(r)
+	u, _ := url.Parse(base)
+	local := u != nil && (u.Hostname() == "localhost" || strings.HasPrefix(u.Hostname(), "127.") || u.Hostname() == "::1")
+	s.render(w, r, "admin-signin", M{"Instance": s.instance(), "Providers": providers, "Callback": base + auth.CallbackPath, "LocalURL": local})
 }
 
 func (s *Server) adminInstancePage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "admin-instance", M{"Instance": s.instance()})
+	s.render(w, r, "admin-instance", M{"Instance": s.instance(), "Defaults": db.EffectiveDefaults(s.DB)})
 }
 
 func (s *Server) saveInstanceSettings(w http.ResponseWriter, r *http.Request) {
@@ -431,7 +421,7 @@ func (s *Server) saveInstanceSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		n, err := strconv.Atoi(r.PostForm.Get(key))
 		if err != nil || n < lim[0] || n > lim[1] {
-			fail(w, r, "/admin/instance", errors.New(strings.ReplaceAll(key, "_", " ")+" must be between "+strconv.Itoa(lim[0])+" and "+strconv.Itoa(lim[1])))
+			fail(w, r, "/admin/instance", errors.New(instanceLabels[key]+" must be a whole number from "+strconv.Itoa(lim[0])+" to "+strconv.Itoa(lim[1])))
 			return
 		}
 		db.SetSetting(s.DB, key, strconv.Itoa(n))
@@ -451,9 +441,14 @@ func (s *Server) saveInstanceSettings(w http.ResponseWriter, r *http.Request) {
 	ok(w, r, "/admin/instance", "Settings saved")
 }
 
+var instanceLabels = map[string]string{
+	"refresh_minutes": "Check for new videos every … minutes", "fetch_concurrency": "Channels checked at once",
+	"retention_days": "Keep videos for … days",
+}
+
 func (s *Server) refreshAll(w http.ResponseWriter, r *http.Request) {
 	s.Fetcher.RefreshAll()
-	ok(w, r, "/admin", "Refreshing all channels in the background")
+	ok(w, r, "/admin", "Checking all channels for new videos in the background. This page shows the result in a minute or two.")
 }
 
 func (s *Server) adminAddUser(w http.ResponseWriter, r *http.Request) {
@@ -604,11 +599,24 @@ func (s *Server) adminSaveProvider(w http.ResponseWriter, r *http.Request) {
 		AutoProvision: r.FormValue("auto_provision") == "1", GroupClaim: strings.TrimSpace(r.FormValue("group_claim")),
 		AdminGroup: strings.TrimSpace(r.FormValue("admin_group")), Enabled: r.FormValue("enabled") == "1",
 	}
+	if p.Enabled && p.Issuer != "" {
+		if err := s.checkIssuer(r, p.Issuer); err != nil {
+			fail(w, r, "/admin/sign-in", err)
+			return
+		}
+	}
 	if err := auth.SaveProvider(s.DB, s.Secret, p, r.FormValue("client_secret")); err != nil {
 		fail(w, r, "/admin/sign-in", err)
 		return
 	}
-	ok(w, r, "/admin/sign-in", "Login provider saved")
+	msg := "Saved " + p.Name + ". The sign-in page now offers it."
+	if !p.Enabled {
+		msg = "Saved " + p.Name + ". It is off, so the sign-in page does not offer it."
+	}
+	if p.AdminGroup != "" {
+		msg += " Admin rights now follow the " + p.AdminGroup + " group: people signing in through " + p.Name + " without it lose them (the last admin always keeps them)."
+	}
+	ok(w, r, "/admin/sign-in", msg)
 }
 
 func (s *Server) adminDeleteProvider(w http.ResponseWriter, r *http.Request) {
@@ -616,5 +624,5 @@ func (s *Server) adminDeleteProvider(w http.ResponseWriter, r *http.Request) {
 	if providers, _ := auth.Providers(s.DB, true); len(providers) == 0 {
 		db.SetSetting(s.DB, "oidc_only", "0") // never lock everyone out
 	}
-	ok(w, r, "/admin/sign-in", "Login provider deleted")
+	ok(w, r, "/admin/sign-in", "Login provider deleted. Accounts that used it keep their data and can sign in with a password if they have one.")
 }

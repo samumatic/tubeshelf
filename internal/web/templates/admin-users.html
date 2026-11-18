@@ -20,10 +20,11 @@
       <div class="fields">
         <label>Email <input type="email" name="email" value="{{.Typed}}" required autofocus autocomplete="off"></label>
         <label><span>Name<span class="optional">Optional</span></span> <input name="name" maxlength="80" autocomplete="off" aria-label="Name"></label>
-        <label><span>Password<span class="optional">Optional</span></span> <input type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" aria-label="Password"></label>
+        {{if not .NoPasswords}}<label><span>Password<span class="optional">Optional</span></span> <input type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" aria-label="Password"></label>{{end}}
       </div>
+      {{if .NoPasswords}}<p class="hint">They sign in through your login provider with this email address.</p>{{else}}
       <p class="hint">Leave the password empty to get a link they can use to choose their own.</p>
-      <label class="check"><input type="checkbox" name="must_change" value="1" checked> Ask them to change the password when they first sign in</label>
+      <label class="check"><input type="checkbox" name="must_change" value="1" checked> Ask them to change the password when they first sign in</label>{{end}}
       <label class="check"><input type="checkbox" name="admin" value="1"> Admin <span class="muted">· can add users and change instance settings</span></label>
       <p class="row"><button class="button primary">Add user</button> <a class="button" href="/admin/users">Cancel</a></p>
     </form>
@@ -42,7 +43,7 @@
       <tbody id="user-rows">{{range .Users}}
         <tr{{if .Disabled}} class="paused"{{end}}>
           <td><strong>{{or .Name .Email}}</strong>{{if eq .ID $.User.ID}} <span class="muted">(you)</span>{{end}}{{if .Name}}<br><small class="muted">{{.Email}}</small>{{end}}
-            <div class="tags">{{if .IsAdmin}}<span class="tag">admin</span>{{end}}{{if .OIDC}}<span class="tag">SSO{{with .Provider}} · {{.}}{{end}}</span>{{end}}{{if .Disabled}}<span class="tag warn">paused</span>{{end}}{{if eq .Source "register"}}<span class="tag">signed up</span>{{end}}{{if and (not .HasPass) (not .OIDC)}}<span class="tag">invited</span>{{end}}{{if .MustChange}}<span class="tag">temporary password</span>{{end}}</div></td>
+            <div class="tags">{{if .IsAdmin}}<span class="tag">admin</span>{{end}}{{if .OIDC}}<span class="tag">SSO{{with .Provider}} · {{.}}{{end}}</span>{{end}}{{if .Disabled}}<span class="tag warn">paused</span>{{end}}{{if eq .Source "register"}}<span class="tag">signed up</span>{{end}}{{if and (not .HasPass) (not .OIDC) (not $.NoPasswords)}}<span class="tag">invited</span>{{end}}{{if .MustChange}}<span class="tag">temporary password</span>{{end}}</div></td>
           <td class="num" data-label="Channels">{{.Subs}}</td>
           <td data-label="Joined">{{ago .Created}}</td>
           <td data-label="Last sign-in">{{if .LastLogin}}{{ago .LastLogin}}{{else}}never{{end}}</td>
@@ -55,11 +56,11 @@
               {{if ne .ID $.User.ID}}
               <form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="admin"><input type="hidden" name="on" value="{{if .IsAdmin}}0{{else}}1{{end}}"><button class="button">{{if .IsAdmin}}Remove admin rights{{else}}Make admin{{end}}</button>{{if not .IsAdmin}} <small class="muted">Can add users and change settings.</small>{{end}}</form>
               {{end}}
-              <form class="stack-sm" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="password">
+              {{if not $.NoPasswords}}<form class="stack-sm" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="password">
                 <label>Set new password <input type="password" name="password" minlength="8" maxlength="72" required autocomplete="new-password"></label>
                 <label class="check"><input type="checkbox" name="must_change" value="1" checked> Ask them to change it</label>
                 <button class="button">Set password</button></form>
-              {{if and (not .HasPass) (not .OIDC)}}<form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="invite"><button class="button">Show invite link</button></form>{{end}}
+              {{if and (not .HasPass) (not .OIDC)}}<form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="invite"><button class="button">Show invite link</button></form>{{end}}{{end}}
               {{if ne .ID $.User.ID}}
               <form method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="{{if .Disabled}}resume{{else}}pause{{end}}"><button class="button">{{if .Disabled}}Let them sign in again{{else}}Pause account{{end}}</button>{{if not .Disabled}} <small class="muted">Signs them out; nothing is deleted.</small>{{end}}</form>
               <form class="stack-sm" method="post" action="/admin/users/{{.ID}}"><input type="hidden" name="action" value="delete"><label class="check"><input type="checkbox" name="confirm" value="1" required> Yes, delete {{or .Name .Email}} and their data</label><button class="button danger">Delete user</button></form>

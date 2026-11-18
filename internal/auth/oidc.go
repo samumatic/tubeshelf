@@ -64,6 +64,15 @@ func providerByID(d *sql.DB, id string) (*Provider, error) {
 	return &p, err
 }
 
+// CheckIssuer runs OIDC discovery, so a typo in the issuer shows up on save
+// instead of at the first sign-in.
+func CheckIssuer(ctx context.Context, issuer string) error {
+	if _, err := oidc.NewProvider(ctx, strings.TrimSpace(issuer)); err != nil {
+		return fmt.Errorf("could not reach %s/.well-known/openid-configuration (%v); check the issuer URL", strings.TrimRight(strings.TrimSpace(issuer), "/"), err)
+	}
+	return nil
+}
+
 // SaveProvider inserts or updates a provider. An empty plainSecret keeps the stored one.
 func SaveProvider(d *sql.DB, s Secret, p Provider, plainSecret string) error {
 	p.Issuer = strings.TrimSpace(p.Issuer)

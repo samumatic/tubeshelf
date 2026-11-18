@@ -140,6 +140,11 @@ func (s *Server) Handler() (http.Handler, error) {
 	admin("POST /admin/appearance/reset", s.resetBrandImage)
 	admin("POST /admin/settings", s.saveInstanceSettings)
 	admin("POST /admin/refresh", s.refreshAll)
+	admin("POST /admin/checklist/hide", s.hideChecklist)
+	admin("POST /admin/channels/{id}/retry", s.retryChannel)
+	admin("POST /admin/channels/{id}/remove", s.removeChannel)
+	admin("POST /admin/defaults", s.saveUserDefaults)
+	admin("POST /admin/danger", s.instanceDanger)
 	admin("POST /admin/users", s.adminAddUser)
 	admin("POST /admin/users/{id}", s.adminUpdateUser)
 	admin("POST /admin/providers", s.adminSaveProvider)
@@ -174,6 +179,7 @@ func (s *Server) loadTemplates() error {
 			return M{"Key": key, "Label": label, "On": set[key] == "1"}
 		},
 		"list":        func(items ...string) []string { return items },
+		"split":       strings.Split,
 		"linkify":     linkify,
 		"newProvider": func() auth.Provider { return auth.Provider{} },
 	}
@@ -227,11 +233,16 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	if goURL := r.URL.Query().Get("go"); goURL != "" && localPath(goURL) == goURL {
 		data["Go"] = M{"URL": goURL, "Label": r.URL.Query().Get("golabel")}
 	}
+	if u != nil && u.IsAdmin {
+		var failing int
+		s.DB.QueryRow(`SELECT count(*) FROM channels WHERE fail_count > 2`).Scan(&failing)
+		data["AdminAlert"] = failing
+	}
 	if _, ok := data["Set"]; !ok {
 		if u != nil {
 			data["Set"] = db.UserSettings(s.DB, u.ID)
 		} else {
-			data["Set"] = db.UserDefaults
+			data["Set"] = db.EffectiveDefaults(s.DB)
 		}
 	}
 	block := "layout"

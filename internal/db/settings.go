@@ -77,12 +77,35 @@ func SetSetting(d *sql.DB, key, value string) error {
 	return err
 }
 
-// UserSettings returns all settings of a user with defaults filled in.
-func UserSettings(d *sql.DB, userID string) map[string]string {
+// DefaultPrefix marks instance settings that change a user setting's default
+// for everyone who has not chosen it themselves ("default.theme").
+const DefaultPrefix = "default."
+
+// EffectiveDefaults returns UserDefaults with the admin's instance defaults applied.
+func EffectiveDefaults(d *sql.DB) map[string]string {
 	out := make(map[string]string, len(UserDefaults))
 	for k, v := range UserDefaults {
 		out[k] = v
 	}
+	rows, err := d.Query(`SELECT substr(key, ?), value FROM settings WHERE key LIKE 'default.%'`, len(DefaultPrefix)+1)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k, v string
+		if rows.Scan(&k, &v) == nil {
+			if _, known := UserDefaults[k]; known {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
+
+// UserSettings returns all settings of a user with defaults filled in.
+func UserSettings(d *sql.DB, userID string) map[string]string {
+	out := EffectiveDefaults(d)
 	rows, err := d.Query(`SELECT key, value FROM user_settings WHERE user_id = ?`, userID)
 	if err != nil {
 		return out
