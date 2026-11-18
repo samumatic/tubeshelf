@@ -118,7 +118,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("POST /channels/import", s.importOPML)
 	page("GET /channels/export.opml", s.exportOPML)
 	page("POST /channels/{id}/delete", s.deleteChannel)
-	page("POST /channels/{id}/scrape", s.scrapeChannel)
+	page("POST /channels/{id}/refresh", s.refreshChannel)
 	page("POST /lists", s.addList)
 	page("POST /lists/{id}/delete", s.deleteList)
 	page("POST /lists/{id}", s.updateList)

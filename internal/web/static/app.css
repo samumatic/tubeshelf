@@ -364,6 +364,15 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 /* A list chip says what a click does: + adds the channel to the list, ✓ shows it is in it. */
 .list-chip::before { content: "+"; margin-right: 2px; }
 .list-chip[aria-pressed="true"]::before { content: "✓"; }
+/* Channels: a row shows only the lists the channel is in; the others appear on hover or focus. */
+.channel-table .chips > form:has([aria-pressed="true"]) { order: -1; }
+@media (hover: hover) {
+  .channel-table .list-chip[aria-pressed="false"] { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+  .channel-table tr:is(:hover, :focus-within) .list-chip[aria-pressed="false"] { opacity: 1; }
+}
+.channel-table .end .icon-button { margin-left: auto; }
+.row-menu { width: 220px; transform-origin: top right; }
+.row-menu .danger, .row-menu .danger svg { color: var(--danger-fg); }
 /* Two or three options side by side; the pressed one is the current choice. */
 .segmented { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--radius-sm); background: var(--fill-muted); box-shadow: inset 0 0 0 1px var(--border); }
 .segmented a { text-decoration: none; }
@@ -667,8 +676,6 @@ details > form, details > div { display: grid; gap: 14px; padding: 14px 0 4px; }
 .table tbody tr:hover { background: var(--fill-row-hover); }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .table .end { text-align: right; padding-right: 0; white-space: nowrap; }
-.table .end form { display: inline-block; }
-.table .end form + form { margin-left: var(--s3); }
 .channel { display: flex; align-items: center; gap: 12px; font-weight: 500; }
 .channel:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -920,6 +927,7 @@ tr.paused td:not(.end) { opacity: .6; }
 .howto ol { margin: var(--s3) 0 0; padding-left: 1.3em; display: grid; gap: var(--s2); color: var(--fg-muted); font-size: 0.875rem; }
 .snack { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; border-radius: var(--radius-md); background: var(--fg); color: var(--canvas); font-size: 0.875rem; translate: -50% 0; box-shadow: var(--elevation-popover); animation: rise var(--dur-base) var(--ease-out); }
 .snack[hidden] { display: none; }
+.snack:not(:has(button)) { padding: 12px 16px; }
 .snack button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 @media (max-width: 639px) { .snack { bottom: calc(84px + env(safe-area-inset-bottom)); } }
 .feed-end { grid-column: 1 / -1; margin: var(--s6) 0 var(--s4); text-align: center; font-size: 0.875rem; }

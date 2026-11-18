@@ -79,7 +79,7 @@ document.addEventListener('submit', async (e) => {
   delete form.dataset.undoing;
 });
 
-// A short message at the bottom of the screen, with an Undo button.
+// A short message at the bottom of the screen, with an Undo button when undo is given.
 let snackTimer;
 function snack(text, undo) {
   let el = document.getElementById('snack');
@@ -88,13 +88,40 @@ function snack(text, undo) {
     el.setAttribute('role', 'status');
     document.body.append(el);
   }
-  const b = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Undo' });
-  b.addEventListener('click', () => { el.hidden = true; undo(); });
-  el.replaceChildren(Object.assign(document.createElement('span'), { textContent: text }), b);
+  el.replaceChildren(Object.assign(document.createElement('span'), { textContent: text }));
+  if (undo) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Undo' });
+    b.addEventListener('click', () => { el.hidden = true; undo(); });
+    el.append(b);
+  }
   el.hidden = false;
   clearTimeout(snackTimer);
   snackTimer = setTimeout(() => { el.hidden = true; }, 5000);
 }
+
+// Actions that stay on the page (Refresh now): post in the background, say what happened.
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('form[data-inline]');
+  if (!form) return;
+  e.preventDefault();
+  form.closest('[popover]')?.hidePopover();
+  const res = await post(form).catch(() => null);
+  if (!res) return offline();
+  const body = await res.json().catch(() => ({}));
+  snack(body.message || body.error || (res.ok ? 'Done.' : 'That did not work. Try again.'));
+});
+
+// Row menus open under their ⋯ button and close when the page scrolls.
+document.addEventListener('beforetoggle', (e) => {
+  const menu = e.target;
+  if (!menu.classList?.contains('row-menu') || e.newState !== 'open') return;
+  const b = document.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`).getBoundingClientRect();
+  const below = innerHeight - b.bottom > 120;
+  menu.style.left = Math.max(8, b.right - 220) + 'px';
+  menu.style.top = below ? b.bottom + 4 + 'px' : 'auto';
+  menu.style.bottom = below ? 'auto' : innerHeight - b.top + 4 + 'px';
+}, true);
+addEventListener('scroll', () => document.querySelectorAll('.row-menu:popover-open').forEach((m) => m.hidePopover()), { passive: true });
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-confirm]');

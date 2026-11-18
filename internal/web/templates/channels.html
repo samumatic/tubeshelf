@@ -42,7 +42,11 @@
           <input type="hidden" name="channel" value="{{$c.ID}}"><input type="hidden" name="on" value="{{if index $c.InList .ID}}0{{else}}1{{end}}">
           <button class="chip small list-chip" aria-pressed="{{index $c.InList .ID}}" title="{{if index $c.InList .ID}}In {{.Name}}: click to take out{{else}}Add to {{.Name}}{{end}}">{{.Name}}</button>
         </form>{{end}}</div></td>{{end}}
-      <td class="end"><form method="post" action="/channels/{{.ID}}/scrape"><button class="link" title="Read the channel's Videos tab again for uploads older than its RSS feed">Scrape page</button></form><form method="post" action="/channels/{{.ID}}/delete"><button class="link danger" data-confirm="Unsubscribe from {{.Title}}? Its videos leave your feed.">Unsubscribe</button></form></td>
+      <td class="end"><button type="button" class="icon-button" popovertarget="cm-{{.ID}}" aria-haspopup="menu" aria-label="More for {{.Title}}">{{template "i-more"}}</button>
+        <div class="popmenu row-menu" id="cm-{{.ID}}" popover role="menu" aria-label="{{.Title}}">
+          <form method="post" action="/channels/{{.ID}}/refresh" data-inline><button role="menuitem">{{template "i-refresh"}}Refresh now</button></form>
+          <form method="post" action="/channels/{{.ID}}/delete"><button role="menuitem" class="danger" data-confirm="Unsubscribe from {{.Title}}? Its videos leave your feed.">{{template "i-logout"}}Unsubscribe</button></form>
+        </div></td>
     </tr>{{end}}
   </tbody>
 </table>
