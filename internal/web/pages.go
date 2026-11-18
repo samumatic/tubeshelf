@@ -261,7 +261,7 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data := M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
 		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"], "Subs": -1, "HiddenShorts": "",
-		"Ctx": watchContext(q)}
+		"Ctx": watchContext(q), "Retention": db.Setting(s.DB, "retention_days")}
 	// Videos started and not finished come first, on the plain feed only.
 	if q["before"] == "" && q["q"] == "" && q["channel"] == "" && q["list"] == "" && r.URL.Query().Get("fragment") != "1" {
 		data["Continue"] = s.continueWatching(u.ID)

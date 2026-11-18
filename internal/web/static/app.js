@@ -620,6 +620,12 @@ async function openWatch(url) {
     if (mine === opening) location.href = url;
   }
 }
+// A page kept for Back (bfcache) after signing out elsewhere must not show the old account.
+addEventListener('pageshow', async (e) => {
+  if (!e.persisted || !document.querySelector('.shell')) return;
+  const who = await fetch('/account', { method: 'HEAD', redirect: 'manual' }).catch(() => null);
+  if (who?.type === 'opaqueredirect') location.reload();
+});
 addEventListener('popstate', () => {
   const here = location.pathname + location.search;
   if (here === shown) return;

@@ -189,7 +189,7 @@
     <a class="avatar" href="/?channel={{$v.ChannelID}}" tabindex="-1" aria-hidden="true" data-initial="{{initial $v.Channel}}">{{if $v.HasAvatar}}<img src="/avatar/{{$v.ChannelID}}" alt="" loading="lazy" width="36" height="36">{{end}}</a>
     <div class="text">
       <h3><a class="title" {{if eq .Set.open_on_youtube "1"}}href="https://www.youtube.com/watch?v={{$v.ID}}" target="_blank" rel="noopener"{{else}}href="/watch/{{$v.ID}}{{.Ctx}}"{{end}}>{{$v.Title}}</a></h3>
-      <p>{{if $v.ChannelID}}<a href="/?channel={{$v.ChannelID}}">{{$v.Channel}}</a>{{else}}{{$v.Channel}}{{end}} · <time datetime="{{iso $v.Published}}">{{ago $v.Published}}</time>{{if $v.Members}} · Members only{{end}}</p>
+      <p>{{if $v.ChannelID}}<a href="/?channel={{$v.ChannelID}}">{{$v.Channel}}</a>{{else}}{{$v.Channel}}{{end}} · <time datetime="{{iso $v.Published}}" title="{{date $v.Published}}">{{ago $v.Published}}</time>{{if $v.Members}} · Members only{{end}}</p>
     </div>
   </div>
   {{/* Watched sits in the corner: a watched mark stays shown, and the unset Later beside it is invisible. */}}

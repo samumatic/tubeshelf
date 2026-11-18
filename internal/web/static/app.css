@@ -920,3 +920,4 @@ tr.paused td:not(.end) { opacity: .6; }
 .snack[hidden] { display: none; }
 .snack button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 @media (max-width: 639px) { .snack { bottom: calc(84px + env(safe-area-inset-bottom)); } }
+.feed-end { grid-column: 1 / -1; margin: var(--s6) 0 var(--s4); text-align: center; font-size: 0.875rem; }

@@ -79,5 +79,5 @@
 {{define "items"}}
 {{range .Groups}}{{if .Label}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>{{end}}
 {{range .Videos}}{{template "card" (card . $.Set $.Ctx)}}{{end}}{{end}}
-{{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{end}}
+{{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{else if .Videos}}<p class="feed-end muted">That's everything. Videos older than {{.Retention}} days are removed, except ones in Watch later or your history.</p>{{end}}
 {{end}}

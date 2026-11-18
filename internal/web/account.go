@@ -173,7 +173,23 @@ type APIKey struct {
 	Created, LastUsed int64
 }
 
-func (s *Server) accountPage(w http.ResponseWriter, r *http.Request) { s.render(w, r, "account", nil) }
+func (s *Server) accountPage(w http.ResponseWriter, r *http.Request) {
+	var sso string
+	s.DB.QueryRow(`SELECT coalesce((SELECT p.name FROM oidc_providers p WHERE p.issuer = u.oidc_issuer LIMIT 1), 'your login provider')
+		FROM users u WHERE u.id = ? AND u.oidc_subject IS NOT NULL`, s.user(r).ID).Scan(&sso)
+	s.render(w, r, "account", M{"SSO": sso})
+}
+
+// unlinkSSO detaches the login provider; the account then signs in with its password only.
+func (s *Server) unlinkSSO(w http.ResponseWriter, r *http.Request) {
+	u := s.user(r)
+	if !u.HasPass {
+		fail(w, r, "/account", errors.New("set a password first, or you could not sign in any more"))
+		return
+	}
+	s.DB.Exec(`UPDATE users SET oidc_subject = NULL, oidc_issuer = NULL WHERE id = ?`, u.ID)
+	ok(w, r, "/account", "Unlinked. Signing in through the provider again links it again; use your email and password instead.")
+}
 
 func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "preferences", nil)
@@ -604,6 +620,12 @@ func (s *Server) adminSaveProvider(w http.ResponseWriter, r *http.Request) {
 			fail(w, r, "/admin/sign-in", err)
 			return
 		}
+	}
+	var clash int
+	s.DB.QueryRow(`SELECT count(*) FROM oidc_providers WHERE name = ? COLLATE NOCASE AND id != ?`, p.Name, p.ID).Scan(&clash)
+	if clash > 0 {
+		fail(w, r, "/admin/sign-in", errors.New("another provider is already called "+p.Name+"; the sign-in buttons need different names"))
+		return
 	}
 	if err := auth.SaveProvider(s.DB, s.Secret, p, r.FormValue("client_secret")); err != nil {
 		fail(w, r, "/admin/sign-in", err)

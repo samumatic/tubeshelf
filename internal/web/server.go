@@ -132,6 +132,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("POST /account/keys", s.addAPIKey)
 	page("POST /account/keys/{id}/delete", s.deleteAPIKey)
 	page("POST /account/danger", s.danger)
+	page("POST /account/unlink", s.unlinkSSO)
 	// The preferences page lived here before the account pages; keeps bookmarks working.
 	mux.Handle("GET /settings", http.RedirectHandler("/account/preferences", http.StatusMovedPermanently))
 
@@ -163,13 +164,30 @@ func (s *Server) Handler() (http.Handler, error) {
 	api("DELETE /api/subscriptions", s.apiDeleteSubscription)
 	api("GET /api/subscriptions/export", s.exportOPML)
 	api("GET /api/videos", s.apiVideos)
+	// Anything else under /api/ answers in JSON too, with Allow for a known path and a wrong method.
+	apiMethods := map[string]string{"/api/subscriptions": "GET, POST, DELETE", "/api/subscriptions/export": "GET", "/api/videos": "GET", "/api/version": "GET"}
+	apiFallback := func(w http.ResponseWriter, r *http.Request) {
+		allow := apiMethods[r.URL.Path]
+		if allow == "" && strings.HasPrefix(r.URL.Path, "/api/subscriptions/") {
+			allow = "DELETE"
+		}
+		if allow != "" {
+			w.Header().Set("Allow", allow)
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": r.Method + " is not supported here; use " + allow})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such API endpoint; see the README for the list"})
+	}
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		mux.HandleFunc(m+" /api/", apiFallback)
+	}
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
 	})
 
 	// Rejects cross-site POSTs (CSRF) using Sec-Fetch-Site / Origin.
 	csrf := http.NewCrossOriginProtection()
-	return securityHeaders(csrf.Handler(s.loadUser(mux))), nil
+	return compress(securityHeaders(csrf.Handler(s.loadUser(mux)))), nil
 }
 
 func (s *Server) loadTemplates() error {
@@ -265,7 +283,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 		block = "items"
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
+	// no-cache, not no-store: the browser may keep the page for Back (bfcache) but asks again on a normal visit.
+	w.Header().Set("Cache-Control", "private, no-cache")
 	if u != nil && block == "layout" {
 		w.Header().Set("Speculation-Rules", `"/speculation-rules.json"`)
 	}

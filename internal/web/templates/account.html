@@ -21,15 +21,25 @@
     <p><button class="button">Change password</button></p>
   </form>
 
-  <form class="panel danger-zone" method="post" action="/account/danger">
+  {{with .SSO}}<form class="panel" method="post" action="/account/unlink">
+    <h2>Sign-in with {{.}}</h2>
+    <p class="muted">This account is linked to {{.}}.{{if not $.User.HasPass}} Set a password above before you unlink it, or you cannot sign in any more.{{end}}</p>
+    <p><button class="button" {{if not $.User.HasPass}}disabled{{end}}>Unlink {{.}}</button></p>
+  </form>{{end}}
+
+  <div class="panel danger-zone">
     <h2>Danger zone</h2>
-    <label class="check"><input type="checkbox" name="confirm" value="1" required> I understand this cannot be undone</label>
-    <div class="row">
-      <button class="button danger" name="action" value="history">Clear watch history</button>
-      <button class="button danger" name="action" value="subscriptions">Delete all subscriptions</button>
-      <button class="button danger" name="action" value="account">Delete my account</button>
-    </div>
-  </form>
+    <p class="muted">None of these can be undone.</p>
+    <form class="danger-row" method="post" action="/account/danger"><input type="hidden" name="action" value="history">
+      <div><strong>Clear watch history</strong><br><small class="muted">Forgets what you played, progress and watched marks.</small></div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> I am sure</label><button class="button danger">Clear history</button></form>
+    <form class="danger-row" method="post" action="/account/danger"><input type="hidden" name="action" value="subscriptions">
+      <div><strong>Delete all subscriptions</strong><br><small class="muted">Unfollows every channel and empties your lists. Export first if you may want them back.</small></div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> I am sure</label><button class="button danger">Delete subscriptions</button></form>
+    <form class="danger-row" method="post" action="/account/danger"><input type="hidden" name="action" value="account">
+      <div><strong>Delete my account</strong><br><small class="muted">Removes you and everything above from {{.Brand.Name}}.</small></div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> I am sure</label><button class="button danger">Delete account</button></form>
+  </div>
   <p class="muted">TubeShelf {{.Version}}</p>
 </div>
 {{end}}
