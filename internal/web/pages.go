@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,9 +67,46 @@ func dayLabel(ts int64, now time.Time) string {
 // the label the previous page ended with, so a day that continues across
 // pages gets no second heading.
 func groupByDay(vids []Video, now time.Time, prev string) []DayGroup {
+	return groupBy(vids, func(ts int64) string { return dayLabel(ts, now) }, prev)
+}
+
+// periodLabel names a coarser bucket than a day: this week, last week, then months.
+func periodLabel(ts int64, now time.Time) string {
+	switch l := dayLabel(ts, now); l {
+	case "Upcoming", "Today", "Yesterday":
+		return l
+	}
+	t := time.Unix(ts, 0).In(now.Location())
+	y, m, d := now.Date()
+	days := int(time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Sub(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)).Hours() / 24)
+	switch {
+	case days < 7:
+		return "This week"
+	case days < 14:
+		return "Last week"
+	case t.Year() == now.Year():
+		return t.Format("January")
+	}
+	return t.Format("January 2006")
+}
+
+// feedLabeler picks day headings, or weeks and months when most days hold
+// only a video or two: a heading per video would leave the grid mostly empty.
+func feedLabeler(vids []Video, now time.Time) func(int64) string {
+	days := map[string]bool{}
+	for _, v := range vids {
+		days[dayLabel(v.Published, now)] = true
+	}
+	if len(days) > 0 && len(vids) < 3*len(days) {
+		return func(ts int64) string { return periodLabel(ts, now) }
+	}
+	return func(ts int64) string { return dayLabel(ts, now) }
+}
+
+func groupBy(vids []Video, labelOf func(int64) string, prev string) []DayGroup {
 	var out []DayGroup
 	for _, v := range vids {
-		label := dayLabel(v.Published, now)
+		label := labelOf(v.Published)
 		if n := len(out); n > 0 && (out[n-1].Label == label || (out[n-1].Label == "" && label == prev)) {
 			out[n-1].Videos = append(out[n-1].Videos, v)
 			continue
@@ -204,18 +242,33 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	prev := ""
-	if ts, _, found := strings.Cut(q["before"], "_"); found {
-		n, _ := strconv.ParseInt(ts, 10, 64)
-		prev = dayLabel(n, time.Now())
-	}
 	groups := []DayGroup{{Videos: vids}} // one continuous grid
 	// A channel posts about once a day; day headings would leave one video per row.
 	if set["group_days"] == "1" && q["channel"] == "" {
-		groups = groupByDay(vids, time.Now(), prev)
+		labelOf := feedLabeler(vids, time.Now())
+		prev := ""
+		if ts, _, found := strings.Cut(q["before"], "_"); found {
+			n, _ := strconv.ParseInt(ts, 10, 64)
+			prev = labelOf(n)
+		}
+		groups = groupBy(vids, labelOf, prev)
+		// Still a heading every video or two: dates on the cards say enough, keep the grid whole.
+		if len(vids) < 3*len(groups) {
+			groups = []DayGroup{{Videos: vids}}
+		}
 	}
 	data := M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query(), "Set": set, "Search": q["q"],
-		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"]}
+		"Lists": s.lists(u.ID), "ListID": q["list"], "ChannelID": q["channel"], "Subs": -1, "HiddenShorts": "",
+		"Ctx": watchContext(q)}
+	// Shorts are hidden by default; say how many, so they are not simply missing.
+	if set["hide_shorts"] == "1" && q["before"] == "" {
+		var n int
+		s.DB.QueryRow(`SELECT count(*) FROM videos v JOIN subscriptions sub ON sub.channel_id = v.channel_id AND sub.user_id = ?
+			WHERE v.kind = 'short'`, u.ID).Scan(&n)
+		if n > 0 {
+			data["HiddenShorts"] = fmt.Sprintf(" · %d hidden", n)
+		}
+	}
 	if q["channel"] != "" {
 		var title string
 		var avatar, subscribed bool
@@ -234,15 +287,73 @@ func (s *Server) feedPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "feed", data)
 }
 
+// watchContext is the query a watch link carries from a filtered feed (a list, a
+// channel, a search), so Up next keeps to the same videos.
+func watchContext(q map[string]string) string {
+	v := url.Values{}
+	for _, k := range []string{"list", "channel", "q"} {
+		if q[k] != "" {
+			v.Set(k, q[k])
+		}
+	}
+	if len(v) == 0 {
+		return ""
+	}
+	return "?" + v.Encode()
+}
+
+// laterQuery lists Watch later as a queue: the first saved plays first.
+const laterQuery = `SELECT ` + videoCols + ` FROM watch_later l JOIN videos v ON v.id = l.video_id` + videoJoins + `
+	WHERE l.user_id = ? ORDER BY l.added_at, v.id`
+
+func (s *Server) laterVideos(userID string) ([]Video, error) {
+	return s.videos(laterQuery, userID, userID, userID)
+}
+
 func (s *Server) laterPage(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
-	vids, err := s.videos(`SELECT `+videoCols+` FROM watch_later l JOIN videos v ON v.id = l.video_id`+videoJoins+`
-		WHERE l.user_id = ? ORDER BY l.added_at DESC`, u.ID, u.ID, u.ID)
+	vids, err := s.laterVideos(u.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "later", M{"Videos": vids})
+	var total int64
+	watched := 0
+	for _, v := range vids {
+		if !v.Watched {
+			total += max(v.Duration-int64(v.Progress), 0)
+		} else {
+			watched++
+		}
+	}
+	s.render(w, r, "later", M{"Videos": vids, "Total": total, "WatchedCount": watched})
+}
+
+// watchedLater takes a just-watched video off Watch later, for users who chose so.
+func (s *Server) watchedLater(userID, videoID string) {
+	if db.UserSettings(s.DB, userID)["later_autoremove"] == "1" {
+		s.DB.Exec(`DELETE FROM watch_later WHERE user_id = ? AND video_id = ?`, userID, videoID)
+	}
+}
+
+// clearWatchedLater takes every watched video off Watch later.
+func (s *Server) clearWatchedLater(w http.ResponseWriter, r *http.Request) {
+	u := s.user(r)
+	res, err := s.DB.Exec(`DELETE FROM watch_later WHERE user_id = ? AND video_id IN
+		(SELECT video_id FROM watch_state WHERE user_id = ? AND watched = 1)`, u.ID, u.ID)
+	if err != nil {
+		fail(w, r, "/later", err)
+		return
+	}
+	n, _ := res.RowsAffected()
+	ok(w, r, "/later", fmt.Sprintf("Removed %d watched %s", n, plural(int(n), "video", "videos")))
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 func (s *Server) historyPage(w http.ResponseWriter, r *http.Request) {
@@ -273,14 +384,41 @@ func (s *Server) watchPage(w http.ResponseWriter, r *http.Request) {
 	if len(vids) > 0 {
 		v = vids[0]
 	}
+	var description string
+	s.DB.QueryRow(`SELECT description FROM videos WHERE id = ?`, id).Scan(&description)
 	set := db.UserSettings(s.DB, u.ID)
 	start := 0
 	// Resume, unless the video was finished or barely started.
 	if !v.Watched && v.Progress > 10 && (v.Duration == 0 || v.Progress < float64(v.Duration)-10) {
 		start = int(v.Progress)
 	}
-	next, _, _ := s.feedVideos(u.ID, set, map[string]string{"before": v.Cursor()}, 8)
-	s.render(w, r, "watch", M{"V": v, "Start": start, "Set": set, "UpNext": next})
+	// Up next continues where the video was opened: Watch later's queue, or the same list, channel or search.
+	var next []Video
+	ctx := ""
+	if r.URL.Query().Get("from") == "later" {
+		ctx = "?from=later"
+		queue, _ := s.laterVideos(u.ID)
+		for i, q := range queue {
+			if q.ID == id {
+				queue = queue[i+1:]
+				break
+			}
+		}
+		for _, q := range queue {
+			if q.ID != id && !q.Watched && len(next) < 8 {
+				next = append(next, q)
+			}
+		}
+	} else {
+		fq := map[string]string{"before": v.Cursor()}
+		for _, k := range []string{"list", "channel", "q"} {
+			fq[k] = strings.TrimSpace(r.URL.Query().Get(k))
+		}
+		ctx = watchContext(fq)
+		next, _, _ = s.feedVideos(u.ID, set, fq, 8)
+	}
+	s.render(w, r, "watch", M{"V": v, "Start": start, "Set": set, "UpNext": next, "Ctx": ctx, "FromLater": ctx == "?from=later",
+		"Description": description})
 }
 
 func (s *Server) done(w http.ResponseWriter, r *http.Request) {
@@ -306,6 +444,9 @@ func (s *Server) setWatched(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if on {
+		s.watchedLater(s.user(r).ID, id)
 	}
 	s.done(w, r)
 }
@@ -352,6 +493,9 @@ func (s *Server) setProgress(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if watched {
+		s.watchedLater(u.ID, id)
 	}
 	if d > 0 {
 		// The player knows the real length; fill it in if enrichment has not.

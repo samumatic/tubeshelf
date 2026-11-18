@@ -25,19 +25,24 @@ var Defaults = map[string]string{
 
 // Per-user settings and their defaults.
 var UserDefaults = map[string]string{
-	"theme":           "system", // system | dark | light
-	"view":            "grid",   // grid | list
-	"sort":            "newest", // newest | oldest
-	"hide_shorts":     "1",
-	"hide_watched":    "0",
-	"hide_members":    "0",
-	"hide_live":       "0",
-	"group_days":      "1", // day headings in the feed
-	"sponsorblock":    "1",
-	"watched_percent": "90",
-	"open_on_youtube": "0",
-	"sidebar":         "expanded", // expanded | collapsed (from 1024px)
-	"sidebar_width":   "256",      // px, 208 to 400 in steps of 16
+	"theme":            "system", // system | dark | light
+	"view":             "grid",   // grid | list
+	"sort":             "newest", // newest | oldest
+	"hide_shorts":      "1",
+	"hide_watched":     "0",
+	"hide_members":     "0",
+	"hide_live":        "0",
+	"group_days":       "1", // day headings in the feed
+	"sponsorblock":     "1",
+	"watched_percent":  "90",
+	"open_on_youtube":  "0",
+	"captions":         "0",        // remembered from the player's captions button
+	"theater":          "0",        // the watch page's large-video mode
+	"autoplay_next":    "1",        // play Up next's first video after a countdown
+	"later_autoremove": "0",        // marking a video watched also takes it off Watch later
+	"click_to_load":    "0",        // load the YouTube player only after a click
+	"sidebar":          "expanded", // expanded | collapsed (from 1024px)
+	"sidebar_width":    "256",      // px, 208 to 400 in steps of 16
 }
 
 type querier interface {

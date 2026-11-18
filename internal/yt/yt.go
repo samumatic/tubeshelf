@@ -76,6 +76,8 @@ type FeedVideo struct {
 	Title     string
 	Published time.Time
 	Short     bool
+	// Description is the uploader's text, from the feed's media:group.
+	Description string
 }
 
 // Feed is a channel's RSS feed (about the 15 newest uploads).
@@ -90,7 +92,10 @@ type rssFeed struct {
 		VideoID   string `xml:"http://www.youtube.com/xml/schemas/2015 videoId"`
 		Title     string `xml:"title"`
 		Published string `xml:"published"`
-		Links     []struct {
+		Group     struct {
+			Description string `xml:"http://search.yahoo.com/mrss/ description"`
+		} `xml:"http://search.yahoo.com/mrss/ group"`
+		Links []struct {
 			Rel  string `xml:"rel,attr"`
 			Href string `xml:"href,attr"`
 		} `xml:"link"`
@@ -117,7 +122,7 @@ func parseFeed(body []byte) (*Feed, error) {
 		if err != nil || e.VideoID == "" {
 			continue
 		}
-		v := FeedVideo{ID: e.VideoID, Title: e.Title, Published: t}
+		v := FeedVideo{ID: e.VideoID, Title: e.Title, Published: t, Description: strings.TrimSpace(e.Group.Description)}
 		for _, l := range e.Links {
 			// YouTube links Shorts as /shorts/ID and everything else as /watch?v=ID.
 			if l.Rel == "alternate" && strings.Contains(l.Href, "/shorts/") {
@@ -136,6 +141,7 @@ type Details struct {
 	Upcoming    bool
 	MembersOnly bool
 	Published   time.Time // zero when YouTube does not say
+	Description string
 }
 
 type playerResponse struct {
@@ -144,9 +150,10 @@ type playerResponse struct {
 		Reason string `json:"reason"`
 	} `json:"playabilityStatus"`
 	VideoDetails *struct {
-		LengthSeconds string `json:"lengthSeconds"`
-		IsLive        bool   `json:"isLive"`
-		IsUpcoming    bool   `json:"isUpcoming"`
+		LengthSeconds    string `json:"lengthSeconds"`
+		ShortDescription string `json:"shortDescription"`
+		IsLive           bool   `json:"isLive"`
+		IsUpcoming       bool   `json:"isUpcoming"`
 	} `json:"videoDetails"`
 	Microformat struct {
 		Renderer struct {
@@ -190,6 +197,7 @@ func parseDetails(body []byte) (*Details, error) {
 	return &Details{
 		Published:   published.UTC(),
 		Seconds:     secs,
+		Description: strings.TrimSpace(p.VideoDetails.ShortDescription),
 		Live:        p.VideoDetails.IsLive,
 		Upcoming:    p.VideoDetails.IsUpcoming,
 		MembersOnly: strings.Contains(strings.ToLower(p.PlayabilityStatus.Reason), "members-only"),

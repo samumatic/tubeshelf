@@ -38,7 +38,10 @@ function setup(box) {
   const watchAnyway = new Set();
   let lastSkip = null; // Enter goes back to its start, as in the SponsorBlock extension
   let savedAt = now.t;
-  let captions = false;
+  let captions = box.dataset.captions === '1'; // remembered per user, like YouTube's own choice
+  const touch = matchMedia('(hover: none)').matches;
+  // A preference that follows the user to every device; the page does not wait for it.
+  const remember = (key, value) => fetch('/account/preferences', { method: 'POST', body: new URLSearchParams({ [key]: value }), headers: { 'X-Requested-With': 'fetch' } }).catch(() => {});
   // Set when the browser refused to start with sound and the video started muted instead; the stored choice stays.
   let forcedMute = false;
 
@@ -47,7 +50,19 @@ function setup(box) {
     try { return { volume: 100, muted: false, ...JSON.parse(localStorage.getItem('player-sound')) }; } catch { return { volume: 100, muted: false }; }
   })();
   const keepSound = () => { try { localStorage.setItem('player-sound', JSON.stringify(sound)); } catch { /* storage blocked */ } };
-  frame.src = frame.dataset.src + (sound.muted ? '&mute=1' : '');
+  // Click to load: nothing reaches Google until the viewer presses play; a thumbnail stands in until then.
+  let loaded = false;
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    box.classList.remove('cold');
+    frame.src = frame.dataset.src + (sound.muted ? '&mute=1' : '');
+    // An embed that never answers (blocked network, a removed video, an extension) gets a plain explanation.
+    setTimeout(() => { if (!connected && !signal.aborted) box.classList.add('unavailable'); }, 10000);
+  }
+  if (box.dataset.clickToLoad === '1') box.classList.add('cold');
+  else load();
+  box.querySelector('.poster-play')?.addEventListener('click', () => { load(); box.focus({ preventScroll: true }); }, { signal });
 
   const send = (msg) => frame.contentWindow?.postMessage(JSON.stringify(msg), ORIGIN);
   const command = (func, ...args) => send({ event: 'command', func, args });
@@ -56,12 +71,23 @@ function setup(box) {
   const hello = setInterval(() => (connected ? clearInterval(hello) : send({ event: 'listening', id: 1, channel: 'widget' })), 250);
 
   let toastTimer;
-  function say(text) {
-    toast.textContent = text;
+  // A short note over the video; with an action it carries a button and stays longer.
+  function say(text, action) {
+    toast.replaceChildren(text);
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { toast.hidden = true; action.run(); box.focus({ preventScroll: true }); });
+      toast.append(b);
+    }
+    toast.classList.toggle('has-action', !!action);
     toast.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (toast.hidden = true), 1600);
+    toastTimer = setTimeout(() => (toast.hidden = true), action ? 5000 : 1600);
   }
+  const undoSkip = () => { if (lastSkip) { seek(lastSkip[0]); say(touch ? 'Playing sponsor' : 'Playing sponsor · Enter to skip'); } };
+  const skipped = () => say(touch ? 'Skipped sponsor' : 'Skipped sponsor · Enter to undo', { label: 'Undo', run: undoSkip });
 
   const clock = (s) => {
     s = Math.max(0, Math.floor(s));
@@ -143,7 +169,7 @@ function setup(box) {
   const running = () => now.state === PLAYING || now.state === BUFFERING;
   function askToPlay() {
     box.classList.add('blocked');
-    say('Press play or k to start');
+    say(touch ? 'Tap play to start' : 'Press play or k to start');
   }
   addEventListener('message', (e) => {
     if (e.origin !== ORIGIN || e.source !== frame.contentWindow) return;
@@ -151,6 +177,7 @@ function setup(box) {
     try { msg = JSON.parse(e.data); } catch { return; }
     if (!connected) {
       connected = true;
+      box.classList.remove('unavailable');
       command('addEventListener', 'onAutoplayBlocked');
       command('setVolume', sound.volume);
       command(sound.muted ? 'mute' : 'unMute');
@@ -189,7 +216,7 @@ function setup(box) {
         watchAnyway.add(hit);
         lastSkip = hit;
         seek(hit[1], true);
-        say('Skipped sponsor · Enter to undo');
+        skipped();
       }
       if (now.state === PLAYING && Math.abs(now.t - savedAt) >= 10) save();
     }
@@ -201,7 +228,8 @@ function setup(box) {
       // each settled state puts back the choice made here.
       if (now.state === PLAYING || now.state === PAUSED) command(captions ? 'loadModule' : 'unloadModule', 'captions');
       if (now.state === PAUSED) save();
-      if (now.state === ENDED) save(true);
+      if (now.state === ENDED) { save(true); offerNext(); }
+      else cancelNext();
     }
   }, { signal });
 
@@ -283,7 +311,7 @@ function setup(box) {
     now.at = performance.now();
     command('seekTo', to, true);
   }
-  const toggle = () => command(now.state === PLAYING || now.state === BUFFERING ? 'pauseVideo' : 'playVideo');
+  const toggle = () => (loaded ? command(now.state === PLAYING || now.state === BUFFERING ? 'pauseVideo' : 'playVideo') : load());
   function setVolume(v) {
     forcedMute = false;
     sound.volume = Math.max(0, Math.min(100, Math.round(v)));
@@ -323,6 +351,53 @@ function setup(box) {
     command(captions ? 'loadModule' : 'unloadModule', 'captions');
     box.querySelector('[data-act="captions"]').setAttribute('aria-pressed', captions);
     say(captions ? 'Captions on' : 'Captions off');
+    remember('captions', captions ? '1' : '0');
+  }
+  function theater() {
+    const on = document.documentElement.classList.toggle('theater');
+    box.querySelector('[data-act="theater"]')?.setAttribute('aria-pressed', on);
+    remember('theater', on ? '1' : '0');
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- Next video ----------
+  // At the end, the first video of Up next starts after a short countdown that can be cancelled, as on YouTube.
+  const nextLink = () => document.querySelector('.up-next a.title');
+  const playNext = () => { cancelNext(); nextLink()?.click(); };
+  let nextTimer = null, nextCard = null;
+  function cancelNext() {
+    clearInterval(nextTimer);
+    nextTimer = null;
+    nextCard?.remove();
+    nextCard = null;
+  }
+  function offerNext() {
+    const link = nextLink();
+    if (!link || box.dataset.autoplay !== '1' || nextCard) return;
+    let left = 8;
+    nextCard = document.createElement('div');
+    nextCard.className = 'next-card';
+    nextCard.setAttribute('role', 'status');
+    const label = document.createElement('p');
+    const title = document.createElement('strong');
+    title.textContent = link.textContent;
+    const row = document.createElement('div');
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'button primary';
+    play.textContent = 'Play now';
+    play.addEventListener('click', playNext);
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => { cancelNext(); box.focus({ preventScroll: true }); });
+    row.append(play, cancel);
+    const tick = () => { label.textContent = `Up next in ${left}`; };
+    tick();
+    nextCard.append(label, title, row);
+    box.querySelector('.screen').append(nextCard);
+    nextTimer = setInterval(() => { if (--left <= 0) playNext(); else tick(); }, 1000);
   }
   const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen()).catch(() => {});
 
@@ -344,7 +419,7 @@ function setup(box) {
 
   const actions = {
     play: toggle, back: () => seek(position() - 10), forward: () => seek(position() + 10), mute,
-    captions: toggleCaptions, fullscreen, keys: showKeys,
+    captions: toggleCaptions, fullscreen, keys: showKeys, theater, next: playNext,
   };
   // A clicked control gives focus back to the player, so Enter and space stay player keys
   // (keyboard users who tab to a control still press it with Enter).
@@ -437,11 +512,9 @@ function setup(box) {
         if (inside) {
           lastSkip = inside;
           seek(inside[1], true);
-          say('Skipped sponsor · Enter to undo');
-        } else if (lastSkip) {
-          seek(lastSkip[0]);
-          say('Playing sponsor · Enter to skip');
-        } else return;
+          skipped();
+        } else if (lastSkip) undoSkip();
+        else return;
         break;
       }
       case 'j': seek(position() - 10); break;
@@ -453,6 +526,9 @@ function setup(box) {
       case 'm': mute(); break;
       case 'c': toggleCaptions(); break;
       case 'f': fullscreen(); break;
+      case 't': theater(); break;
+      case 'N': playNext(); break;
+      case 'Escape': if (!nextCard) return; cancelNext(); break;
       case '<': step(-1); break;
       case '>': step(1); break;
       case '?': showKeys(); break;
@@ -470,6 +546,7 @@ function setup(box) {
     cancelAnimationFrame(raf);
     clearTimeout(toastTimer);
     clearTimeout(idleTimer);
+    cancelNext();
     if (document.fullscreenElement === box) document.exitFullscreen().catch(() => {});
     save();
   };

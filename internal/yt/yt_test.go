@@ -34,6 +34,12 @@ func TestParseFeed(t *testing.T) {
 			shorts++
 		}
 	}
+	one, _ := parseFeed([]byte(`<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+		<entry><yt:videoId>abcdefghijk</yt:videoId><title>T</title><published>2026-11-04T07:52:59+00:00</published>
+		<media:group><media:description> Sources: https://example.com </media:description></media:group></entry></feed>`))
+	if len(one.Videos) != 1 || one.Videos[0].Description != "Sources: https://example.com" {
+		t.Errorf("description from media:group: %+v", one.Videos)
+	}
 	if shorts != 1 {
 		t.Errorf("got %d shorts, want 1 (the entry linked as /shorts/)", shorts)
 	}

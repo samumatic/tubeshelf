@@ -195,12 +195,13 @@ func (f *Fetcher) fetchChannel(ctx context.Context, id string) {
 			kind = "short"
 		}
 		// New rows are queued for enrichment; existing rows only get a fresh title.
-		if _, err := tx.Exec(`INSERT INTO videos (id, channel_id, channel_title, title, published_at, kind, enrich_after)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+		if _, err := tx.Exec(`INSERT INTO videos (id, channel_id, channel_title, title, published_at, kind, enrich_after, description)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET title = excluded.title, channel_title = excluded.channel_title,
 				channel_id = excluded.channel_id,
-				kind = CASE WHEN excluded.kind = 'short' THEN 'short' ELSE kind END`,
-			v.ID, id, feed.Title, v.Title, v.Published.Unix(), kind, now.Unix()); err != nil {
+				kind = CASE WHEN excluded.kind = 'short' THEN 'short' ELSE kind END,
+				description = CASE WHEN excluded.description != '' THEN excluded.description ELSE description END`,
+			v.ID, id, feed.Title, v.Title, v.Published.Unix(), kind, now.Unix(), v.Description); err != nil {
 			slog.Error("fetch: upsert video", "video", v.ID, "err", err)
 			return
 		}
@@ -281,6 +282,9 @@ func (f *Fetcher) enrich(ctx context.Context, id string) {
 	f.DB.Exec(`UPDATE videos SET duration_seconds = ?, members_only = ?, enrich_after = ?, enrich_attempts = 0,
 		kind = CASE WHEN kind = 'short' THEN 'short' ELSE ? END WHERE id = ?`,
 		secs, d.MembersOnly, next, state, id)
+	if d.Description != "" {
+		f.DB.Exec(`UPDATE videos SET description = ? WHERE id = ? AND description = ''`, d.Description, id)
+	}
 	// A channel-page row only had "3 weeks ago"; the player knows the real date.
 	if !d.Published.IsZero() {
 		f.DB.Exec(`UPDATE videos SET published_at = ?, date_approx = 0 WHERE id = ? AND date_approx = 1`, d.Published.Unix(), id)

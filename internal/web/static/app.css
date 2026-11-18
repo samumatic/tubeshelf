@@ -349,6 +349,14 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .link:hover { color: var(--fg); text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
 .link.danger:hover { color: var(--danger-fg); }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row.center { justify-content: center; }
+/* Two or three options side by side; the pressed one is the current choice. */
+.segmented { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--radius-sm); background: var(--fill-muted); box-shadow: inset 0 0 0 1px var(--border); }
+.segmented button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: calc(var(--h-sm) - 4px); min-width: 32px; padding: 0 10px; border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--fg-muted); font-size: 13px; font-weight: 500; cursor: pointer; }
+.segmented button svg { width: 16px; height: 16px; }
+.segmented button:hover { color: var(--fg); }
+.segmented button[aria-pressed="true"] { background: var(--surface-raised, var(--surface)); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), inset 0 0 0 1px var(--border); }
+@media (forced-colors: active) { .segmented button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; } }
 .row > input:not([type="checkbox"]):not([type="number"]) { flex: 1 1 180px; }
 
 /* Segmented filters and tabs */
@@ -384,7 +392,7 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .flash.error { background: var(--danger-soft); color: var(--danger-fg); box-shadow: inset 0 0 0 1px var(--danger-border); }
 
 /* ---------- Video cards ---------- */
-.videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: var(--s6) var(--s5); }
+.videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: var(--s6) var(--s5); }
 .day { animation: rise var(--dur-slow) var(--ease-out) backwards; grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; margin-top: var(--s4); font: 400 22px/30px var(--font-display); letter-spacing: -0.01em; }
 .day:first-child { margin-top: 0; }
 .day small { font: 400 14px/20px var(--font-sans); letter-spacing: 0; }
@@ -411,7 +419,9 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .card p { margin-top: 2px; color: var(--fg-muted); font-size: 14px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card p a { transition: color var(--dur-fast) var(--ease-out); }
 .card p a:hover { color: var(--fg); }
-.card.watched .thumb img { opacity: 0.4; filter: grayscale(1); }
+.card.watched .thumb img { opacity: 0.7; }
+.card.watched .thumb::after { content: "Watched"; position: absolute; left: 8px; bottom: 8px; padding: 2px 6px; border-radius: var(--radius-xs); background: rgb(0 0 0 / 0.75); color: #fff; font-size: 12px; font-weight: 600; line-height: 16px; }
+.page-history .card.watched .thumb img { opacity: 1; }
 .card.watched h3 { color: var(--fg-muted); font-weight: 500; }
 .card.focus .thumb { outline: 2px solid var(--ring); outline-offset: 3px; }
 .actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
@@ -440,13 +450,37 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 /* The video takes the full width, but never more than leaves its control bar on screen. */
 /* The video's height sets its width: the viewport minus the page's top padding, the control bar and a peek at the title. */
 main:has(> .watch) { padding-top: 16px; }
-.watch { --video-w: min(100%, calc((100dvh - 144px) * 16 / 9)); display: flex; flex-direction: column; gap: var(--s6); }
+.watch { --video-w: min(100%, calc((100dvh - 264px) * 16 / 9)); display: flex; flex-direction: column; gap: var(--s6); }
+/* Theater: the video as large as the screen allows; the title is a scroll away. */
+.theater .watch { --video-w: min(100%, calc((100dvh - 96px) * 16 / 9)); }
+/* Wide screens: Up next beside the video, as on YouTube, so the title and buttons stay above the fold. */
+@media (min-width: 1280px) {
+  html:not(.theater) .watch:has(> .up-next) { display: grid; grid-template-columns: minmax(0, var(--video-w)) 340px; grid-template-rows: auto auto 1fr; justify-content: center; gap: var(--s5) var(--s6); align-items: start;
+    --video-w: min(calc(100vw - 340px - 160px), calc((100dvh - 264px) * 16 / 9)); }
+  html:not(.theater) .watch:has(> .up-next) > :not(.up-next) { grid-column: 1; width: 100%; margin-inline: 0; }
+  html:not(.theater) .watch > .up-next { grid-column: 2; grid-row: 1 / span 3; }
+  html:not(.theater) .up-next .videos { grid-template-columns: 1fr; gap: var(--s3); }
+  html:not(.theater) .up-next .card { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 10px; align-items: start; }
+  html:not(.theater) .up-next .card .meta { margin-top: 0; }
+  html:not(.theater) .up-next .card .avatar, html:not(.theater) .up-next .card .actions { display: none; }
+  html:not(.theater) .up-next .card h3 { font-size: 14px; line-height: 19px; }
+  html:not(.theater) .up-next .card p { font-size: 13px; }
+}
 .player, .watch-info, .comments { width: var(--video-w); margin-inline: auto; }
 /* The player is a dark island in both themes, as on YouTube. */
 .player { --fg: #f2f2f2; --fg-muted: #a3a3a3; --fill-muted: rgb(255 255 255 / 0.08); --fill-hover: rgb(255 255 255 / 0.1); --fill-selected: rgb(255 255 255 / 0.16); --surface-raised: #232323; --border: rgb(255 255 255 / 0.1);
   --seek: #e5484d; position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-lg); background: #000; color: var(--fg); color-scheme: dark; outline: none; box-shadow: 0 0 0 1px var(--border); }
 .screen { position: relative; aspect-ratio: 16 / 9; }
 .screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.poster, .unavailable-note { position: absolute; inset: 0; display: none; }
+.player.cold .poster { display: grid; place-items: center; }
+.poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
+.poster-play { position: relative; display: grid; justify-items: center; gap: 4px; padding: 16px 28px; border: 0; border-radius: var(--radius-lg); background: rgb(0 0 0 / 0.7); color: #fff; font: 600 18px/24px var(--font-sans); cursor: pointer; }
+.poster-play svg { width: 40px; height: 40px; }
+.poster-play small { color: #bbb; font-size: 12px; font-weight: 400; }
+.poster-play:hover { background: rgb(0 0 0 / 0.85); }
+.player.unavailable .unavailable-note { display: grid; place-content: center; gap: 12px; padding: 24px; background: #111; text-align: center; color: var(--fg-muted); }
+.unavailable-note strong { color: var(--fg); }
 .player:fullscreen { width: 100%; border-radius: 0; box-shadow: none; }
 .player:fullscreen .screen { flex: 1; aspect-ratio: auto; }
 /* Fullscreen: the bar lies over the video's foot and fades out while playing untouched (player.js sets .idle).
@@ -491,7 +525,18 @@ main:has(> .watch) { padding-top: 16px; }
 .speed:hover { background: var(--fill-hover); }
 .speed-menu { width: 120px; position-anchor: --speed; position-area: top span-left; margin: 0 0 8px; transform-origin: bottom right; }
 .speed-menu [aria-checked="true"] { background: var(--fill-selected); }
-.toast { position: absolute; left: 50%; bottom: 80px; z-index: 3; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--fg); font-size: 13px; translate: -50% 0; pointer-events: none; animation: pop var(--dur-base) var(--ease-out); }
+.toast { position: absolute; left: 50%; bottom: 80px; z-index: 3; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--fg); font-size: 13px; translate: -50% 0; pointer-events: none; animation: pop var(--dur-base) var(--ease-out); box-shadow: 0 4px 16px rgb(0 0 0 / 0.4); }
+.toast.has-action:not([hidden]) { display: flex; align-items: center; gap: 12px; padding: 4px 4px 4px 12px; pointer-events: auto; }
+.toast button { height: 28px; padding: 0 10px; border: 0; border-radius: calc(var(--radius-sm) - 2px); background: var(--fill-selected); color: var(--fg); font-weight: 600; cursor: pointer; }
+.toast button:hover { background: rgb(255 255 255 / 0.24); }
+/* End of a video: the next one, with a countdown. */
+.next-card { position: absolute; inset: 0; z-index: 4; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 24px; background: rgb(0 0 0 / 0.8); text-align: center; animation: pop var(--dur-base) var(--ease-out); }
+.next-card p { color: var(--fg-muted); font-size: 14px; }
+.next-card strong { max-width: 36ch; font: 400 20px/28px var(--font-display); }
+.next-card div { display: flex; gap: 8px; margin-top: 8px; }
+/* Keyboard hints and theater make no sense on touch screens or phones. */
+@media (hover: none) { .player [data-act="keys"], .keys-hint { display: none; } }
+@media (max-width: 1023px) { .player .wide-only { display: none; } }
 .keys-dialog { width: min(440px, calc(100% - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface-raised); color: var(--fg); }
 .keys-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
 .keys-dialog h2 { font: 400 20px/28px var(--font-display); }
@@ -515,6 +560,16 @@ main:has(> .watch) { padding-top: 16px; }
 .comment-head strong { color: var(--fg); font-weight: 600; }
 .comment-head .badge { position: static; padding: 0 6px; border-radius: var(--radius-xs); background: var(--fill-selected); color: var(--fg); font-size: 12px; }
 .comment-text { white-space: pre-line; overflow-wrap: anywhere; }
+/* Long text shows a few lines and a Show more button (app.js adds it only when something is cut). */
+[data-clamp]:not(.open) > p, p[data-clamp]:not(.open) { display: -webkit-box; -webkit-line-clamp: var(--lines, 6); -webkit-box-orient: vertical; overflow: hidden; }
+.description { --lines: 3; margin-top: var(--s4); padding: 12px 16px; border-radius: var(--radius-md); background: var(--fill-muted); font-size: 14px; line-height: 21px; }
+.description p { white-space: pre-line; overflow-wrap: anywhere; }
+.description a, .comment-text a { color: var(--fg); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.description .link { margin-top: 4px; color: var(--fg); }
+.comments { max-width: 760px; }
+.comments summary h2 { display: inline; font: 400 20px/28px var(--font-display); }
+.comments summary { padding: 8px 0; cursor: pointer; }
+.clamp-more { display: block; margin-top: 2px; }
 .comment-foot { display: flex; gap: 12px; margin-top: 2px; color: var(--fg-muted); font-size: 13px; }
 .comments-more { justify-self: start; }
 summary { cursor: pointer; width: fit-content; font-size: 14px; font-weight: 500; color: var(--fg-muted); border-radius: var(--radius-xs); transition: color var(--dur-fast) var(--ease-out); }
@@ -679,7 +734,11 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
   .buttons .time { margin-left: 4px; }
   .shell { flex-direction: column; gap: 0; padding: 0; }
   .content { border-radius: 0; box-shadow: none; }
-  main { padding: var(--s5) var(--s4) 104px; }
+  main { padding: var(--s5) var(--s4) calc(104px + env(safe-area-inset-bottom)); }
+  /* The feed's first video belongs on the first screen: no eyebrow, search lives in the search button, filters scroll in one row. */
+  .page-head .eyebrow, .page-feed .page-head > form.search { display: none; }
+  .toolbar .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); }
+  .toolbar .filters > * { flex: none; }
   .phone-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: var(--s3); height: 52px; padding: 0 var(--s4); background: var(--sidebar); view-transition-name: phone-bar; }
   .phone-bar .avatar { width: 32px; height: 32px; font-size: 12px; background: var(--primary); color: var(--primary-fg); }
   .phone-bar .me { display: grid; place-items: center; width: 44px; height: 44px; margin-right: -6px; padding: 0; border: 0; border-radius: 50%; background: none; anchor-name: --me; }

@@ -539,3 +539,27 @@ async function openWatch(url) {
 addEventListener('popstate', () => {
   if (location.pathname + location.search !== shown) location.reload();
 });
+
+// Long descriptions and comments show a few lines; a Show more button appears only where text is cut.
+function clamps(root = document) {
+  for (const el of root.querySelectorAll('[data-clamp]:not([data-clamp-ready])')) {
+    el.dataset.clampReady = '';
+    const text = el.matches('p') ? el : el.querySelector('p');
+    if (!text || text.scrollHeight <= text.clientHeight + 2) continue;
+    let button = el.querySelector('[data-clamp-toggle]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'link clamp-more';
+      el.after(button);
+    }
+    button.hidden = false;
+    button.textContent = 'Show more';
+    button.addEventListener('click', () => {
+      const open = el.classList.toggle('open');
+      button.textContent = open ? 'Show less' : 'Show more';
+    });
+  }
+}
+clamps();
+new MutationObserver(() => clamps()).observe(document.body, { childList: true, subtree: true });

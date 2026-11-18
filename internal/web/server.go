@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -93,6 +94,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	page("GET /watch/{id}", s.watchPage)
 	page("POST /videos/{id}/watched", s.setWatched)
 	page("POST /videos/{id}/later", s.setLater)
+	page("POST /later/clear-watched", s.clearWatchedLater)
 	page("POST /videos/{id}/progress", s.setProgress)
 	page("GET /videos/{id}/segments", s.sponsorSegments)
 	page("GET /videos/{id}/comments", s.comments)
@@ -160,11 +162,15 @@ func (s *Server) loadTemplates() error {
 		"ago": ago, "dur": dur, "iso": func(t int64) string { return time.Unix(t, 0).UTC().Format(time.RFC3339) },
 		"date": func(t int64) string { return time.Unix(t, 0).Format("2 Jan 2006") },
 		"pct":  pct, "query": queryWith, "initial": initial,
-		"card": func(v Video, set map[string]string) M { return M{"V": v, "Set": set} },
+		// ctx is the query a watch link carries, so the watch page's Up next continues where the video was found.
+		"card": func(v Video, set map[string]string, ctx ...string) M {
+			return M{"V": v, "Set": set, "Ctx": strings.Join(ctx, "")}
+		},
 		"toggle": func(key, label string, set map[string]string) M {
 			return M{"Key": key, "Label": label, "On": set[key] == "1"}
 		},
 		"list":        func(items ...string) []string { return items },
+		"linkify":     linkify,
 		"newProvider": func() auth.Provider { return auth.Provider{} },
 	}
 	base, err := template.New("base").Funcs(funcs).ParseFS(templateFS, "templates/_*.html")
@@ -527,4 +533,21 @@ func queryWith(q url.Values, key, value string) template.URL {
 		return "?"
 	}
 	return template.URL("?" + out.Encode())
+}
+
+var reLink = regexp.MustCompile(`https?://[^\s<>"]+[^\s<>".,;:!?)\]'’]`)
+
+// linkify escapes text and turns the web addresses in it into links that open
+// in a new tab, for descriptions and comments.
+func linkify(text string) template.HTML {
+	var b strings.Builder
+	last := 0
+	for _, m := range reLink.FindAllStringIndex(text, -1) {
+		b.WriteString(template.HTMLEscapeString(text[last:m[0]]))
+		u := text[m[0]:m[1]]
+		fmt.Fprintf(&b, `<a href="%s" target="_blank" rel="noopener nofollow ugc">%s</a>`, template.HTMLEscapeString(u), template.HTMLEscapeString(u))
+		last = m[1]
+	}
+	b.WriteString(template.HTMLEscapeString(text[last:]))
+	return template.HTML(b.String())
 }

@@ -1,10 +1,17 @@
-{{define "title"}}Later · {{.Brand.Name}}{{end}}
+{{define "title"}}Watch later · {{.Brand.Name}}{{end}}
 {{define "main"}}
-<p class="eyebrow">Library</p>
-<h1 class="page-title">Watch later</h1>
+<p class="eyebrow">Watch</p>
+<div class="page-head">
+  <div><h1 class="page-title">Watch later {{with len .Videos}}<small class="count">{{.}}</small>{{end}}</h1>
+  {{if .Videos}}<p class="muted">{{if .Total}}{{dur .Total}} left to watch · {{end}}Plays from the top: the first saved comes first.</p>{{end}}</div>
+  {{if .Videos}}<div class="row">
+    <a class="button primary" href="/watch/{{(index .Videos 0).ID}}?from=later">{{template "i-play"}} Play all</a>
+    {{if .WatchedCount}}<form method="post" action="/later/clear-watched"><button class="button">Remove {{.WatchedCount}} watched</button></form>{{end}}
+  </div>{{end}}
+</div>
 {{if .Videos}}
-<div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set)}}{{end}}</div>
+<div id="feed" class="videos">{{range .Videos}}{{template "card" (card . $.Set "?from=later")}}{{end}}</div>
 {{else}}
-<div class="empty"><h2>Nothing saved</h2><p>Press <kbd>l</kbd> on a video, or use its clock button, to save it here.</p></div>
+<div class="empty"><h2>Nothing saved yet</h2><p>Use the clock button on any video to save it here for later.<span class="keys-hint"> In the feed, <kbd>l</kbd> saves the highlighted video.</span></p><p><a class="button" href="/">Go to your feed</a></p></div>
 {{end}}
 {{end}}

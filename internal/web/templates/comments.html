@@ -10,7 +10,7 @@
   <span class="avatar" data-initial="{{initial .Author}}" aria-hidden="true"></span>
   <div>
     <p class="comment-head"><strong>{{.Author}}</strong>{{if .Creator}} <span class="badge">Creator</span>{{end}}{{if .Pinned}} <span class="badge">Pinned</span>{{end}} <span>{{.Published}}</span></p>
-    <p class="comment-text">{{.Text}}</p>
+    <p class="comment-text" data-clamp>{{linkify .Text}}</p>
     {{- if or .Likes .Replies}}<p class="comment-foot">{{if .Likes}}<span>{{.Likes}} likes</span>{{end}}{{if .Replies}}<span>{{.Replies}}</span>{{end}}</p>{{end}}
   </div>
 </article>

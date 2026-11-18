@@ -447,6 +447,12 @@ func TestSpeculationRules(t *testing.T) {
 func TestGroupDays(t *testing.T) {
 	a := newApp(t)
 	a.signUp()
+	// Two videos alone get no heading: a heading per video or two leaves the grid empty.
+	if _, body := a.get("/"); strings.Contains(body, `<h2 class="day">`) {
+		t.Fatal("sparse feed got day headings")
+	}
+	now := time.Now().Unix()
+	a.db.Exec(`INSERT INTO videos (id, channel_id, title, published_at) VALUES ('more0000001', ?, 'm1', ?), ('more0000002', ?, 'm2', ?)`, chanA, now-30, chanA, now-40)
 	if _, body := a.get("/"); !strings.Contains(body, `<h2 class="day">`) {
 		t.Fatal("day headings missing by default")
 	}

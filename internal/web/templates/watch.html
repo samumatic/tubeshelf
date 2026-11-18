@@ -3,10 +3,13 @@
 {{define "main"}}
 <div class="watch">
   {{/* The embed runs without YouTube's controls; TubeShelf's bar sits under the video, never over it, as YouTube's policy asks. */}}
-  <div id="player" class="player" tabindex="-1" data-id="{{.V.ID}}" data-duration="{{.V.Duration}}" data-sponsorblock="{{.Set.sponsorblock}}" data-start="{{.Start}}">
+  <div id="player" class="player" tabindex="-1" data-id="{{.V.ID}}" data-duration="{{.V.Duration}}" data-sponsorblock="{{.Set.sponsorblock}}" data-captions="{{.Set.captions}}" data-click-to-load="{{.Set.click_to_load}}" data-autoplay="{{.Set.autoplay_next}}" data-start="{{.Start}}">
     <div class="screen">
       <iframe id="yt" title="{{.V.Title}}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"
         data-src="https://www.youtube-nocookie.com/embed/{{.V.ID}}?enablejsapi=1&amp;autoplay=1&amp;controls=0&amp;disablekb=1&amp;fs=0&amp;rel=0&amp;iv_load_policy=3&amp;playsinline=1{{if .Start}}&amp;start={{.Start}}{{end}}"></iframe>
+      <div class="poster"><img src="/thumb/{{.V.ID}}.jpg" alt=""><button type="button" class="poster-play">{{template "i-play"}} Play<small>Loads YouTube's player</small></button></div>
+      <div class="unavailable-note" role="alert"><p><strong>The video didn't load.</strong> YouTube may be blocked on this network, or the video was removed or made private.</p>
+        <p class="row center"><a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a><a class="button" href="">Try again</a></p></div>
     </div>
     <div class="bar" role="group" aria-label="Player controls">
       <div class="track" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="{{.V.Duration}}" aria-valuenow="{{.Start}}" aria-valuetext="0:00">
@@ -23,8 +26,9 @@
         </div>
         <span class="time"><span class="now">0:00</span> / <span class="total">{{if .V.Duration}}{{dur .V.Duration}}{{else}}0:00{{end}}</span></span>
         <span class="grow"></span>
-        <button type="button" class="icon-button" data-act="captions" aria-label="Captions (c)" aria-pressed="false" data-tip="Captions" data-tip-key="C">{{template "i-captions"}}</button>
+        <button type="button" class="icon-button" data-act="captions" aria-label="Captions (c)" aria-pressed="{{eq .Set.captions "1"}}" data-tip="Captions" data-tip-key="C">{{template "i-captions"}}</button>
         <button type="button" class="speed" popovertarget="speed-menu" aria-haspopup="menu" aria-label="Playback speed" data-tip="Speed" data-tip-key="⇧, ⇧.">1×</button>
+        <button type="button" class="icon-button wide-only" data-act="theater" aria-label="Theater mode (t)" aria-pressed="{{eq .Set.theater "1"}}" data-tip="Theater" data-tip-key="T">{{template "i-theater"}}</button>
         <button type="button" class="icon-button" data-act="keys" aria-label="Keyboard shortcuts (?)" data-tip="Shortcuts" data-tip-key="?">{{template "i-keyboard"}}</button>
         <button type="button" class="icon-button" data-act="fullscreen" aria-label="Fullscreen (f)" data-tip="Fullscreen" data-tip-key="F">{{template "i-expand"}}{{template "i-shrink"}}</button>
       </div>
@@ -46,6 +50,8 @@
         <dt><kbd>⇧</kbd><kbd>,</kbd> <kbd>⇧</kbd><kbd>.</kbd></dt><dd>Slower or faster</dd>
         <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>Frame back or forward, while paused</dd>
         <dt><kbd>f</kbd></dt><dd>Fullscreen</dd>
+        <dt><kbd>t</kbd></dt><dd>Theater mode</dd>
+        <dt><kbd>⇧</kbd><kbd>n</kbd></dt><dd>Next video</dd>
         <dt><kbd>w</kbd></dt><dd>Mark as watched</dd>
         <dt><kbd>enter</kbd></dt><dd>Skip a sponsor, or undo the last skip</dd>
         <dt><kbd>?</kbd></dt><dd>This list</dd>
@@ -71,11 +77,12 @@
         <a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a>
       </div>
     </div>
+    {{with .Description}}<div class="description" data-clamp><p>{{linkify .}}</p><button type="button" class="link" data-clamp-toggle hidden>Show more</button></div>{{end}}
   </div>
 
   <section class="comments" aria-label="Comments">
     <details data-comments="/videos/{{.V.ID}}/comments">
-      <summary>Comments</summary>
+      <summary><h2>Comments</h2></summary>
       <div class="comments-body" aria-live="polite"><p class="muted">Loading comments…</p></div>
     </details>
   </section>
@@ -83,7 +90,7 @@
   {{if .UpNext}}
   <section class="up-next" aria-labelledby="up-next">
     <h2 id="up-next" class="day">Up next</h2>
-    <div class="videos">{{range .UpNext}}{{template "card" (card . $.Set)}}{{end}}</div>
+    <div class="videos">{{range .UpNext}}{{template "card" (card . $.Set $.Ctx)}}{{end}}</div>
   </section>
   {{end}}
 </div>
