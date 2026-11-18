@@ -12,7 +12,7 @@
         <p class="row center"><a class="button" href="https://www.youtube.com/watch?v={{.V.ID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a><a class="button" href="">Try again</a></p></div>
     </div>
     <div class="bar" role="group" aria-label="Player controls">
-      <div class="track" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="{{.V.Duration}}" aria-valuenow="{{.Start}}" aria-valuetext="0:00">
+      <div class="track" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="{{.V.Duration}}" aria-valuenow="{{.Start}}" aria-valuetext="0:00">
         <div class="loaded"></div><div class="segments"></div><div class="played"></div><div class="knob"></div>
         <span class="hover-time" hidden></span>
       </div>

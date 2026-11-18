@@ -3,6 +3,8 @@ package web
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"embed"
@@ -231,13 +233,20 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["AssetV"] = s.assetVer
 	data["Version"] = s.Version
 	data["Release"], _, _ = strings.Cut(s.Version, "+") // without the build hash, for the sidebar
-	data["Msg"] = r.URL.Query().Get("msg")
-	if e := r.URL.Query().Get("err"); e != "" || data["Err"] == nil {
+	// Messages in the URL show only when this server wrote them: a crafted link cannot put text on the page.
+	fq := r.URL.Query()
+	if !flashValid(fq) {
+		for _, k := range []string{"msg", "err", "go", "golabel"} {
+			fq.Del(k)
+		}
+	}
+	data["Msg"] = fq.Get("msg")
+	if e := fq.Get("err"); e != "" || data["Err"] == nil {
 		data["Err"] = sentence(e)
 	}
 	// A message can offer the obvious next step ("Subscribed to X · Open the feed").
-	if goURL := r.URL.Query().Get("go"); goURL != "" && localPath(goURL) == goURL {
-		data["Go"] = M{"URL": goURL, "Label": r.URL.Query().Get("golabel")}
+	if goURL := fq.Get("go"); goURL != "" && localPath(goURL) == goURL {
+		data["Go"] = M{"URL": goURL, "Label": fq.Get("golabel")}
 	}
 	if u != nil && u.IsAdmin {
 		var failing int
@@ -341,7 +350,7 @@ func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
 		if u := s.user(r); u != nil {
 			// A temporary password from an admin: choose your own before anything else.
 			if u.MustChange && r.Method == http.MethodGet && r.URL.Path != "/account" && !isFetch(r) {
-				http.Redirect(w, r, "/account?"+url.Values{"msg": {"Choose your own password to continue."}}.Encode()+"#password", http.StatusSeeOther)
+				http.Redirect(w, r, "/account?"+signFlash(url.Values{"msg": {"Choose your own password to continue."}}).Encode()+"#password", http.StatusSeeOther)
 				return
 			}
 			next(w, r)
@@ -425,7 +434,7 @@ func back(w http.ResponseWriter, r *http.Request, fallback, key, msg string) {
 		target = ref
 	}
 	q := target.Query()
-	for _, k := range []string{"msg", "err", "go", "golabel", "typed"} {
+	for _, k := range []string{"msg", "err", "go", "golabel", "typed", "fs"} {
 		q.Del(k)
 	}
 	if msg != "" {
@@ -439,8 +448,35 @@ func back(w http.ResponseWriter, r *http.Request, fallback, key, msg string) {
 			q.Set("typed", parts[2])
 		}
 	}
-	target.RawQuery = q.Encode()
+	target.RawQuery = signFlash(q).Encode()
 	http.Redirect(w, r, target.RequestURI(), http.StatusSeeOther)
+}
+
+// flashKey signs the messages this process puts in redirect URLs. A restart
+// forgets it, which only drops a message nobody has seen yet.
+var flashKey = func() []byte { b := make([]byte, 32); rand.Read(b); return b }()
+
+func flashMAC(q url.Values) string {
+	m := hmac.New(sha256.New, flashKey)
+	for _, k := range []string{"msg", "err", "go", "golabel"} {
+		m.Write([]byte(q.Get(k) + "\x00"))
+	}
+	return hex.EncodeToString(m.Sum(nil)[:12])
+}
+
+// signFlash adds the signature that makes render show msg, err and go.
+func signFlash(q url.Values) url.Values {
+	if q.Get("msg") != "" || q.Get("err") != "" {
+		q.Set("fs", flashMAC(q))
+	}
+	return q
+}
+
+func flashValid(q url.Values) bool {
+	if q.Get("msg") == "" && q.Get("err") == "" {
+		return true
+	}
+	return hmac.Equal([]byte(q.Get("fs")), []byte(flashMAC(q)))
 }
 
 func ok(w http.ResponseWriter, r *http.Request, fallback, msg string) {

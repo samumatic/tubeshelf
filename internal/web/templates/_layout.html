@@ -129,6 +129,7 @@
   <form method="dialog"><button class="button">Close</button></form>
 </dialog>
 {{else}}
+<a class="skip" href="#main">Skip to content</a>
 <img class="auth-bg" src="{{.Brand.Background}}" alt="">
 <main class="auth-page" id="main">
   {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}

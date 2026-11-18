@@ -147,7 +147,7 @@ func (s *Server) oidcStart(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) oidcCallback(w http.ResponseWriter, r *http.Request) {
 	loginErr := func(err error) {
-		http.Redirect(w, r, "/login?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/login?"+signFlash(url.Values{"err": {err.Error()}}).Encode(), http.StatusSeeOther)
 	}
 	c, err := r.Cookie(flowCookie)
 	if err != nil {
@@ -461,13 +461,13 @@ func (s *Server) adminAddUser(w http.ResponseWriter, r *http.Request) {
 	who := cmp.Or(u.Name, u.Email)
 	if pw == "" {
 		// No password: the person gets a link to choose one.
-		http.Redirect(w, r, "/admin/users?"+url.Values{"msg": {"Added " + who + "."}, "invite": {u.ID}}.Encode(), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users?"+signFlash(url.Values{"msg": {"Added " + who + "."}, "invite": {u.ID}}).Encode(), http.StatusSeeOther)
 		return
 	}
 	if r.FormValue("must_change") == "1" {
 		s.DB.Exec(`UPDATE users SET must_change_password = 1 WHERE id = ?`, u.ID)
 	}
-	http.Redirect(w, r, "/admin/users?"+url.Values{"msg": {"Added " + who + "."}, "added": {u.ID}}.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/users?"+signFlash(url.Values{"msg": {"Added " + who + "."}, "added": {u.ID}}).Encode(), http.StatusSeeOther)
 }
 
 // inviteTTL is how long a link to choose a password works.
@@ -549,7 +549,7 @@ func (s *Server) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.DB.Exec(`UPDATE users SET must_change_password = ? WHERE id = ?`, r.FormValue("must_change") == "1", id)
-		http.Redirect(w, r, "/admin/users?"+url.Values{"msg": {"New password set for " + who + ". They were signed out everywhere."}, "added": {id}}.Encode(), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/users?"+signFlash(url.Values{"msg": {"New password set for " + who + ". They were signed out everywhere."}, "added": {id}}).Encode(), http.StatusSeeOther)
 	case "invite":
 		http.Redirect(w, r, "/admin/users?"+url.Values{"invite": {id}}.Encode(), http.StatusSeeOther)
 	case "profile":

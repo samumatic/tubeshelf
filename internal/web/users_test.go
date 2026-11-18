@@ -84,3 +84,17 @@ func TestFailingChannelActions(t *testing.T) {
 		t.Error("remove leaves the channel")
 	}
 }
+
+// A link with ?err= or ?msg= made elsewhere must not put its text on the page.
+func TestFlashCannotBeSpoofed(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	for _, q := range []string{"/?err=Your+account+is+locked", "/?msg=Call+support", "/login?err=Session+expired"} {
+		if _, body := a.get(q); strings.Contains(body, "account is locked") || strings.Contains(body, "Call support") || strings.Contains(body, "Session expired") {
+			t.Errorf("%s: unsigned message shown", q)
+		}
+	}
+	if _, body := a.post("/lists", url.Values{"name": {"Music"}}); !strings.Contains(body, "Created “Music”") {
+		t.Error("a message the server wrote is not shown")
+	}
+}

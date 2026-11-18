@@ -467,6 +467,14 @@ function setup(box) {
     hoverTime.hidden = !track.matches(':hover');
     if (!cancel) seek(to);
   };
+  // Focused seek bar: Home, End and Page keys as on any slider; arrows work everywhere on the page.
+  track.addEventListener('keydown', (e) => {
+    const to = { Home: 0, End: Math.max(0, now.d - 1), PageUp: now.t + 60, PageDown: now.t - 60 }[e.key];
+    if (to === undefined || !now.d) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seek(Math.max(0, Math.min(now.d - 1, to)));
+  });
   track.addEventListener('pointerup', (e) => endScrub(e, false));
   track.addEventListener('pointercancel', (e) => endScrub(e, true));
 

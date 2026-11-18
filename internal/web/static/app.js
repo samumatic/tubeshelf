@@ -25,8 +25,7 @@ requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement
 {
   const u = new URL(location.href);
   if (u.searchParams.has('msg') || u.searchParams.has('err')) {
-    u.searchParams.delete('msg');
-    u.searchParams.delete('err');
+    for (const k of ['msg', 'err', 'fs', 'go', 'golabel', 'typed', 'failed', 'failedn']) u.searchParams.delete(k);
     history.replaceState(history.state, '', u.pathname + u.search + u.hash);
   }
 }
@@ -609,6 +608,8 @@ async function openWatch(url) {
       }
       scrollTo(0, 0);
       playerModule.mount();
+      // Keyboard and screen reader users land on the video, not on whatever they clicked.
+      document.getElementById('player')?.focus({ preventScroll: true });
     };
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     history.pushState(null, '', url);

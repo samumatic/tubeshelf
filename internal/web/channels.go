@@ -219,7 +219,7 @@ func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	// From the channel's own page, whose feed is now empty, go back to the feed.
 	if r.FormValue("next") == "/" {
-		http.Redirect(w, r, "/?msg="+url.QueryEscape("Unsubscribed"), http.StatusSeeOther)
+		http.Redirect(w, r, "/?"+signFlash(url.Values{"msg": {"Unsubscribed"}}).Encode(), http.StatusSeeOther)
 		return
 	}
 	ok(w, r, "/channels", "Unsubscribed")
@@ -481,7 +481,7 @@ func (s *Server) importOPML(w http.ResponseWriter, r *http.Request) {
 		q.Set("failed", strings.Join(failedNames, "\n"))
 		q.Set("failedn", fmt.Sprint(failed))
 	}
-	http.Redirect(w, r, "/channels/import?"+q.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, "/channels/import?"+signFlash(q).Encode(), http.StatusSeeOther)
 }
 
 func feedURL(id string) string { return "https://www.youtube.com/feeds/videos.xml?channel_id=" + id }
