@@ -377,14 +377,28 @@ func plural(n int, one, many string) string {
 
 func (s *Server) historyPage(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
+	const pageSize = 60
+	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	if before <= 0 {
+		before = 1 << 62
+	}
 	vids, err := s.videos(`SELECT `+videoCols+` FROM watch_state h JOIN videos v ON v.id = h.video_id`+videoJoins+`
-		WHERE h.user_id = ? ORDER BY h.updated_at DESC LIMIT 200`, u.ID, u.ID, u.ID)
+		WHERE h.user_id = ? AND h.updated_at < ? ORDER BY h.updated_at DESC LIMIT ?`, u.ID, u.ID, u.ID, before, pageSize+1)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Grouped by when it was watched, not when it was published.
+	next := ""
+	if len(vids) > pageSize {
+		vids = vids[:pageSize]
+		next = strconv.FormatInt(vids[pageSize-1].SeenAt, 10)
+	}
+	// Grouped by when it was watched, not when it was published; a later page continues the day it started in.
 	now := time.Now()
+	prev := ""
+	if before < 1<<62 {
+		prev = dayLabel(before, now)
+	}
 	var groups []DayGroup
 	for _, v := range vids {
 		label := dayLabel(v.SeenAt, now)
@@ -392,9 +406,13 @@ func (s *Server) historyPage(w http.ResponseWriter, r *http.Request) {
 			groups[n-1].Videos = append(groups[n-1].Videos, v)
 			continue
 		}
-		groups = append(groups, DayGroup{Label: label, Videos: []Video{v}})
+		g := DayGroup{Label: label, Videos: []Video{v}}
+		if len(groups) == 0 && label == prev {
+			g.Label = ""
+		}
+		groups = append(groups, g)
 	}
-	s.render(w, r, "history", M{"Videos": vids, "Groups": groups})
+	s.render(w, r, "history", M{"Videos": vids, "Groups": groups, "Next": next, "Q": r.URL.Query()})
 }
 
 // forget removes one video from the user's history (its progress and watched mark go with it).

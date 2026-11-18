@@ -223,7 +223,7 @@ var userChoices = map[string][]string{
 	"sidebar_width": sidebarWidths(),
 	"hide_shorts":   nil, "hide_watched": nil, "hide_members": nil, "hide_live": nil, "group_days": nil,
 	"sponsorblock": nil, "open_on_youtube": nil, "captions": nil, "theater": nil, "autoplay_next": nil,
-	"later_autoremove": nil, "click_to_load": nil,
+	"later_autoremove": nil, "click_to_load": nil, "text_size": {"normal", "large", "larger"},
 }
 
 // sidebarWidths are the sidebar widths a user can drag to: 208 to 400px in steps of 16, as in Pocket ID.

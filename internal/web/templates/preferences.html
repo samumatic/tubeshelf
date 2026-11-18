@@ -8,6 +8,7 @@
     <h2>Appearance and feed</h2>
     <div class="fields">
       <label>Theme <select name="theme"><option value="system" {{if eq .Set.theme "system"}}selected{{end}}>Match my device</option><option value="light" {{if eq .Set.theme "light"}}selected{{end}}>Light</option><option value="dark" {{if eq .Set.theme "dark"}}selected{{end}}>Dark</option></select></label>
+      <label>Text size <select name="text_size"><option value="normal" {{if eq .Set.text_size "normal"}}selected{{end}}>Normal</option><option value="large" {{if eq .Set.text_size "large"}}selected{{end}}>Large</option><option value="larger" {{if eq .Set.text_size "larger"}}selected{{end}}>Larger, for a TV across the room</option></select></label>
       <label>Layout <select name="view"><option value="grid" {{if eq .Set.view "grid"}}selected{{end}}>Grid of thumbnails</option><option value="list" {{if eq .Set.view "list"}}selected{{end}}>List</option></select></label>
       <label>Order <select name="sort"><option value="newest" {{if eq .Set.sort "newest"}}selected{{end}}>Newest first</option><option value="oldest" {{if eq .Set.sort "oldest"}}selected{{end}}>Oldest first</option></select></label>
       <label>Count a video as watched after <span class="row"><input type="number" name="watched_percent" min="25" max="100" value="{{.Set.watched_percent}}"> % of it</span></label>

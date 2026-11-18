@@ -1,5 +1,5 @@
 {{define "layout"}}{{/* The watch page folds the sidebar for a bigger video, without changing the saved choice. */}}{{$rail := or (eq .Set.sidebar "collapsed") (eq .Page "watch")}}<!doctype html>
-<html lang="en" data-theme="{{.Set.theme}}" class="preload {{if $rail}}rail {{end}}{{if eq .Set.theater "1"}}theater {{end}}sw-{{.Set.sidebar_width}}">
+<html lang="en" data-theme="{{.Set.theme}}" class="preload {{if $rail}}rail {{end}}{{if eq .Set.theater "1"}}theater {{end}}{{if ne .Set.text_size "normal"}}text-{{.Set.text_size}} {{end}}sw-{{.Set.sidebar_width}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

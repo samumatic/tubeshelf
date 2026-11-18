@@ -60,7 +60,7 @@ func (s *Server) comments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, max-age=300")
 	// The sort buttons come with the first page only; player.js keeps them when the order changes.
-	data := M{"P": e.page, "First": tok == "" || r.URL.Query().Get("sort") == "1", "Sort": tok}
+	data := M{"P": e.page, "First": tok == "" || r.URL.Query().Get("sort") == "1", "Sort": tok, "Video": id}
 	if err := s.pages["comments"].ExecuteTemplate(w, "comments", data); err != nil {
 		slog.Error("render comments", "err", err)
 	}

@@ -41,6 +41,7 @@ var UserDefaults = map[string]string{
 	"autoplay_next":    "1",        // play Up next's first video after a countdown
 	"later_autoremove": "0",        // marking a video watched also takes it off Watch later
 	"click_to_load":    "0",        // load the YouTube player only after a click
+	"text_size":        "normal",   // normal | large | larger, for TVs and tired eyes
 	"sidebar":          "expanded", // expanded | collapsed (from 1024px)
 	"sidebar_width":    "256",      // px, 208 to 400 in steps of 16
 }

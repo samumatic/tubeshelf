@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -96,5 +97,25 @@ func TestFlashCannotBeSpoofed(t *testing.T) {
 	}
 	if _, body := a.post("/lists", url.Values{"name": {"Music"}}); !strings.Contains(body, "Created “Music”") {
 		t.Error("a message the server wrote is not shown")
+	}
+}
+
+func TestHistoryPages(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	id := a.userID("admin@example.com")
+	for i := range 70 {
+		vid := fmt.Sprintf("hist%07d", i)
+		a.db.Exec(`INSERT INTO videos (id, channel_id, title, published_at, kind) VALUES (?, ?, ?, 0, 'video')`, vid, chanA, "H"+vid)
+		a.db.Exec(`INSERT INTO watch_state (user_id, video_id, progress, watched, updated_at) VALUES (?, ?, 5, 1, ?)`, id, vid, 1000+i)
+	}
+	_, body := a.get("/history")
+	m := regexp.MustCompile(`id="more" class="more button" href="([^"]+)"`).FindStringSubmatch(body)
+	if m == nil || strings.Count(body, `class="history-item"`) != 60 {
+		t.Fatalf("first page: %d items, more link %v", strings.Count(body, `class="history-item"`), m != nil)
+	}
+	_, frag := a.get("/history" + strings.ReplaceAll(m[1], "&amp;", "&") + "&fragment=1")
+	if n := strings.Count(frag, `class="history-item"`); n != 10 || strings.Contains(frag, `id="more"`) {
+		t.Errorf("second page: %d items", n)
 	}
 }

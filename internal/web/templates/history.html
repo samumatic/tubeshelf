@@ -7,11 +7,12 @@
   </div></details>{{end}}
 </div>
 {{if .Videos}}
-<div class="videos history">{{range .Groups}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>
-  {{range .Videos}}<div class="history-item">{{template "card" (card . $.Set)}}
-    <form method="post" action="/history/{{.ID}}/remove"><button class="link small" aria-label="Remove {{.Title}} from history">Remove from history</button></form></div>{{end}}{{end}}
-</div>
+<div id="feed" class="videos history">{{template "items" .}}</div>
 {{else}}
 <div class="empty"><h2>No history yet</h2><p>Videos you play or mark as watched show up here, newest first.</p><p><a class="button primary" href="/">Open the feed</a></p></div>
 {{end}}
 {{end}}
+{{define "items"}}{{range .Groups}}{{if .Label}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>{{end}}
+  {{range .Videos}}<div class="history-item">{{template "card" (card . $.Set)}}
+    <form method="post" action="/history/{{.ID}}/remove"><button class="link small" aria-label="Remove {{.Title}} from history">Remove from history</button></form></div>{{end}}{{end}}
+{{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{end}}{{end}}

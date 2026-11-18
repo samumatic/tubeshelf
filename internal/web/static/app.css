@@ -752,7 +752,7 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
 @media (max-width: 639px) {
   .sidebar, .backdrop { display: none; }
   /* No keyboard on a phone: the shortcuts button pushed Fullscreen off the bar. */
-  .buttons [data-act="keys"] { display: none; }
+  .buttons [data-act="keys"], .buttons [data-act="youtube"] { display: none; }
   .player .bar { padding-inline: 4px; }
   .buttons { gap: 0; }
   .buttons .time { margin-left: 4px; }
@@ -921,3 +921,7 @@ tr.paused td:not(.end) { opacity: .6; }
 .snack button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 @media (max-width: 639px) { .snack { bottom: calc(84px + env(safe-area-inset-bottom)); } }
 .feed-end { grid-column: 1 / -1; margin: var(--s6) 0 var(--s4); text-align: center; font-size: 0.875rem; }
+/* Text size preference: everything sized in rem grows with it. */
+html.text-large { font-size: 112.5%; }
+html.text-larger { font-size: 137.5%; }
+html.text-larger .videos { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }

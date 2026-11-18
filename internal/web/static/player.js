@@ -420,6 +420,11 @@ function setup(box) {
   const actions = {
     play: toggle, back: () => seek(position() - 10), forward: () => seek(position() + 10), mute,
     captions: toggleCaptions, fullscreen, keys: showKeys, theater, next: playNext,
+    // Hand over to YouTube (to cast, or for features the embed lacks) at the same moment.
+    youtube: () => {
+      if (loaded) command('pauseVideo');
+      window.open(`https://www.youtube.com/watch?v=${box.dataset.id}&t=${Math.floor(position())}s`, '_blank', 'noopener');
+    },
   };
   // A clicked control gives focus back to the player, so Enter and space stay player keys
   // (keyboard users who tab to a control still press it with Enter).
