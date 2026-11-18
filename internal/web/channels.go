@@ -82,8 +82,17 @@ func (s *Server) channelsPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sort := r.URL.Query().Get("sort")
+	switch sort {
+	case "videos":
+		slices.SortStableFunc(chans, func(a, b ChannelRow) int { return cmp.Compare(b.Videos, a.Videos) })
+	case "updated":
+		slices.SortStableFunc(chans, func(a, b ChannelRow) int { return cmp.Compare(b.LastSuccess, a.LastSuccess) })
+	default:
+		sort = "name"
+	}
 	s.render(w, r, "channels", M{"Channels": chans, "Lists": s.lists(u.ID), "Suggestions": s.suggestions(u.ID, 12),
-		"Typed": r.URL.Query().Get("typed")})
+		"Typed": r.URL.Query().Get("typed"), "Sort": sort})
 }
 
 func (s *Server) listsPage(w http.ResponseWriter, r *http.Request) {

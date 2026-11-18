@@ -67,8 +67,35 @@ document.addEventListener('submit', async (e) => {
   if (!still.matches) button.querySelector('svg')?.animate({ scale: [1, 1.3, 1] }, { duration: 280, easing: ease });
   const card = form.closest('.card');
   if (card) card.classList.toggle(form.dataset.toggle, active);
-  if (card && !active && document.body.classList.contains('page-later') && form.dataset.toggle === 'later') leave(card);
+  const removed = card && !active && document.body.classList.contains('page-later') && form.dataset.toggle === 'later';
+  if (removed) leave(card);
+  const words = { later: ['Added to Watch later', 'Removed from Watch later'], watched: ['Marked as watched', 'Marked as not watched'] }[form.dataset.toggle];
+  if (words && !form.dataset.undoing) {
+    snack(words[active ? 0 : 1], () => {
+      if (removed) return post(form).then(() => location.reload());
+      form.dataset.undoing = '1';
+      form.requestSubmit();
+    });
+  }
+  delete form.dataset.undoing;
 });
+
+// A short message at the bottom of the screen, with an Undo button.
+let snackTimer;
+function snack(text, undo) {
+  let el = document.getElementById('snack');
+  if (!el) {
+    el = Object.assign(document.createElement('div'), { id: 'snack', className: 'snack' });
+    el.setAttribute('role', 'status');
+    document.body.append(el);
+  }
+  const b = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Undo' });
+  b.addEventListener('click', () => { el.hidden = true; undo(); });
+  el.replaceChildren(Object.assign(document.createElement('span'), { textContent: text }), b);
+  el.hidden = false;
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(() => { el.hidden = true; }, 5000);
+}
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-confirm]');
@@ -532,8 +559,10 @@ document.addEventListener('keydown', (e) => {
 
 // Videos open inside this page, as on YouTube and in TubeShelf 1.x: the watch page is fetched and swapped in,
 // so the click that opened it still counts as the go-ahead for sound. Firefox only gives that to the page
-// that was clicked; a freshly loaded watch page would have to start muted. Back reloads the page left.
+// that was clicked; a freshly loaded watch page would have to start muted. Back puts the page left back as it
+// was (loaded pages, scroll position, focus), without fetching it again.
 let playerModule = null;
+let left = null;
 let shown = location.pathname + location.search;
 document.addEventListener('click', (e) => {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -555,7 +584,15 @@ async function openWatch(url) {
     if (!main || !src || !next.querySelector('.shell')) throw new Error('watch page: unexpected markup');
     playerModule ??= await import(src);
     if (mine !== opening) return;
+    const from = shown;
     const swap = () => {
+      // Keep the page being left (the very nodes, so its listeners and loaded pages survive) for Back.
+      if (!document.getElementById('player')) {
+        left = { url: from, nodes: [...document.querySelector('main#main').childNodes], y: scrollY, title: document.title,
+          html: document.documentElement.className, body: document.body.className, focus: document.activeElement?.closest('.card')?.querySelector('a.title'),
+          nav: [...document.querySelectorAll('.sidebar nav [aria-current]')], fold: sidebarForm?.innerHTML,
+          foldValue: sidebarForm?.elements.sidebar.value };
+      }
       playerModule.unmount();
       document.title = next.title;
       document.documentElement.className = next.documentElement.className.replace(/\bpreload\b ?/, '');
@@ -573,6 +610,7 @@ async function openWatch(url) {
       scrollTo(0, 0);
       playerModule.mount();
     };
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     history.pushState(null, '', url);
     shown = location.pathname + location.search;
     if (document.startViewTransition && !still.matches) document.startViewTransition(swap);
@@ -582,7 +620,24 @@ async function openWatch(url) {
   }
 }
 addEventListener('popstate', () => {
-  if (location.pathname + location.search !== shown) location.reload();
+  const here = location.pathname + location.search;
+  if (here === shown) return;
+  if (left && here === left.url) {
+    playerModule?.unmount();
+    document.querySelector('main#main').replaceChildren(...left.nodes);
+    document.title = left.title;
+    document.documentElement.className = left.html;
+    document.body.className = left.body;
+    for (const el of left.nav) el.setAttribute('aria-current', 'page');
+    if (sidebarForm && left.fold) { sidebarForm.innerHTML = left.fold; sidebarForm.elements.sidebar.value = left.foldValue; }
+    shown = here;
+    const { y, focus } = left;
+    left = null;
+    scrollTo(0, y);
+    requestAnimationFrame(() => { scrollTo(0, y); focus?.focus({ preventScroll: true }); });
+    return;
+  }
+  location.reload();
 });
 
 // Long descriptions and comments show a few lines; a Show more button appears only where text is cut.

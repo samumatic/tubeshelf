@@ -907,3 +907,7 @@ tr.paused td:not(.end) { opacity: .6; }
 .failed-list { margin: var(--s2) 0 0; padding-left: 1.2em; max-height: 240px; overflow: auto; color: var(--fg-muted); font-size: 14px; overflow-wrap: anywhere; }
 .howto { margin-top: var(--s4); }
 .howto ol { margin: var(--s3) 0 0; padding-left: 1.3em; display: grid; gap: var(--s2); color: var(--fg-muted); font-size: 14px; }
+.snack { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; border-radius: var(--radius-md); background: var(--fg); color: var(--canvas); font-size: 14px; translate: -50% 0; box-shadow: var(--elevation-popover); animation: rise var(--dur-base) var(--ease-out); }
+.snack[hidden] { display: none; }
+.snack button { min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+@media (max-width: 639px) { .snack { bottom: calc(84px + env(safe-area-inset-bottom)); } }

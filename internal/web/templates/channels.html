@@ -23,7 +23,12 @@
 {{if .Channels}}
 <div class="table-tools">
   <h2 class="section-title">You follow</h2>
+  <span class="row">
   {{if gt (len .Channels) 8}}<input type="search" class="filter-input" placeholder="Filter channels" aria-label="Filter channels" data-filter-rows="#channel-rows">{{end}}
+  {{if gt (len .Channels) 1}}<span class="segmented" role="group" aria-label="Sort channels">
+    <a href="?sort=name"{{if eq .Sort "name"}} aria-current="true"{{end}}>A–Z</a><a href="?sort=videos"{{if eq .Sort "videos"}} aria-current="true"{{end}}>Most videos</a><a href="?sort=updated"{{if eq .Sort "updated"}} aria-current="true"{{end}}>Updated</a>
+  </span>{{end}}
+  </span>
 </div>
 <table class="table channel-table">
   <thead><tr><th>Channel</th><th class="num">Videos</th><th>Updated</th>{{if .Lists}}<th>Lists</th>{{end}}<th><span class="sr">Actions</span></th></tr></thead>
