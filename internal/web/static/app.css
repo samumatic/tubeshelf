@@ -864,3 +864,5 @@ tr.paused td:not(.end) { opacity: .6; }
 .danger-row { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s3); align-items: center; padding: var(--s3) 0; border-top: 1px solid var(--border); }
 @media (max-width: 639px) { .danger-row { grid-template-columns: 1fr; } }
 .provider { margin-top: var(--s3); }
+.keys-item kbd { margin-left: auto; }
+@media (hover: none) { .keys-item { display: none; } }

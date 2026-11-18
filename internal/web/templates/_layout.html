@@ -76,6 +76,8 @@
     <a role="menuitem" href="/account" {{if eq .Page "account"}}aria-current="page"{{end}}>{{template "i-user"}}My account</a>
     <a role="menuitem" href="/account/preferences" {{if eq .Page "preferences"}}aria-current="page"{{end}}>{{template "i-settings"}}Preferences</a>
     <a role="menuitem" href="/account/keys" {{if eq .Page "keys"}}aria-current="page"{{end}}>{{template "i-key"}}API keys</a>
+    {{if .User.IsAdmin}}<a role="menuitem" href="/admin" {{if hasPrefix .Page "admin"}}aria-current="page"{{end}}>{{template "i-server"}}Administration</a>{{end}}
+    <button type="button" role="menuitem" class="keys-item" data-show-keys>{{template "i-keyboard"}}Keyboard shortcuts<kbd>?</kbd></button>
     <button type="button" role="menuitem" class="has-sub" popovertarget="theme-menu" popovertargetaction="show" aria-haspopup="menu" aria-expanded="false">{{template "i-theme"}}<span>Appearance<small>{{.Set.theme}}</small></span>{{template "i-chevron"}}</button>
     <div class="popmenu theme-menu" id="theme-menu" popover role="menu" aria-label="Appearance">
       <form method="post" action="/account/preferences">{{range list "light" "dark" "system"}}<button role="menuitemradio" name="theme" value="{{.}}" aria-checked="{{eq . $.Set.theme}}">{{.}}{{template "i-check"}}</button>{{end}}</form>
@@ -87,10 +89,11 @@
 <dialog class="palette" id="palette" aria-label="Command palette">
   <input type="text" placeholder="Go to a page, list or channel, or search the feed" aria-label="Command" autocomplete="off">
   <ul role="listbox">
-    <li class="group" role="presentation">Navigation</li>
+    <li class="group" role="presentation">Watch</li>
     <li data-k="feed home"><a href="/">{{template "i-feed"}}Feed</a></li>
     <li data-k="later saved"><a href="/later">{{template "i-clock"}}Watch later</a></li>
     <li data-k="history watched"><a href="/history">{{template "i-history"}}History</a></li>
+    <li class="group" role="presentation">Library</li>
     <li data-k="channels subscriptions subscribe unsubscribe"><a href="/channels">{{template "i-channels"}}Channels</a></li>
     <li data-k="lists manage"><a href="/lists">{{template "i-list"}}Lists</a></li>
     <li data-k="import export opml takeout"><a href="/channels/import">{{template "i-import"}}Import &amp; export</a></li>
@@ -108,6 +111,19 @@
     {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
   </ul>
   <footer><button type="button" class="button palette-close" data-palette-close>Close</button><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+</dialog>
+<dialog class="keys-dialog" id="site-keys" aria-label="Keyboard shortcuts">
+  <h2>Keyboard shortcuts</h2>
+  <dl>
+    <dt><kbd>⌘</kbd><kbd>K</kbd></dt><dd>Search and jump anywhere</dd>
+    <dt><kbd>/</kbd></dt><dd>Search the feed</dd>
+    <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next or previous video in the feed</dd>
+    <dt><kbd>o</kbd> <kbd>enter</kbd></dt><dd>Open the selected video</dd>
+    <dt><kbd>l</kbd></dt><dd>Add to or remove from Watch later</dd>
+    <dt><kbd>w</kbd></dt><dd>Mark as watched or unwatched</dd>
+    <dt><kbd>?</kbd></dt><dd>This list (the video page has its own)</dd>
+  </dl>
+  <form method="dialog"><button class="button">Close</button></form>
 </dialog>
 {{else}}
 <img class="auth-bg" src="{{.Brand.Background}}" alt="">

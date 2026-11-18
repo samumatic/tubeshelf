@@ -180,6 +180,7 @@ func (s *Server) loadTemplates() error {
 		},
 		"list":        func(items ...string) []string { return items },
 		"split":       strings.Split,
+		"hasPrefix":   strings.HasPrefix,
 		"linkify":     linkify,
 		"newProvider": func() auth.Provider { return auth.Provider{} },
 	}

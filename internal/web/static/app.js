@@ -479,6 +479,11 @@ document.addEventListener('keydown', (e) => {
     field ? field.focus() : openPalette();
     return;
   }
+  if (e.key === '?' && !document.getElementById('player')) {
+    const d = document.getElementById('site-keys');
+    if (d) { e.preventDefault(); d.open ? d.close() : d.showModal(); }
+    return;
+  }
   if (!feed || document.getElementById('player')) return;
   // Enter on a focused link or button (Tab navigation) keeps its own meaning.
   if (e.key === 'Enter' && e.target.closest?.('a, button, summary')) return;
@@ -583,6 +588,13 @@ document.addEventListener('input', (e) => {
     const text = row.dataset.filterText.toLowerCase();
     row.hidden = !words.every((w) => text.includes(w));
   }
+});
+
+// "Keyboard shortcuts" in the account menu: the video page's own list there, else the site list.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-show-keys]')) return;
+  document.getElementById('account-menu')?.hidePopover();
+  (document.getElementById('keys') || document.getElementById('site-keys'))?.showModal();
 });
 
 // Login provider presets fill the usual name, scopes and group claim.
