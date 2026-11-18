@@ -364,6 +364,8 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .chips.tabs .chip { position: relative; height: 40px; padding: 0 2px; border-radius: 0; background: none; font-size: 15px; }
 .chips.tabs .chip:hover { background: none; }
 .chips.tabs .chip:active { scale: 1; }
+/* Inside the faded, scrolling tab row a ring outside the chip would be cut off. */
+.chips.tabs .chip:focus-visible { outline-offset: -2px; }
 .chips.tabs .chip[aria-current] { color: var(--fg); background: none; }
 .chips.tabs .chip[aria-current]::after { content: ""; position: absolute; inset: auto 0 0 0; height: 2px; background: var(--fg); view-transition-name: tab-fill; }
 .chips.tabs .chip.clear { margin-left: auto; font-size: 14px; }
@@ -398,8 +400,8 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .badge.live { background: var(--danger-fill); }
 .thumb progress { position: absolute; inset: auto 0 0 0; width: 100%; height: 3px; appearance: none; border: 0; background: rgb(255 255 255 / 0.3); }
 .thumb progress::-webkit-progress-bar { background: transparent; }
-.thumb progress::-webkit-progress-value { background: #fff; }
-.thumb progress::-moz-progress-bar { background: #fff; }
+.thumb progress::-webkit-progress-value { background: #e5484d; }
+.thumb progress::-moz-progress-bar { background: #e5484d; }
 .meta { display: flex; gap: 12px; margin-top: 12px; }
 .avatar { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border-radius: 50%; background: var(--fill-selected); color: var(--fg-muted); font-size: 13px; font-weight: 600; }
 .avatar::before { content: attr(data-initial); }
@@ -441,7 +443,7 @@ main:has(> .watch) { padding-top: 16px; }
 .watch { --video-w: min(100%, calc((100dvh - 144px) * 16 / 9)); display: flex; flex-direction: column; gap: var(--s6); }
 .player, .watch-info, .comments { width: var(--video-w); margin-inline: auto; }
 /* The player is a dark island in both themes, as on YouTube. */
-.player { --fg: #f2f2f2; --fg-muted: #a3a3a3; --fill-hover: rgb(255 255 255 / 0.1); --fill-selected: rgb(255 255 255 / 0.16); --surface-raised: #232323; --border: rgb(255 255 255 / 0.1);
+.player { --fg: #f2f2f2; --fg-muted: #a3a3a3; --fill-muted: rgb(255 255 255 / 0.08); --fill-hover: rgb(255 255 255 / 0.1); --fill-selected: rgb(255 255 255 / 0.16); --surface-raised: #232323; --border: rgb(255 255 255 / 0.1);
   --seek: #e5484d; position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-lg); background: #000; color: var(--fg); color-scheme: dark; outline: none; box-shadow: 0 0 0 1px var(--border); }
 .screen { position: relative; aspect-ratio: 16 / 9; }
 .screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
@@ -746,4 +748,17 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
   .table .end { text-align: left; }
   .menu, .menu > div { position: static; display: block; width: auto; }
   .menu > div { box-shadow: inset 0 0 0 1px var(--border); margin-top: var(--s2); }
+}
+
+/* Forced colours (Windows high contrast) drop backgrounds and shadows: give state a border or a system colour. */
+@media (forced-colors: active) {
+  .button, .chip:not(.chips.tabs .chip) { border: 1px solid ButtonText; }
+  input[type="checkbox"] { forced-color-adjust: none; border: 1.5px solid ButtonText; background: Canvas; box-shadow: none; }
+  input[type="checkbox"]:checked { background: Highlight; border-color: Highlight; }
+  input[type="checkbox"]::after { border-color: HighlightText; }
+  input[type="checkbox"][role="switch"]::after { background: ButtonText; box-shadow: none; }
+  input[type="checkbox"][role="switch"]:checked::after { background: HighlightText; }
+  .filters .chip::before { forced-color-adjust: none; box-shadow: none; border: 1.5px solid ButtonText; }
+  .filters .chip[aria-pressed="true"]::before { background: Highlight; border-color: Highlight; }
+  .chip[aria-pressed="true"], .chip[aria-current] { outline: 2px solid Highlight; outline-offset: -2px; }
 }

@@ -444,3 +444,52 @@ func TestComments(t *testing.T) {
 		t.Error("comments are served to signed-out visitors")
 	}
 }
+
+// Round-4 usability fixes: sign-in returns to the page asked for, non-admins get
+// a real page instead of bare text, and saving preferences says so.
+func TestSignInFlowAndForbiddenPage(t *testing.T) {
+	a := newApp(t)
+	a.signUp()
+	auth.CreateUser(a.db, "kid@example.com", "Kid", "correct horse", false)
+
+	jar, _ := cookiejar.New(nil)
+	anon := &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	res, err := anon.Get(a.url + "/later?x=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loc := res.Header.Get("Location"); loc != "/login?next="+url.QueryEscape("/later?x=1") {
+		t.Errorf("redirect to %q", loc)
+	}
+	for next, want := range map[string]string{"/later?x=1": "/later?x=1", "//evil.example/": "/", "https://evil.example/": "/", `/\evil.example`: "/"} {
+		req, _ := http.NewRequest(http.MethodPost, a.url+"/login", strings.NewReader(url.Values{"email": {"kid@example.com"}, "password": {"correct horse"}, "next": {next}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res, err := anon.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := res.Header.Get("Location"); loc != want {
+			t.Errorf("next=%q: redirect to %q, want %q", next, loc, want)
+		}
+	}
+
+	kid := a.as("kid@example.com", "correct horse")
+	code, body := kid.get("/admin/users")
+	if code != http.StatusForbidden || !strings.Contains(body, "Back to your feed") || !strings.Contains(body, "<nav") {
+		t.Errorf("forbidden page: %d %.200q", code, body)
+	}
+	if code, _ := kid.post("/admin/users", url.Values{"email": {"x@example.com"}}); code != http.StatusForbidden {
+		t.Errorf("admin POST by non-admin: %d", code)
+	}
+
+	req, _ := http.NewRequest(http.MethodPost, a.url+"/account/preferences", strings.NewReader("theme=dark"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", a.url+"/account/preferences")
+	res, err = (&http.Client{Jar: a.c.Jar, CheckRedirect: anon.CheckRedirect}).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loc := res.Header.Get("Location"); !strings.Contains(loc, "msg=Preferences+saved") {
+		t.Errorf("preferences redirect %q has no message", loc)
+	}
+}

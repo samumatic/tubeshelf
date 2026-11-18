@@ -317,14 +317,33 @@ func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
 			http.Redirect(w, r, "/setup", http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// Back to the page asked for once signed in.
+		target := "/login"
+		if r.URL.Path != "/" {
+			target += "?next=" + url.QueryEscape(r.URL.RequestURI())
+		}
+		http.Redirect(w, r, target, http.StatusSeeOther)
 	})
+}
+
+// localPath returns p if it is a path on this site, else "/".
+func localPath(p string) string {
+	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || strings.HasPrefix(p, "/\\") {
+		return "/"
+	}
+	return p
 }
 
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.user(r).IsAdmin {
-			http.Error(w, "admins only", http.StatusForbidden)
+			if isFetch(r) || r.Method != http.MethodGet {
+				http.Error(w, "admins only", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusForbidden)
+			s.render(w, r, "forbidden", nil)
 			return
 		}
 		next(w, r)

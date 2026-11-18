@@ -23,7 +23,7 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, u *auth.User) {
 		return
 	}
 	s.setSession(w, r, tok)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, localPath(r.FormValue("next")), http.StatusSeeOther)
 }
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +40,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 		"Providers":    providers,
 		"OIDCOnly":     db.Setting(s.DB, "oidc_only") == "1" && len(providers) > 0,
 		"Registration": db.Setting(s.DB, "public_registration") == "1",
+		"Next":         r.URL.Query().Get("next"),
 	})
 }
 
@@ -240,7 +241,12 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	ok(w, r, "/account/preferences", "")
+	// The feed's filter buttons save here too; only the preferences page says so.
+	msg := ""
+	if ref, err := url.Parse(r.Referer()); err == nil && ref.Path == "/account/preferences" {
+		msg = "Preferences saved"
+	}
+	ok(w, r, "/account/preferences", msg)
 }
 
 func (s *Server) saveProfile(w http.ResponseWriter, r *http.Request) {
