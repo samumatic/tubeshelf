@@ -210,8 +210,17 @@ func hasGroup(claim any, want string) bool {
 func oidcUser(d *sql.DB, p *Provider, subject, email, name string, admin bool) (*User, error) {
 	// Admin follows the group only when a group mapping is configured.
 	sync := func(id string) (*User, error) {
+		var disabled bool
+		if d.QueryRow(`SELECT disabled FROM users WHERE id = ?`, id).Scan(&disabled); disabled {
+			return nil, ErrDisabled
+		}
 		if p.AdminGroup != "" {
-			d.Exec(`UPDATE users SET is_admin = ? WHERE id = ?`, admin, id)
+			// Never demote the last admin: that would lock everyone out of the admin pages.
+			var others int
+			d.QueryRow(`SELECT count(*) FROM users WHERE is_admin = 1 AND id != ? AND disabled = 0`, id).Scan(&others)
+			if admin || others > 0 {
+				d.Exec(`UPDATE users SET is_admin = ? WHERE id = ?`, admin, id)
+			}
 		}
 		return UserByID(d, id)
 	}
@@ -239,7 +248,7 @@ func oidcUser(d *sql.DB, p *Provider, subject, email, name string, admin bool) (
 	if err != nil {
 		return nil, err
 	}
-	d.Exec(`UPDATE users SET oidc_issuer = ?, oidc_subject = ? WHERE id = ?`, p.Issuer, subject, u.ID)
+	d.Exec(`UPDATE users SET oidc_issuer = ?, oidc_subject = ?, source = 'oidc' WHERE id = ?`, p.Issuer, subject, u.ID)
 	return u, nil
 }
 

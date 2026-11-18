@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/samumatic/tubeshelf/internal/auth"
 	"github.com/samumatic/tubeshelf/internal/db"
@@ -77,6 +78,8 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.HandleFunc("POST /setup", s.setupSubmit)
 	mux.HandleFunc("GET /register", s.registerPage)
 	mux.HandleFunc("POST /register", s.registerSubmit)
+	mux.HandleFunc("GET /welcome", s.welcomePage)
+	mux.HandleFunc("POST /welcome", s.welcomeSubmit)
 	mux.HandleFunc("GET /api/auth/oidc/start", s.oidcStart)
 	mux.HandleFunc("GET /branding/theme.css", s.themeStylesheet)
 	mux.HandleFunc("GET /speculation-rules.json", func(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +88,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	})
 	mux.HandleFunc("GET /branding/{kind}", s.brandImage)
 	mux.HandleFunc("GET "+auth.CallbackPath, s.oidcCallback)
+	mux.HandleFunc("GET /", s.notFound)
 
 	// Signed-in pages.
 	page := func(pattern string, h http.HandlerFunc) { mux.Handle(pattern, s.requireUser(h)) }
@@ -216,7 +220,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["Version"] = s.Version
 	data["Release"], _, _ = strings.Cut(s.Version, "+") // without the build hash, for the sidebar
 	data["Msg"] = r.URL.Query().Get("msg")
-	data["Err"] = r.URL.Query().Get("err")
+	if e := r.URL.Query().Get("err"); e != "" || data["Err"] == nil {
+		data["Err"] = sentence(e)
+	}
+	// A message can offer the obvious next step ("Subscribed to X · Open the feed").
+	if goURL := r.URL.Query().Get("go"); goURL != "" && localPath(goURL) == goURL {
+		data["Go"] = M{"URL": goURL, "Label": r.URL.Query().Get("golabel")}
+	}
 	if _, ok := data["Set"]; !ok {
 		if u != nil {
 			data["Set"] = db.UserSettings(s.DB, u.ID)
@@ -311,7 +321,12 @@ func (s *Server) loadUser(next http.Handler) http.Handler {
 
 func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.user(r) != nil {
+		if u := s.user(r); u != nil {
+			// A temporary password from an admin: choose your own before anything else.
+			if u.MustChange && r.Method == http.MethodGet && r.URL.Path != "/account" && !isFetch(r) {
+				http.Redirect(w, r, "/account?"+url.Values{"msg": {"Choose your own password to continue."}}.Encode()+"#password", http.StatusSeeOther)
+				return
+			}
 			next(w, r)
 			return
 		}
@@ -338,6 +353,17 @@ func localPath(p string) string {
 		return "/"
 	}
 	return p
+}
+
+// notFound is a page with a way back, not the bare Go 404 text.
+func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
+	if isFetch(r) || strings.HasPrefix(r.URL.Path, "/api/") || r.Method != http.MethodGet {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	s.render(w, r, "notfound", nil)
 }
 
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
@@ -377,26 +403,56 @@ func (s *Server) requireAPI(next http.HandlerFunc) http.Handler {
 
 // back redirects to where the form was submitted from, with a message.
 func back(w http.ResponseWriter, r *http.Request, fallback, key, msg string) {
-	target := fallback
+	target, _ := url.Parse(fallback)
 	if ref, err := url.Parse(r.Referer()); err == nil && ref.Host == r.Host && ref.Path != "" {
-		q := ref.Query()
-		q.Del("msg")
-		q.Del("err")
-		ref.RawQuery = q.Encode()
-		target = ref.RequestURI()
+		target = ref
+	}
+	q := target.Query()
+	for _, k := range []string{"msg", "err", "go", "golabel", "typed"} {
+		q.Del(k)
 	}
 	if msg != "" {
-		sep := "?"
-		if strings.Contains(target, "?") {
-			sep = "&"
+		// okThen and failKeep pack extra fields after NUL bytes.
+		parts := strings.Split(msg, "\x00")
+		q.Set(key, parts[0])
+		if len(parts) == 3 && key == "msg" {
+			q.Set("go", parts[1])
+			q.Set("golabel", parts[2])
+		} else if len(parts) == 3 {
+			q.Set("typed", parts[2])
 		}
-		target += sep + key + "=" + url.QueryEscape(msg)
 	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	target.RawQuery = q.Encode()
+	http.Redirect(w, r, target.RequestURI(), http.StatusSeeOther)
 }
 
 func ok(w http.ResponseWriter, r *http.Request, fallback, msg string) {
 	back(w, r, fallback, "msg", msg)
+}
+
+// okThen is ok with a link to the next step in the message.
+func okThen(w http.ResponseWriter, r *http.Request, fallback, msg, goURL, label string) {
+	back(w, r, fallback, "msg", msg+"\x00"+goURL+"\x00"+label)
+}
+
+// failKeep is fail that also keeps what was typed into the form (as ?typed=), so a typo can be fixed.
+func failKeep(w http.ResponseWriter, r *http.Request, fallback string, err error, value string) {
+	back(w, r, fallback, "err", err.Error()+"\x00typed\x00"+value)
+}
+
+// sentence makes an error read as one: a capital first letter and a full stop.
+func sentence(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	s = string(r)
+	if !strings.ContainsAny(s[len(s)-1:], ".!?") {
+		s += "."
+	}
+	return s
 }
 func fail(w http.ResponseWriter, r *http.Request, fallback string, err error) {
 	back(w, r, fallback, "err", err.Error())

@@ -12,6 +12,7 @@
   <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
   <button class="button {{if not .Providers}}primary{{end}} wide">Sign in</button>
 </form>
+<p class="muted">Forgot your password? Ask the person who runs this {{.Brand.Name}} to set a new one.</p>
 {{if .Registration}}<p class="muted">No account? <a href="/register">Register</a></p>{{end}}
 {{end}}
 {{end}}

@@ -133,8 +133,14 @@ func TestOIDCLogin(t *testing.T) {
 		t.Errorf("provisioned user: %+v", u)
 	}
 
-	// Same subject again: same account, and losing the group removes admin.
+	// The only admin keeps admin when the group goes: nobody could manage the instance otherwise.
 	again, err := p.login(t, env, map[string]any{"sub": "sub-1", "email": "changed@example.com", "groups": []string{"users"}})
+	if err != nil || again.ID != u.ID || !again.IsAdmin {
+		t.Errorf("last admin was demoted: %+v, %v", again, err)
+	}
+	// With another admin around, losing the group removes admin.
+	CreateUser(d, "boss@example.com", "Boss", "correct horse", true)
+	again, err = p.login(t, env, map[string]any{"sub": "sub-1", "email": "changed@example.com", "groups": []string{"users"}})
 	if err != nil || again.ID != u.ID || again.IsAdmin {
 		t.Errorf("second login: %+v, %v", again, err)
 	}

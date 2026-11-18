@@ -4,29 +4,44 @@
 <h1 class="page-title">Channels <small>{{len .Channels}}</small></h1>
 <div class="panels">
   <form class="panel" method="post" action="/channels">
-    <h2>Subscribe</h2>
-    <label for="channel">Channel URL, @handle or channel id</label>
-    <div class="row"><input id="channel" name="channel" placeholder="@veritasium" required autocomplete="off" aria-label="Channel URL, @handle or channel id"><button class="button primary">Subscribe</button></div>
+    <h2>Add a channel</h2>
+    <label for="channel">Channel name, @handle or YouTube link</label>
+    <div class="row"><input id="channel" name="channel" value="{{.Typed}}" placeholder="Veritasium, @veritasium or youtube.com/@veritasium" required autocomplete="off"><button class="button primary">Subscribe</button></div>
+    <p class="hint">Following many channels on YouTube? <a class="text-link" href="/channels/import">Import them all at once</a>.</p>
   </form>
 </div>
+{{if .Suggestions}}
+<section class="suggestions" aria-labelledby="suggest-head">
+  <h2 id="suggest-head" class="section-title">Others here follow</h2>
+  <ul class="suggest-list">{{range .Suggestions}}
+    <li><form method="post" action="/channels"><input type="hidden" name="channel" value="{{.ID}}">
+      <a class="channel" href="/?channel={{.ID}}"><span class="avatar" data-initial="{{initial .Title}}">{{if .HasAvatar}}<img src="/avatar/{{.ID}}" alt="" loading="lazy" width="36" height="36">{{end}}</span><span>{{.Title}}</span></a>
+      <button class="button small" aria-label="Subscribe to {{.Title}}">{{template "i-plus"}} Subscribe</button></form></li>{{end}}
+  </ul>
+</section>
+{{end}}
 {{if .Channels}}
-<table class="table">
-  <thead><tr><th>Channel</th><th class="num">Videos</th><th>Last fetch</th>{{if .Lists}}<th>Lists</th>{{end}}<th></th></tr></thead>
-  <tbody>{{range $c := .Channels}}
-    <tr>
+<div class="table-tools">
+  <h2 class="section-title">You follow</h2>
+  {{if gt (len .Channels) 8}}<input type="search" class="filter-input" placeholder="Filter channels" aria-label="Filter channels" data-filter-rows="#channel-rows">{{end}}
+</div>
+<table class="table channel-table">
+  <thead><tr><th>Channel</th><th class="num">Videos</th><th>Updated</th>{{if .Lists}}<th>Lists</th>{{end}}<th><span class="sr">Actions</span></th></tr></thead>
+  <tbody id="channel-rows">{{range $c := .Channels}}
+    <tr data-filter-text="{{.Title}}">
       <td><a class="channel" href="/?channel={{.ID}}"><span class="avatar" data-initial="{{initial .Title}}">{{if .HasAvatar}}<img src="/avatar/{{.ID}}" alt="" loading="lazy" width="36" height="36">{{end}}</span>{{.Title}}</a></td>
       <td class="num" data-label="Videos">{{.Videos}}</td>
-      <td data-label="Last fetch">{{if .LastError}}<span class="bad" title="{{.LastError}}">Failing</span>{{else if .LastSuccess}}{{ago .LastSuccess}}{{else}}Queued{{end}}</td>
-      {{if $.Lists}}<td><div class="chips">{{range $.Lists}}
+      <td data-label="Updated">{{if .LastError}}<span class="bad">Can't update: {{.LastError}}</span>{{else if .LastSuccess}}{{ago .LastSuccess}}{{else}}Waiting for the first update{{end}}</td>
+      {{if $.Lists}}<td data-label="Lists"><div class="chips">{{range $.Lists}}
         <form method="post" action="/lists/{{.ID}}/channels" data-toggle="list">
           <input type="hidden" name="channel" value="{{$c.ID}}"><input type="hidden" name="on" value="{{if index $c.InList .ID}}0{{else}}1{{end}}">
-          <button class="chip small" aria-pressed="{{index $c.InList .ID}}">{{.Name}}</button>
+          <button class="chip small list-chip" aria-pressed="{{index $c.InList .ID}}" title="{{if index $c.InList .ID}}In {{.Name}}: click to take out{{else}}Add to {{.Name}}{{end}}">{{.Name}}</button>
         </form>{{end}}</div></td>{{end}}
-      <td class="end"><form method="post" action="/channels/{{.ID}}/delete"><button class="link danger" data-confirm="Unsubscribe from {{.Title}}?">Unsubscribe</button></form></td>
+      <td class="end"><form method="post" action="/channels/{{.ID}}/delete"><button class="link danger" data-confirm="Unsubscribe from {{.Title}}? Its videos leave your feed.">Unsubscribe</button></form></td>
     </tr>{{end}}
   </tbody>
 </table>
 {{else}}
-<div class="empty"><h2>No subscriptions yet</h2><p>Paste a channel link above, or <a class="text-link" href="/channels/import">import your subscriptions</a> from another app.</p></div>
+<div class="empty"><h2>No channels yet</h2><p>Type a channel's name above{{if .Suggestions}}, pick one others here follow,{{end}} or <a class="text-link" href="/channels/import">import your subscriptions</a> from YouTube or another app.</p></div>
 {{end}}
 {{end}}

@@ -28,6 +28,7 @@ const (
 var (
 	ErrBadLogin   = errors.New("wrong email or password")
 	ErrEmailTaken = errors.New("that email is already registered")
+	ErrDisabled   = errors.New("this account is paused; ask your admin to turn it back on")
 )
 
 type User struct {
@@ -36,6 +37,8 @@ type User struct {
 	Name    string
 	IsAdmin bool
 	HasPass bool
+	// MustChange: an admin set a temporary password; the user picks their own before going on.
+	MustChange bool
 }
 
 // NewID returns 16 random bytes as hex.
@@ -73,11 +76,11 @@ var dummyHash = sync.OnceValue(func() []byte {
 	return h
 })
 
-const userCols = `id, email, name, is_admin, password_hash IS NOT NULL`
+const userCols = `id, email, name, is_admin, password_hash IS NOT NULL, must_change_password`
 
 func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	u := &User{}
-	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.IsAdmin, &u.HasPass); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.IsAdmin, &u.HasPass, &u.MustChange); err != nil {
 		return nil, err
 	}
 	return u, nil
@@ -124,7 +127,8 @@ func CreateUser(d *sql.DB, email, name, pw string, admin bool) (*User, error) {
 func Login(d *sql.DB, email, pw string) (*User, error) {
 	var hash sql.NullString
 	var id string
-	err := d.QueryRow(`SELECT id, password_hash FROM users WHERE email = ?`, strings.TrimSpace(email)).Scan(&id, &hash)
+	var disabled bool
+	err := d.QueryRow(`SELECT id, password_hash, disabled FROM users WHERE email = ?`, strings.TrimSpace(email)).Scan(&id, &hash, &disabled)
 	if err != nil || !hash.Valid {
 		// Burn the same time as a real check so timing does not reveal which emails exist.
 		bcrypt.CompareHashAndPassword(dummyHash(), []byte(pw))
@@ -132,6 +136,9 @@ func Login(d *sql.DB, email, pw string) (*User, error) {
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash.String), []byte(pw)) != nil {
 		return nil, ErrBadLogin
+	}
+	if disabled {
+		return nil, ErrDisabled
 	}
 	return UserByID(d, id)
 }
@@ -176,9 +183,9 @@ func SessionUser(d *sql.DB, tok string) (u *User, renew bool, err error) {
 	now := time.Now()
 	var exp int64
 	u = &User{}
-	err = d.QueryRow(`SELECT u.id, u.email, u.name, u.is_admin, u.password_hash IS NOT NULL, s.expires_at
-		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`,
-		h, now.Unix()).Scan(&u.ID, &u.Email, &u.Name, &u.IsAdmin, &u.HasPass, &exp)
+	err = d.QueryRow(`SELECT u.id, u.email, u.name, u.is_admin, u.password_hash IS NOT NULL, u.must_change_password, s.expires_at
+		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled = 0`,
+		h, now.Unix()).Scan(&u.ID, &u.Email, &u.Name, &u.IsAdmin, &u.HasPass, &u.MustChange, &exp)
 	if err != nil {
 		return nil, false, err
 	}
@@ -207,8 +214,8 @@ func APIKeyUser(d *sql.DB, key string) (*User, error) {
 		return nil, sql.ErrNoRows
 	}
 	h := hashToken(key)
-	u, err := scanUser(d.QueryRow(`SELECT u.id, u.email, u.name, u.is_admin, u.password_hash IS NOT NULL
-		FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ?`, h))
+	u, err := scanUser(d.QueryRow(`SELECT u.id, u.email, u.name, u.is_admin, u.password_hash IS NOT NULL, u.must_change_password
+		FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ? AND u.disabled = 0`, h))
 	if err != nil {
 		return nil, err
 	}

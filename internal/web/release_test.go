@@ -189,7 +189,7 @@ func TestOIDCOnlyClosesPasswordLogin(t *testing.T) {
 	a.post("/admin/settings", url.Values{"oidc_only": {"0", "1"}, "public_registration": {"0", "1"}})
 
 	anon := &app{t: t, db: a.db, url: a.url, c: &http.Client{}}
-	if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); !strings.Contains(body, "password login is disabled") {
+	if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); !strings.Contains(body, "Password login is disabled.") {
 		t.Error("password login still works with OIDC only")
 	}
 	anon.post("/register", url.Values{"email": {"new@example.com"}, "password": {"correct horse"}})
@@ -199,7 +199,7 @@ func TestOIDCOnlyClosesPasswordLogin(t *testing.T) {
 
 	// Deleting the last provider reopens password login instead of locking everyone out.
 	a.post("/admin/providers/p1/delete", nil)
-	if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); strings.Contains(body, "password login is disabled") {
+	if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); strings.Contains(body, "Password login is disabled.") {
 		t.Error("deleting the only provider left password login disabled")
 	}
 }
@@ -227,7 +227,7 @@ func TestLoginLimitIgnoresSpoofedForwardedFor(t *testing.T) {
 	for i := range 15 {
 		_, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"wrong"}},
 			"X-Forwarded-For", fmt.Sprintf("10.0.0.%d, 203.0.113.9", i))
-		limited = limited || strings.Contains(body, "too many attempts")
+		limited = limited || strings.Contains(body, "Too many attempts")
 	}
 	if !limited {
 		t.Error("15 failed logins from one client were never limited: the spoofable first X-Forwarded-For entry is used")
@@ -240,7 +240,7 @@ func TestSuccessfulLoginsAreNotLimited(t *testing.T) {
 	a.signUp()
 	for i := range 15 {
 		anon := &app{t: t, db: a.db, url: a.url, c: &http.Client{}}
-		if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); strings.Contains(body, "too many attempts") {
+		if _, body := anon.post("/login", url.Values{"email": {"admin@example.com"}, "password": {"correct horse"}}); strings.Contains(body, "Too many attempts") {
 			t.Fatalf("sign-in %d refused as too many attempts", i+1)
 		}
 	}

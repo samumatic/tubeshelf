@@ -371,7 +371,7 @@ func (s *Server) watchPage(w http.ResponseWriter, r *http.Request) {
 	u := s.user(r)
 	id := r.PathValue("id")
 	if !reVideoID.MatchString(id) {
-		http.NotFound(w, r)
+		s.notFound(w, r)
 		return
 	}
 	vids, err := s.videos(`SELECT `+videoCols+` FROM videos v`+videoJoins+` WHERE v.id = ?`, u.ID, u.ID, id)

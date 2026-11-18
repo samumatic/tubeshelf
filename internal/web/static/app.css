@@ -350,12 +350,27 @@ form.busy .button { mask-image: linear-gradient(90deg, #0006 0 35%, #000 50%, #0
 .link.danger:hover { color: var(--danger-fg); }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row.center { justify-content: center; }
+.hint { margin-top: 8px; color: var(--fg-muted); font-size: 13px; line-height: 18px; font-weight: 400; }
+.section-title { margin: var(--s6) 0 var(--s3); font: 400 20px/28px var(--font-display); letter-spacing: -0.01em; }
+.suggest-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; list-style: none; padding: 0; margin: 0 0 var(--s4); }
+.suggest-list form { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 8px 10px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--border); }
+.suggest-list .channel { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 500; }
+.suggest-list .channel span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-list .avatar { width: 32px; height: 32px; flex: none; }
+.button svg { width: 16px; height: 16px; }
+.table-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: var(--s6); }
+.table-tools .section-title { margin: 0; }
+.filter-input { max-width: 240px; }
+/* A list chip says what a click does: + adds the channel to the list, ✓ shows it is in it. */
+.list-chip::before { content: "+"; margin-right: 2px; }
+.list-chip[aria-pressed="true"]::before { content: "✓"; }
 /* Two or three options side by side; the pressed one is the current choice. */
 .segmented { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--radius-sm); background: var(--fill-muted); box-shadow: inset 0 0 0 1px var(--border); }
-.segmented button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: calc(var(--h-sm) - 4px); min-width: 32px; padding: 0 10px; border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--fg-muted); font-size: 13px; font-weight: 500; cursor: pointer; }
+.segmented a { text-decoration: none; }
+.segmented button, .segmented a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: calc(var(--h-sm) - 4px); min-width: 32px; padding: 0 10px; border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--fg-muted); font-size: 13px; font-weight: 500; cursor: pointer; }
 .segmented button svg { width: 16px; height: 16px; }
-.segmented button:hover { color: var(--fg); }
-.segmented button[aria-pressed="true"] { background: var(--surface-raised, var(--surface)); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), inset 0 0 0 1px var(--border); }
+.segmented button:hover, .segmented a:hover { color: var(--fg); }
+.segmented button[aria-pressed="true"], .segmented a[aria-current] { background: var(--surface-raised, var(--surface)); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), inset 0 0 0 1px var(--border); }
 @media (forced-colors: active) { .segmented button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; } }
 .row > input:not([type="checkbox"]):not([type="number"]) { flex: 1 1 180px; }
 
@@ -821,3 +836,12 @@ dialog.palette[open]::backdrop { opacity: 1; transition-duration: var(--dur-slow
   .filters .chip[aria-pressed="true"]::before { background: Highlight; border-color: Highlight; }
   .chip[aria-pressed="true"], .chip[aria-current] { outline: 2px solid Highlight; outline-offset: -2px; }
 }
+
+/* Admin users */
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tags:empty { display: none; }
+.tag.warn { background: var(--danger-soft); color: var(--danger-fg); }
+tr.paused td:not(.end) { opacity: .6; }
+.stack-sm { display: grid; gap: var(--s2); }
+.notice { border-left: 3px solid var(--primary); }
+.copy-row input { flex: 1 1 auto; min-width: 0; font-family: ui-monospace, monospace; font-size: 13px; }

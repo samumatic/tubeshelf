@@ -12,7 +12,7 @@
     <p><button class="button">Save profile</button></p>
   </form>
 
-  <form class="panel" method="post" action="/account/password">
+  <form class="panel" id="password" method="post" action="/account/password">
     <h2>{{if .User.HasPass}}Change password{{else}}Set a password{{end}}</h2>
     <div class="fields">
       {{if .User.HasPass}}<label>Current password <input type="password" name="current" required autocomplete="current-password"></label>{{end}}

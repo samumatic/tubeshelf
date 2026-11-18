@@ -563,3 +563,25 @@ function clamps(root = document) {
 }
 clamps();
 new MutationObserver(() => clamps()).observe(document.body, { childList: true, subtree: true });
+
+// Filter a long table as you type (Channels, Users).
+document.addEventListener('input', (e) => {
+  const input = e.target.closest?.('[data-filter-rows]');
+  if (!input) return;
+  const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const row of document.querySelectorAll(`${input.dataset.filterRows} > [data-filter-text]`)) {
+    const text = row.dataset.filterText.toLowerCase();
+    row.hidden = !words.every((w) => text.includes(w));
+  }
+});
+
+// Copy buttons: copy the nearest [data-copy-source] input.
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const src = b.parentElement.querySelector('[data-copy-source]');
+  if (!src) return;
+  src.select();
+  try { await navigator.clipboard.writeText(src.value); } catch { document.execCommand('copy'); }
+  const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1500);
+});

@@ -1,0 +1,12 @@
+{{define "title"}}Not found · {{.Brand.Name}}{{end}}
+{{define "main"}}{{if .User}}
+<h1 class="page-title">Nothing here</h1>
+<div class="stack">
+  <div class="panel">
+    <p>This page does not exist, or the video or channel was removed.</p>
+    <p class="row"><a class="button primary" href="/">Back to your feed</a> <a class="button" href="/channels">Your channels</a></p>
+  </div>
+</div>
+{{else}}{{template "auth-shell" .}}{{end}}{{end}}
+{{define "auth-title"}}Nothing here{{end}}
+{{define "auth"}}<p>This page does not exist.</p><p><a class="button primary wide" href="/login">Sign in</a></p>{{end}}

@@ -10,6 +10,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"log/slog"
 	"io"
 	"net/http"
 	"net/url"
@@ -80,7 +81,8 @@ func (s *Server) channelsPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "channels", M{"Channels": chans, "Lists": s.lists(u.ID)})
+	s.render(w, r, "channels", M{"Channels": chans, "Lists": s.lists(u.ID), "Suggestions": s.suggestions(u.ID, 12),
+		"Typed": r.URL.Query().Get("typed")})
 }
 
 func (s *Server) listsPage(w http.ResponseWriter, r *http.Request) {
@@ -131,14 +133,15 @@ func (s *Server) unsubscribe(userID, channelID string) error {
 func (s *Server) addChannel(w http.ResponseWriter, r *http.Request) {
 	input := strings.TrimSpace(r.FormValue("channel"))
 	if input == "" {
-		fail(w, r, "/channels", errors.New("enter a channel URL, @handle or channel id"))
+		fail(w, r, "/channels", errors.New("Type a channel's name, @handle or YouTube link"))
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	ch, err := s.YT.Resolve(ctx, input)
+	ch, err := s.resolveChannel(ctx, input)
 	if err != nil {
-		fail(w, r, "/channels", fmt.Errorf("could not find that channel: %w", err))
+		slog.Info("subscribe: channel not found", "input", input, "err", err)
+		failKeep(w, r, "/channels", fmt.Errorf("Couldn't find a YouTube channel for “%s”. Paste the channel's link (youtube.com/@name) or its @handle", input), input)
 		return
 	}
 	added, err := s.subscribe(s.user(r).ID, *ch)
@@ -148,10 +151,49 @@ func (s *Server) addChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Fetcher.Wake()
 	if !added {
-		ok(w, r, "/channels", "Already subscribed to "+ch.Title)
+		okThen(w, r, "/channels", "You already follow "+ch.Title+".", "/?channel="+ch.ID, "Open channel")
 		return
 	}
-	ok(w, r, "/channels", "Subscribed to "+ch.Title)
+	okThen(w, r, "/channels", "Subscribed to "+ch.Title+". New videos show up in your feed.", "/", "Open the feed")
+}
+
+// resolveChannel finds a channel from what someone typed: a link, an @handle
+// or an id as YouTube knows them, or just a name. A name is first matched
+// against the channels this server already follows, then tried as a handle.
+func (s *Server) resolveChannel(ctx context.Context, input string) (*yt.Channel, error) {
+	ch, err := s.YT.Resolve(ctx, input)
+	if err == nil {
+		return ch, nil
+	}
+	if strings.ContainsAny(input, "/@.") {
+		return nil, err
+	}
+	var c yt.Channel
+	if s.DB.QueryRow(`SELECT id, title, thumbnail FROM channels WHERE title = ? COLLATE NOCASE
+		ORDER BY (SELECT count(*) FROM subscriptions WHERE channel_id = channels.id) DESC LIMIT 1`, input).Scan(&c.ID, &c.Title, &c.Thumbnail) == nil {
+		return &c, nil
+	}
+	return s.YT.Resolve(ctx, "@"+strings.Join(strings.Fields(input), ""))
+}
+
+// suggestions are channels other people on this server follow and this user does not.
+func (s *Server) suggestions(userID string, limit int) []ChannelRow {
+	rows, err := s.DB.Query(`SELECT c.id, c.title, c.thumbnail LIKE 'https://%', count(*) AS n FROM channels c
+		JOIN subscriptions s ON s.channel_id = c.id
+		WHERE c.id NOT IN (SELECT channel_id FROM subscriptions WHERE user_id = ?) AND c.last_error = ''
+		GROUP BY c.id ORDER BY n DESC, c.title COLLATE NOCASE LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []ChannelRow
+	for rows.Next() {
+		var c ChannelRow
+		if rows.Scan(&c.ID, &c.Title, &c.HasAvatar, &c.Videos) == nil {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +212,11 @@ func (s *Server) deleteChannel(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addList(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name == "" || len(name) > 60 {
-		fail(w, r, "/lists", errors.New("list name must be 1 to 60 characters"))
+		fail(w, r, "/lists", errors.New("A list name needs 1 to 60 characters"))
 		return
 	}
 	if _, err := s.DB.Exec(`INSERT INTO lists (user_id, name) VALUES (?, ?)`, s.user(r).ID, name); err != nil {
-		fail(w, r, "/lists", errors.New("a list with that name already exists"))
+		fail(w, r, "/lists", fmt.Errorf("You already have a list called “%s”", name))
 		return
 	}
 	ok(w, r, "/lists", "List created")
