@@ -13,14 +13,7 @@ services:
     user: "1000:1000"
     security_opt:
       - no-new-privileges:true
-    environment:
-      BETTER_AUTH_SECRET: "replace-with-a-random-32+-char-secret"
-
-      # Feed fetching and video retention are configured in the app:
-      #   Admin > System Settings > Feed & Video Cache  (instance defaults)
-      #   Settings > Keep Videos For                    (per user)
-
-      # Set to debug for per-channel fetch logging.
-      # LOG_LEVEL: "debug"
+    # Refresh interval, parallel fetches and video retention are set in the
+    # app under Admin > Instance settings.
     volumes:
       - ../data:/app/data

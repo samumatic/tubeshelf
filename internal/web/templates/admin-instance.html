@@ -1,0 +1,41 @@
+{{define "title"}}Instance · {{.Brand.Name}}{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Instance</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/admin/settings">
+    <h2>Fetching</h2>
+    <div class="fields even">
+      <label>Check for new videos every <span class="unit-input"><input type="number" name="refresh_minutes" min="5" max="1440" value="{{.Instance.refresh_minutes}}" aria-describedby="h-refresh"> minutes</span>
+        <small class="hint" id="h-refresh">5 to 1440. More often finds new videos sooner but makes more requests to YouTube.</small></label>
+      <label>Channels checked at once <span class="unit-input"><input type="number" name="fetch_concurrency" min="1" max="16" value="{{.Instance.fetch_concurrency}}" aria-describedby="h-conc"></span>
+        <small class="hint" id="h-conc">1 to 16. Keep it low (3) so YouTube does not start blocking requests.</small></label>
+      <label>Keep videos for <span class="unit-input"><input type="number" name="retention_days" min="7" max="3650" value="{{.Instance.retention_days}}" aria-describedby="h-ret"> days</span>
+        <small class="hint" id="h-ret">7 to 3650. Older videos are deleted, except ones in someone's Watch later or history.</small></label>
+    </div>
+    <p><button class="button primary">Save</button></p>
+  </form>
+
+  <form class="panel" id="defaults" method="post" action="/admin/defaults">
+    <h2>Defaults for everyone</h2>
+    <p class="muted">What people get until they change it in their own Preferences.</p>
+    <div class="fields even">
+      <label>Theme <select name="theme">{{range list "system" "light" "dark"}}<option value="{{.}}" {{if eq . $.Defaults.theme}}selected{{end}}>{{if eq . "system"}}Match the device{{else if eq . "light"}}Light{{else}}Dark{{end}}</option>{{end}}</select></label>
+      <label>Feed layout <select name="view"><option value="grid" {{if eq .Defaults.view "grid"}}selected{{end}}>Grid of thumbnails</option><option value="list" {{if eq .Defaults.view "list"}}selected{{end}}>List</option></select></label>
+    </div>
+    {{range list "hide_shorts:Hide Shorts" "sponsorblock:Skip sponsor segments (SponsorBlock)" "autoplay_next:Play the next video after a countdown" "click_to_load:Load the YouTube player only after a click"}}{{$kv := split . ":"}}
+    <label class="check"><input type="hidden" name="{{index $kv 0}}" value="0"><input type="checkbox" role="switch" name="{{index $kv 0}}" value="1" {{if eq (index $.Defaults (index $kv 0)) "1"}}checked{{end}}> {{index $kv 1}}</label>{{end}}
+    <p><button class="button primary">Save defaults</button></p>
+  </form>
+
+  <div class="panel danger-zone" id="danger">
+    <h2>Danger zone</h2>
+    <form class="danger-row" method="post" action="/admin/danger"><input type="hidden" name="action" value="sessions">
+      <div><strong>Sign everyone else out</strong><br><small class="muted">For a lost device or a shared password. Nothing is deleted.</small></div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> I am sure</label><button class="button danger">Sign out</button></form>
+    <form class="danger-row" method="post" action="/admin/danger"><input type="hidden" name="action" value="keys">
+      <div><strong>Delete every API key</strong><br><small class="muted">Scripts and apps using one stop working until someone makes a new key.</small></div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> I am sure</label><button class="button danger">Delete keys</button></form>
+  </div>
+</div>
+{{end}}

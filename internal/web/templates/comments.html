@@ -1,0 +1,21 @@
+{{define "comments"}}{{with .P}}
+{{- if .Disabled}}<p class="muted">Comments are turned off for this video.</p>
+{{- else}}
+{{- if and $.First (or .Top .Newest) (not $.Sort)}}<div class="chips comments-sort" role="group" aria-label="Sort comments">
+  <button type="button" class="chip" data-comments-sort="{{.Top}}" aria-pressed="true"{{if not .Top}} disabled{{end}}>Top</button>
+  <button type="button" class="chip" data-comments-sort="{{.Newest}}" aria-pressed="false"{{if not .Newest}} disabled{{end}}>Newest</button>
+</div>{{end}}
+{{- range .Comments}}
+<article class="comment">
+  <span class="avatar" data-initial="{{initial .Author}}" aria-hidden="true"></span>
+  <div>
+    <p class="comment-head"><strong>{{.Author}}</strong>{{if .Creator}} <span class="badge">Creator</span>{{end}}{{if .Pinned}} <span class="badge">Pinned</span>{{end}} <span>{{.Published}}</span></p>
+    <p class="comment-text" data-clamp>{{linkify .Text}}</p>
+    {{- if or .Likes .Replies}}<p class="comment-foot">{{if .Likes}}<span>{{.Likes}} likes</span>{{end}}{{if .Replies}}<a class="text-link" href="https://www.youtube.com/watch?v={{$.Video}}&amp;lc={{.ID}}" target="_blank" rel="noopener">{{.Replies}} on YouTube</a>{{end}}</p>{{end}}
+  </div>
+</article>
+{{- else}}{{if $.First}}<p class="muted">No comments yet.</p>{{end}}
+{{- end}}
+{{- if .Next}}<button type="button" class="button comments-more" data-comments-more="{{.Next}}">Show more comments</button>{{end}}
+{{- end}}
+{{end}}{{end}}

@@ -1,0 +1,583 @@
+// TubeShelf's player: the youtube-nocookie embed without YouTube's controls, driven over its postMessage
+// protocol (the one YouTube's iframe_api script speaks), so no third-party script runs on this page.
+// Every control, shortcut and the fullscreen mode belong to this page; the embed only shows the video.
+
+// The page may swap a watch page in without loading it (app.js does, so the click that opened the video
+// still counts as the user's go-ahead for sound); mount() starts the player found in the page, and
+// unmount() saves the position and drops every listener and timer of the one before.
+let active = null;
+export function unmount() {
+  active?.();
+  active = null;
+}
+export function mount() {
+  unmount();
+  const box = document.getElementById('player');
+  if (box) active = setup(box);
+}
+
+function setup(box) {
+  const abort = new AbortController();
+  const { signal } = abort;
+  const frame = document.getElementById('yt');
+  const toast = document.getElementById('toast');
+  const track = box.querySelector('.track');
+  const volumeInput = box.querySelector('.volume input');
+  const speedButton = box.querySelector('.speed');
+  const speedMenu = document.getElementById('speed-menu');
+  const keysDialog = document.getElementById('keys');
+  const ORIGIN = 'https://www.youtube-nocookie.com';
+  const id = box.dataset.id;
+  const ENDED = 0, PLAYING = 1, PAUSED = 2, BUFFERING = 3;
+  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+  const now = { t: Number(box.dataset.start) || 0, at: performance.now(), d: Number(box.dataset.duration) || 0, state: -1, rate: 1, loaded: 0 };
+  let connected = false;
+  let segments = [];
+  // Segments skipped once already, or sought into: these play. Going back to one is how a skip is undone.
+  const watchAnyway = new Set();
+  // The last sponsor skipped; watching once Enter or Undo went back into it. Enter decides by this,
+  // not by the reported time alone, which lags behind a seek in the real player.
+  let lastSkip = null;
+  // The embed keeps reporting the old time for a moment after seekTo; until it reports near the target,
+  // those reports are ignored so the bar, the auto skip and Enter see where the video is going.
+  let seekGuard = null;
+  let savedAt = now.t;
+  let captions = box.dataset.captions === '1'; // remembered per user, like YouTube's own choice
+  const touch = matchMedia('(hover: none)').matches;
+  // A preference that follows the user to every device; the page does not wait for it.
+  const remember = (key, value) => fetch('/account/preferences', { method: 'POST', body: new URLSearchParams({ [key]: value }), headers: { 'X-Requested-With': 'fetch' } }).catch(() => {});
+  // Set when the browser refused to start with sound and the video started muted instead; the stored choice stays.
+  let forcedMute = false;
+
+  // Volume and mute are remembered in this browser. A muted start also starts the embed muted.
+  const sound = (() => {
+    try { return { volume: 100, muted: false, ...JSON.parse(localStorage.getItem('player-sound')) }; } catch { return { volume: 100, muted: false }; }
+  })();
+  const keepSound = () => { try { localStorage.setItem('player-sound', JSON.stringify(sound)); } catch { /* storage blocked */ } };
+  // Click to load: nothing reaches Google until the viewer presses play; a thumbnail stands in until then.
+  let loaded = false;
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    box.classList.remove('cold');
+    frame.src = frame.dataset.src + (sound.muted ? '&mute=1' : '');
+    // An embed that never answers (blocked network, a removed video, an extension) gets a plain explanation.
+    setTimeout(() => { if (!connected && !signal.aborted) box.classList.add('unavailable'); }, 10000);
+  }
+  if (box.dataset.clickToLoad === '1') box.classList.add('cold');
+  else load();
+  box.querySelector('.poster-play')?.addEventListener('click', () => { load(); box.focus({ preventScroll: true }); }, { signal });
+
+  const send = (msg) => frame.contentWindow?.postMessage(JSON.stringify(msg), ORIGIN);
+  const command = (func, ...args) => send({ event: 'command', func, args });
+
+  // The embed only starts reporting after it hears "listening"; repeat until it answers.
+  const hello = setInterval(() => (connected ? clearInterval(hello) : send({ event: 'listening', id: 1, channel: 'widget' })), 250);
+
+  let toastTimer;
+  // A short note over the video; with an action it carries a button and stays longer.
+  function say(text, action) {
+    toast.replaceChildren(text);
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { toast.hidden = true; action.run(); box.focus({ preventScroll: true }); });
+      toast.append(b);
+    }
+    toast.classList.toggle('has-action', !!action);
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (toast.hidden = true), action ? 5000 : 1600);
+  }
+  const undoSkip = () => {
+    if (!lastSkip) return;
+    lastSkip.watching = true;
+    seek(lastSkip.seg[0]);
+    say(touch ? 'Playing sponsor' : 'Playing sponsor · Enter to skip');
+  };
+  function skipSegment(seg) {
+    watchAnyway.add(seg);
+    lastSkip = { seg, watching: false };
+    seek(seg[1], true);
+    say(touch ? 'Skipped sponsor' : 'Skipped sponsor · Enter to undo', { label: 'Undo', run: undoSkip });
+  }
+
+  const clock = (s) => {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+  };
+
+  // ---------- Progress ----------
+  function save(ended = false, beacon = false) {
+    if (!now.t && !ended && !savedAt) return; // nothing played yet; a rewind to 0:00 is still saved
+    savedAt = now.t;
+    const body = new URLSearchParams({ t: now.t.toFixed(1), d: now.d.toFixed(1), ended: ended ? '1' : '0' });
+    const url = `/videos/${id}/progress`;
+    if (beacon) return navigator.sendBeacon(url, body);
+    fetch(url, { method: 'POST', body, headers: { 'X-Requested-With': 'fetch' } })
+      .then((r) => r.json())
+      .then((r) => {
+        if (!r.watched) return;
+        const form = document.querySelector('.watch-meta [data-toggle="watched"]');
+        form.elements.on.value = '0';
+        form.querySelector('button').setAttribute('aria-pressed', 'true');
+      })
+      .catch(() => {});
+  }
+  // pagehide also fires when the tab is closed, where fetch would be cancelled.
+  addEventListener('pagehide', () => save(false, true), { signal });
+
+  // ---------- Drawing ----------
+  let scrubbing = null; // seconds while the knob is dragged
+  const position = () => (scrubbing ?? (now.state === PLAYING ? now.t + ((performance.now() - now.at) / 1000) * now.rate : now.t));
+
+  function draw() {
+    const t = Math.min(position(), now.d || Infinity);
+    const pct = now.d ? (t / now.d) * 100 : 0;
+    track.style.setProperty('--played', `${pct}%`);
+    track.style.setProperty('--loaded', `${now.loaded * 100}%`);
+    track.setAttribute('aria-valuenow', Math.floor(t));
+    track.setAttribute('aria-valuetext', `${clock(t)} of ${clock(now.d)}`);
+    box.querySelector('.now').textContent = clock(t);
+    raf = requestAnimationFrame(draw);
+  }
+  let raf = requestAnimationFrame(draw);
+
+  function drawSegments() {
+    const host = box.querySelector('.segments');
+    host.replaceChildren();
+    if (!now.d) return;
+    for (const [from, to] of segments) {
+      const s = document.createElement('span');
+      s.style.setProperty('left', `${(from / now.d) * 100}%`);
+      s.style.setProperty('width', `${((to - from) / now.d) * 100}%`);
+      host.append(s);
+    }
+  }
+
+  function drawState() {
+    const playing = now.state === PLAYING || now.state === BUFFERING;
+    box.classList.toggle('playing', playing);
+    const play = box.querySelector('[data-act="play"]');
+    play.setAttribute('aria-label', playing ? 'Pause (k)' : 'Play (k)');
+    play.dataset.tip = playing ? 'Pause' : 'Play';
+    if (playing) box.classList.remove('blocked');
+    wake();
+  }
+
+  function drawSound() {
+    const off = sound.muted || forcedMute;
+    box.classList.toggle('muted', off || sound.volume === 0);
+    box.classList.toggle('asks-sound', forcedMute);
+    volumeInput.value = off ? 0 : sound.volume;
+    volumeInput.style.setProperty('--fill', `${volumeInput.value}%`);
+    const mute = box.querySelector('[data-act="mute"]');
+    mute.setAttribute('aria-label', off ? 'Unmute (m)' : 'Mute (m)');
+    mute.dataset.tip = off ? 'Unmute' : 'Mute';
+  }
+  drawSound();
+
+  // ---------- Messages from the embed ----------
+  const running = () => now.state === PLAYING || now.state === BUFFERING;
+  function askToPlay() {
+    box.classList.add('blocked');
+    say(touch ? 'Tap play to start' : 'Press play or k to start');
+  }
+  addEventListener('message', (e) => {
+    if (e.origin !== ORIGIN || e.source !== frame.contentWindow) return;
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    if (!connected) {
+      connected = true;
+      box.classList.remove('unavailable');
+      command('addEventListener', 'onAutoplayBlocked');
+      command('setVolume', sound.volume);
+      command(sound.muted ? 'mute' : 'unMute');
+      // Should the embed neither start nor report a block (see onAutoplayBlocked), the play button asks for a click.
+      setTimeout(() => { if (!running() && !forcedMute) askToPlay(); }, 6000);
+    }
+    // The browser refused to start with sound: start muted, which browsers allow; m or the sound button
+    // gives the sound back. If even that is refused, the play button asks for one click.
+    if (msg.event === 'onAutoplayBlocked' && !forcedMute && !sound.muted) {
+      forcedMute = true;
+      command('mute');
+      command('playVideo');
+      drawSound();
+      say('Your browser started this muted · press m for sound');
+      setTimeout(() => { if (!running()) askToPlay(); }, 1500);
+    }
+    const info = msg.info;
+    if (!info) return;
+    if (typeof info.duration === 'number' && info.duration > 0 && info.duration !== now.d) {
+      now.d = info.duration;
+      track.setAttribute('aria-valuemax', Math.floor(now.d));
+      box.querySelector('.total').textContent = clock(now.d);
+      drawSegments();
+    }
+    if (typeof info.videoLoadedFraction === 'number') now.loaded = info.videoLoadedFraction;
+    if (typeof info.playbackRate === 'number' && info.playbackRate !== now.rate) {
+      now.rate = info.playbackRate;
+      speedButton.textContent = `${now.rate}×`;
+      for (const b of speedMenu.querySelectorAll('[data-rate]')) b.setAttribute('aria-checked', Number(b.dataset.rate) === now.rate);
+    }
+    const stale = typeof info.currentTime === 'number' && seekGuard
+      && performance.now() < seekGuard.until && Math.abs(info.currentTime - seekGuard.to) > 1.5;
+    if (typeof info.currentTime === 'number' && !stale) {
+      seekGuard = null;
+      now.t = info.currentTime;
+      now.at = performance.now();
+      const hit = segments.find((s) => !watchAnyway.has(s) && now.t >= s[0] && now.t < s[1] - 0.5);
+      if (hit) skipSegment(hit);
+      if (now.state === PLAYING && Math.abs(now.t - savedAt) >= 10) save();
+    }
+    if (typeof info.playerState === 'number' && info.playerState !== now.state) {
+      now.state = info.playerState;
+      now.at = performance.now();
+      drawState();
+      // YouTube turns captions on by itself (a muted start, again after a seek) and does not report it;
+      // each settled state puts back the choice made here.
+      if (now.state === PLAYING || now.state === PAUSED) command(captions ? 'loadModule' : 'unloadModule', 'captions');
+      if (now.state === PAUSED) save();
+      if (now.state === ENDED) { save(true); offerNext(); }
+      else cancelNext();
+    }
+  }, { signal });
+
+  // ---------- Comments ----------
+  // Loaded when first opened, through the server, so the browser still only contacts YouTube for the video.
+  const comments = document.querySelector('details[data-comments]');
+  if (comments) {
+    const body = comments.querySelector('.comments-body');
+    // A failed load leaves a Try again button that repeats it (YouTube refuses now and then; trains lose signal).
+    const failed = (token, sort, text) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'comments-error';
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = text;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'button';
+      b.textContent = 'Try again';
+      b.dataset.commentsRetry = token;
+      if (sort) b.dataset.sort = '1';
+      wrap.append(p, b);
+      const f = document.createDocumentFragment();
+      f.append(wrap);
+      return f;
+    };
+    const load = async (token, sort) => {
+      const q = new URLSearchParams();
+      if (token) q.set('t', token);
+      if (sort) q.set('sort', '1');
+      try {
+        const r = await fetch(`${comments.dataset.comments}?${q}`, { signal });
+        if (!r.ok) return failed(token, sort, 'Comments could not be loaded from YouTube.');
+        const html = await r.text();
+        return document.createRange().createContextualFragment(html);
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        return failed(token, sort, 'Comments could not be loaded. Check your connection.');
+      }
+    };
+    let started = false;
+    comments.addEventListener('toggle', () => {
+      if (!comments.open || started) return;
+      started = true;
+      load('').then((f) => body.replaceChildren(f)).catch(() => {});
+    }, { signal });
+    body.addEventListener('click', async (e) => {
+      const retry = e.target.closest('[data-comments-retry]');
+      if (retry) {
+        retry.disabled = true;
+        retry.closest('.comments-error').replaceWith(await load(retry.dataset.commentsRetry, retry.dataset.sort === '1').catch(() => ''));
+        return;
+      }
+      const more = e.target.closest('[data-comments-more]');
+      const sort = e.target.closest('[data-comments-sort]');
+      if (more) {
+        more.disabled = true;
+        more.replaceWith(await load(more.dataset.commentsMore).catch(() => ''));
+      } else if (sort && sort.getAttribute('aria-pressed') !== 'true') {
+        for (const b of body.querySelectorAll('[data-comments-sort]')) b.setAttribute('aria-pressed', b === sort);
+        const f = await load(sort.dataset.commentsSort, true).catch(() => null);
+        if (!f) return;
+        for (const n of [...body.children]) if (!n.matches('.comments-sort')) n.remove();
+        body.append(f);
+      }
+    }, { signal });
+  }
+
+  if (box.dataset.sponsorblock === '1') {
+    fetch(`/videos/${id}/segments`).then((r) => r.json()).then((s) => { segments = s || []; drawSegments(); }).catch(() => {});
+  }
+
+  // ---------- Actions ----------
+  // auto: the sponsor skip itself. Any other seek into a segment means the viewer wants to see it.
+  function seek(to, auto = false) {
+    to = Math.max(0, Math.min(to, now.d ? now.d - 0.5 : to));
+    if (!auto) for (const s of segments) if (to >= s[0] && to < s[1] - 0.5) watchAnyway.add(s);
+    now.t = to;
+    now.at = performance.now();
+    seekGuard = { to, until: now.at + 2500 };
+    command('seekTo', to, true);
+  }
+  const toggle = () => (loaded ? command(now.state === PLAYING || now.state === BUFFERING ? 'pauseVideo' : 'playVideo') : load());
+  function setVolume(v) {
+    forcedMute = false;
+    sound.volume = Math.max(0, Math.min(100, Math.round(v)));
+    sound.muted = sound.volume === 0;
+    command('setVolume', sound.volume);
+    command(sound.muted ? 'mute' : 'unMute');
+    keepSound();
+    drawSound();
+  }
+  // After a forced mute, m, the sound button or the volume bring the sound back.
+  function liftMute() {
+    if (!forcedMute) return;
+    forcedMute = false;
+    command('setVolume', sound.volume);
+    command('unMute');
+    drawSound();
+    say('Sound on');
+  }
+
+  function mute() {
+    if (forcedMute) return liftMute();
+    sound.muted = !sound.muted;
+    if (!sound.muted && sound.volume === 0) sound.volume = 50;
+    command(sound.muted ? 'mute' : 'unMute');
+    if (!sound.muted) command('setVolume', sound.volume);
+    keepSound();
+    drawSound();
+    say(sound.muted ? 'Muted' : 'Sound on');
+  }
+  function speed(rate) {
+    command('setPlaybackRate', rate);
+    say(`${rate}×`);
+  }
+  const step = (dir) => speed(RATES[Math.max(0, Math.min(RATES.length - 1, RATES.indexOf(now.rate) + dir))]);
+  function toggleCaptions() {
+    captions = !captions;
+    command(captions ? 'loadModule' : 'unloadModule', 'captions');
+    box.querySelector('[data-act="captions"]').setAttribute('aria-pressed', captions);
+    say(captions ? 'Captions on' : 'Captions off');
+    remember('captions', captions ? '1' : '0');
+  }
+  function theater() {
+    const on = document.documentElement.classList.toggle('theater');
+    box.querySelector('[data-act="theater"]')?.setAttribute('aria-pressed', on);
+    remember('theater', on ? '1' : '0');
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- Next video ----------
+  // At the end, the first video of Up next starts after a short countdown that can be cancelled, as on YouTube.
+  const nextLink = () => document.querySelector('.up-next a.title');
+  const playNext = () => { cancelNext(); nextLink()?.click(); };
+  let nextTimer = null, nextCard = null;
+  function cancelNext() {
+    clearInterval(nextTimer);
+    nextTimer = null;
+    nextCard?.remove();
+    nextCard = null;
+  }
+  function offerNext() {
+    const link = nextLink();
+    if (!link || box.dataset.autoplay !== '1' || nextCard) return;
+    let left = 8;
+    nextCard = document.createElement('div');
+    nextCard.className = 'next-card';
+    nextCard.setAttribute('role', 'status');
+    const label = document.createElement('p');
+    const title = document.createElement('strong');
+    title.textContent = link.textContent;
+    const row = document.createElement('div');
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'button primary';
+    play.textContent = 'Play now';
+    play.addEventListener('click', playNext);
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => { cancelNext(); box.focus({ preventScroll: true }); });
+    row.append(play, cancel);
+    const tick = () => { label.textContent = `Up next in ${left}`; };
+    tick();
+    nextCard.append(label, title, row);
+    box.querySelector('.screen').append(nextCard);
+    nextTimer = setInterval(() => { if (--left <= 0) playNext(); else tick(); }, 1000);
+  }
+  const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen()).catch(() => {});
+
+  // Fullscreen: the bar lies over the video and fades out while playing and untouched. Pointer moves over the
+  // embed never reach this page, so while playing a layer of ours (.screen::after) covers it: it sees moves,
+  // and a click on it pauses. Paused, the layer is gone and YouTube's own links work.
+  let idleTimer;
+  function wake() {
+    box.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (document.fullscreenElement === box && running() && !box.querySelector('.bar:hover, .bar :focus-visible') && !speedMenu.matches(':popover-open')) box.classList.add('idle');
+    }, 2500);
+  }
+  box.addEventListener('pointermove', wake);
+  document.addEventListener('fullscreenchange', wake, { signal });
+  box.querySelector('.screen').addEventListener('click', (e) => { if (e.target.classList.contains('screen')) toggle(); });
+  const showKeys = () => (keysDialog.open ? keysDialog.close() : keysDialog.showModal());
+
+  const actions = {
+    play: toggle, back: () => seek(position() - 10), forward: () => seek(position() + 10), mute,
+    captions: toggleCaptions, fullscreen, keys: showKeys, theater, next: playNext,
+    // Hand over to YouTube (to cast, or for features the embed lacks) at the same moment.
+    youtube: () => {
+      if (loaded) command('pauseVideo');
+      window.open(`https://www.youtube.com/watch?v=${box.dataset.id}&t=${Math.floor(position())}s`, '_blank', 'noopener');
+    },
+  };
+  // A clicked control gives focus back to the player, so Enter and space stay player keys
+  // (keyboard users who tab to a control still press it with Enter).
+  box.querySelector('.bar').addEventListener('pointerup', (e) => {
+    if (e.target.closest('button') && !e.target.closest('[popover], [popovertarget]')) setTimeout(() => box.focus({ preventScroll: true }), 0);
+  }, { signal });
+  box.querySelector('.buttons').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (b) actions[b.dataset.act]();
+  });
+  speedMenu.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rate]');
+    if (!b) return;
+    speed(Number(b.dataset.rate));
+    speedMenu.hidePopover();
+  });
+  volumeInput.addEventListener('input', () => setVolume(Number(volumeInput.value)));
+
+  // ---------- Seek bar: click or drag, with the time under the pointer ----------
+  const hoverTime = track.querySelector('.hover-time');
+  const at = (e) => {
+    const r = track.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  };
+  track.addEventListener('pointermove', (e) => {
+    if (!now.d) return;
+    const f = at(e);
+    hoverTime.hidden = false;
+    hoverTime.textContent = clock(f * now.d);
+    hoverTime.style.setProperty('left', `${f * 100}%`);
+    if (scrubbing !== null) scrubbing = f * now.d;
+  });
+  track.addEventListener('pointerleave', () => { if (scrubbing === null) hoverTime.hidden = true; });
+  track.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !now.d) return;
+    track.setPointerCapture(e.pointerId);
+    scrubbing = at(e) * now.d;
+    box.classList.add('scrubbing');
+  });
+  const endScrub = (e, cancel) => {
+    if (scrubbing === null) return;
+    const to = scrubbing;
+    scrubbing = null;
+    box.classList.remove('scrubbing');
+    hoverTime.hidden = !track.matches(':hover');
+    if (!cancel) seek(to);
+  };
+  // Focused seek bar: Home, End and Page keys as on any slider; arrows work everywhere on the page.
+  track.addEventListener('keydown', (e) => {
+    const to = { Home: 0, End: Math.max(0, now.d - 1), PageUp: now.t + 60, PageDown: now.t - 60 }[e.key];
+    if (to === undefined || !now.d) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seek(Math.max(0, Math.min(now.d - 1, to)));
+  });
+  track.addEventListener('pointerup', (e) => endScrub(e, false));
+  track.addEventListener('pointercancel', (e) => endScrub(e, true));
+
+  // ---------- Keyboard: one owner ----------
+  // A click on the video moves focus into the embed, which ignores keys (disablekb); take focus back.
+  // Tab also lands in the embed; then focus moves on past it, so the controls stay reachable.
+  let tabbed = null;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') tabbed = { back: e.shiftKey, at: performance.now() };
+  }, { signal });
+  addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement !== frame) return;
+    const tab = tabbed && performance.now() - tabbed.at < 500 && tabbed;
+    tabbed = null;
+    if (tab && !tab.back) (box.querySelector('.bar button') ?? box).focus({ preventScroll: true });
+    else box.focus({ preventScroll: true });
+  }, 0), { signal });
+
+  document.addEventListener('keydown', (e) => {
+    wake();
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input:not([type="range"]), select, textarea, dialog.palette')) return;
+    if (e.target === volumeInput && e.key.startsWith('Arrow')) return;
+    if (keysDialog.open && e.key !== '?') return;
+    // As on YouTube, by physical key so every layout works (a German Shift+. gives ":"): Shift+. and Shift+,
+    // change the speed; . and , step one frame while paused.
+    if (e.code === 'Period' || e.code === 'Comma') {
+      const dir = e.code === 'Period' ? 1 : -1;
+      if (e.shiftKey) step(dir);
+      else if (!running()) seek(position() + dir / 30);
+      e.preventDefault();
+      return;
+    }
+    switch (e.key) {
+      case ' ':
+        if (e.target.closest('button, a, summary')) return; // space presses the focused control
+        toggle(); break;
+      case 'k': toggle(); break;
+      case 'Enter': {
+        if (e.target.closest('button, a, summary')) return; // Enter presses the focused control
+        // As in the SponsorBlock extension: in the 10 s after a skip Enter goes back to the sponsor, while
+        // it plays Enter skips it again, and inside any other sponsor Enter skips that one. The player lands
+        // a seek on a frame it can show, which may be up to a second or two early, hence the margins.
+        const t = position();
+        const seg = lastSkip?.seg;
+        if (seg && !lastSkip.watching && t >= seg[1] - 2 && t < seg[1] + 10) { undoSkip(); break; }
+        let target = seg && lastSkip.watching && t >= seg[0] - 2 && t < seg[1] - 0.5 ? seg : null;
+        target ??= segments.find((s) => t >= s[0] && t < s[1] - 0.5);
+        if (!target) return;
+        skipSegment(target);
+        break;
+      }
+      case 'j': seek(position() - 10); break;
+      case 'l': seek(position() + 10); break;
+      case 'ArrowLeft': seek(position() - 5); break;
+      case 'ArrowRight': seek(position() + 5); break;
+      case 'ArrowUp': setVolume((sound.muted ? 0 : sound.volume) + 5); say(`Volume ${sound.volume}%`); break;
+      case 'ArrowDown': setVolume((sound.muted ? 0 : sound.volume) - 5); say(`Volume ${sound.volume}%`); break;
+      case 'm': mute(); break;
+      case 'c': toggleCaptions(); break;
+      case 'f': fullscreen(); break;
+      case 't': theater(); break;
+      case 'N': playNext(); break;
+      case 'Escape': if (!nextCard) return; cancelNext(); break;
+      case '<': step(-1); break;
+      case '>': step(1); break;
+      case '?': showKeys(); break;
+      case 'w': document.querySelector('.watch-meta [data-toggle="watched"]')?.requestSubmit(); break;
+      default:
+        if (e.key >= '0' && e.key <= '9' && now.d) seek((now.d * Number(e.key)) / 10);
+        else return;
+    }
+    e.preventDefault();
+  }, { signal });
+
+  return () => {
+    abort.abort();
+    clearInterval(hello);
+    cancelAnimationFrame(raf);
+    clearTimeout(toastTimer);
+    clearTimeout(idleTimer);
+    cancelNext();
+    if (document.fullscreenElement === box) document.exitFullscreen().catch(() => {});
+    save();
+  };
+}
+
+mount();

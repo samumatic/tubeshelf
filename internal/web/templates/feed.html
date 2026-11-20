@@ -1,0 +1,83 @@
+{{define "main"}}
+<div class="page-head">
+  {{if .ChannelID}}
+  <div class="channel-head">
+    <span class="avatar" data-initial="{{initial .ChannelTitle}}">{{if .ChannelAvatar}}<img src="/avatar/{{.ChannelID}}" alt="" width="56" height="56">{{end}}</span>
+    <div><p class="eyebrow">Channel</p><h1 class="page-title">{{or .ChannelTitle .ChannelID}}</h1></div>
+  </div>
+  <div class="row">
+    <a class="button" href="https://www.youtube.com/channel/{{.ChannelID}}" target="_blank" rel="noopener">{{template "i-external"}} Open on YouTube</a>
+    {{if .Subscribed}}<form method="post" action="/channels/{{.ChannelID}}/delete"><input type="hidden" name="next" value="/"><button class="button" data-confirm="Unsubscribe from {{or .ChannelTitle .ChannelID}}?">Unsubscribe</button></form>
+    {{else}}<form method="post" action="/channels"><input type="hidden" name="channel" value="{{.ChannelID}}"><button class="button primary">Subscribe</button></form>{{end}}
+  </div>
+  {{if and .Subscribed .Lists}}<div class="chips channel-lists" role="group" aria-label="Lists with this channel"><span class="muted">In lists:</span>{{range .Lists}}
+    <form method="post" action="/lists/{{.ID}}/channels" data-toggle="list">
+      <input type="hidden" name="channel" value="{{$.ChannelID}}"><input type="hidden" name="on" value="{{if index $.InList .ID}}0{{else}}1{{end}}">
+      <button class="chip small list-chip" aria-pressed="{{index $.InList .ID}}" title="{{if index $.InList .ID}}In {{.Name}}: click to take out{{else}}Add to {{.Name}}{{end}}">{{.Name}}</button>
+    </form>{{end}}</div>{{end}}
+  {{else}}
+  <div><p class="eyebrow">{{if .Search}}Search results{{else}}Your subscriptions{{end}}</p>
+  <h1 class="page-title">{{if .Search}}“{{.Search}}”{{else}}Feed{{end}}</h1></div>
+  <form class="search" action="/" role="search">
+    {{template "i-search"}}
+    <label class="sr" for="feed-search">Search the feed</label>
+    <input id="feed-search" type="search" name="q" value="{{.Search}}" placeholder="Search videos and channels" data-search>
+  </form>
+  {{end}}
+</div>
+{{if or .Videos (ne .Subs 0)}}
+<div class="toolbar">
+  {{if or .Lists .ChannelID .Search}}<div class="chips tabs" role="group" aria-label="Lists">
+    <a class="chip" href="{{query .Q "list" ""}}" {{if not .ListID}}aria-current="true"{{end}}>All</a>
+    {{range .Lists}}<a class="chip" href="{{query $.Q "list" (print .ID)}}" {{if eq (print .ID) $.ListID}}aria-current="true"{{end}}>{{.Name}}</a>{{end}}
+    {{if or .ChannelID .Search}}<a class="chip clear" href="/">Clear filter ×</a>{{end}}
+  </div>{{end}}
+  <form class="chips filters" method="post" action="/account/preferences" aria-label="Filters">
+    {{template "toggle" (toggle "hide_shorts" (print "Shorts" (or .HiddenShorts "")) .Set)}}
+    {{template "toggle" (toggle "hide_live" "Live" .Set)}}
+    {{template "toggle" (toggle "hide_members" "Members" .Set)}}
+    {{template "toggle" (toggle "hide_watched" "Watched" .Set)}}
+    <span class="sep"></span>
+    <span class="segmented" role="group" aria-label="Sort">
+      <button name="sort" value="newest" aria-pressed="{{ne .Set.sort "oldest"}}">Newest</button><button name="sort" value="oldest" aria-pressed="{{eq .Set.sort "oldest"}}">Oldest</button>
+    </span>
+    <span class="segmented" role="group" aria-label="Layout">
+      <button name="view" value="grid" aria-pressed="{{ne .Set.view "list"}}" title="Grid">{{template "i-grid"}}<span class="sr">Grid</span></button><button name="view" value="list" aria-pressed="{{eq .Set.view "list"}}" title="List">{{template "i-list"}}<span class="sr">List</span></button>
+    </span>
+  </form>
+</div>
+{{end}}
+{{if .Videos}}
+{{with .Continue}}<section class="continue" aria-labelledby="continue-h">
+  <h2 class="day" id="continue-h">Continue watching</h2>
+  <div class="videos">{{range .}}{{template "card" (card . $.Set)}}{{end}}</div>
+</section>{{end}}
+<div id="feed" class="videos">{{template "items" .}}</div>
+{{else}}
+<div class="empty" {{if .Pending}}data-reload="4"{{end}}>
+  {{if eq .Subs 0}}
+    <h2>Your shelf is empty</h2>
+    <p>Follow YouTube channels here and their new videos show up in this feed, newest first. You don't need a Google account.</p>
+    <p class="row center"><a class="button primary" href="/channels">Add channels</a><a class="button" href="/channels/import">Import from YouTube</a></p>
+  {{else if .Pending}}
+    <h2>Fetching videos…</h2>
+    <p>{{.Pending}} of {{.Subs}} channels are being fetched for the first time. This page reloads on its own.</p>
+  {{else}}
+    {{if .Search}}<h2>No videos match “{{.Search}}”</h2>
+    <p>Try another word, or search all of YouTube for it.</p>
+    <p class="row center"><a class="button" href="/">Clear search</a><a class="button" href="https://www.youtube.com/results?search_query={{.Search}}" target="_blank" rel="noopener">{{template "i-external"}} Search YouTube</a></p>
+    {{else}}<h2>Nothing to show</h2>
+    <p>Every video is hidden by the filters above. Turn one off to see more.</p>{{end}}
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+{{/* toggle expects {Key, Label, On}, where On means the kind is hidden: a chip that is "on" while the kind is shown */}}
+{{define "toggle"}}<button class="chip" name="{{.Key}}" value="{{if .On}}0{{else}}1{{end}}" aria-pressed="{{not .On}}" title="{{if .On}}Show{{else}}Hide{{end}} {{.Label}}">{{.Label}}</button>{{end}}
+
+{{define "items"}}
+{{range .Groups}}{{if .Label}}<h2 class="day">{{.Label}} <small>{{len .Videos}}</small></h2>{{end}}
+{{range .Videos}}{{template "card" (card . $.Set $.Ctx)}}{{end}}{{end}}
+{{if .Next}}<a id="more" class="more button" href="{{query .Q "before" .Next}}">Load more</a>{{else if .Videos}}<p class="feed-end muted">That's everything. Videos older than {{.Retention}} days are removed, except ones in Watch later or your history.</p>{{end}}
+{{end}}

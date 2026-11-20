@@ -1,0 +1,59 @@
+{{define "title"}}Sign-in · {{.Brand.Name}}{{end}}
+{{define "provider-fields"}}
+<div class="fields">
+  <label>Name <input name="name" value="{{.Name}}" required placeholder="Pocket ID">
+    <small class="hint">Shown on the button: “Sign in with …”.</small></label>
+  <label>Issuer URL <input name="issuer" type="url" value="{{.Issuer}}" placeholder="https://id.example.com" required>
+    <small class="hint">The provider's base address. Checked when you save.</small></label>
+  <label>Client ID <input name="client_id" value="{{.ClientID}}" required autocomplete="off">
+    <small class="hint">From the app or client you created at the provider.</small></label>
+  <label>Client secret <input name="client_secret" type="password" autocomplete="off" {{if .ID}}placeholder="unchanged"{{else}}required{{end}}>
+    <small class="hint">{{if .ID}}Leave empty to keep the stored one.{{else}}Stored encrypted.{{end}}</small></label>
+  <label>Scopes <input name="scopes" value="{{or .Scopes "openid profile email"}}">
+    <small class="hint">Add <code>groups</code> if you use an admin group.</small></label>
+  <label>Group claim <input name="group_claim" value="{{.GroupClaim}}" placeholder="groups">
+    <small class="hint">The token field that lists a person's groups.</small></label>
+  <label>Admin group <input name="admin_group" value="{{.AdminGroup}}" placeholder="tubeshelf-admins">
+    <small class="hint">Leave empty to manage admins under Users. If set, people signing in through this provider without the group lose admin rights.</small></label>
+</div>
+<label class="check"><input type="checkbox" role="switch" name="auto_provision" value="1" {{if .AutoProvision}}checked{{end}}> Create an account for anyone the provider lets in <small class="muted">· off: only people with an account here can sign in</small></label>
+<label class="check"><input type="checkbox" role="switch" name="enabled" value="1" {{if or .Enabled (not .ID)}}checked{{end}}> Offer it on the sign-in page</label>
+{{end}}
+{{define "main"}}
+<p class="eyebrow">Administration</p>
+<h1 class="page-title">Sign-in</h1>
+<div class="stack">
+  <form class="panel" method="post" action="/admin/settings">
+    <h2>Accounts</h2>
+    <label class="check"><input type="hidden" name="public_registration" value="0"><input type="checkbox" role="switch" name="public_registration" value="1" {{if eq .Instance.public_registration "1"}}checked{{end}}> Anyone who can open this site can create an account</label>
+    <label class="check"><input type="hidden" name="oidc_only" value="0"><input type="checkbox" role="switch" name="oidc_only" value="1" {{if eq .Instance.oidc_only "1"}}checked{{end}} {{if not .Providers}}disabled{{end}}> Sign in only through a login provider (no passwords)</label>
+    {{if not .Providers}}<p class="hint">Add a login provider below first.</p>{{end}}
+    <p><button class="button primary">Save</button></p>
+  </form>
+
+  <div class="panel">
+    <h2>Login providers (OIDC)</h2>
+    <p class="muted">Let people sign in with an account they already have, for example at Pocket ID, Authentik, Authelia, Keycloak or Google.</p>
+    <p>Redirect URI to enter at the provider:</p>
+    <div class="row copy-row"><input readonly value="{{.Callback}}" aria-label="Redirect URI" data-copy-source><button type="button" class="button" data-copy>Copy</button></div>
+    {{if .LocalURL}}<p class="hint warn-text">This address only works on this computer. Set <code>TUBESHELF_URL</code> to the address people use (for example https://tube.example.com) so the provider can send them back.</p>{{end}}
+    {{range .Providers}}
+    <details class="provider"><summary>{{.Name}} {{if not .Enabled}}<span class="tag">off</span>{{end}}{{with .AdminGroup}} <span class="tag">admins: {{.}}</span>{{end}}</summary>
+      <form method="post" action="/admin/providers"><input type="hidden" name="id" value="{{.ID}}">{{template "provider-fields" .}}<p><button class="button">Save</button></p></form>
+      <form method="post" action="/admin/providers/{{.ID}}/delete"><button class="link danger" data-confirm="Delete the login provider “{{.Name}}”? People who only sign in through it lose access.">Delete provider</button></form>
+    </details>{{end}}
+    <details class="provider" {{if not .Providers}}open{{end}}><summary>Add a provider</summary>
+      <form method="post" action="/admin/providers" data-provider-form>
+        <label>Start from <select data-preset>
+          <option value="">Anything else</option>
+          <option value="Pocket ID|openid profile email groups|groups">Pocket ID</option>
+          <option value="Authentik|openid profile email|groups">Authentik</option>
+          <option value="Authelia|openid profile email groups|groups">Authelia</option>
+          <option value="Keycloak|openid profile email|groups">Keycloak</option>
+          <option value="Google|openid profile email|">Google</option>
+        </select></label>
+        {{template "provider-fields" (newProvider)}}<p><button class="button primary">Add provider</button></p></form>
+    </details>
+  </div>
+</div>
+{{end}}

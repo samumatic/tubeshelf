@@ -1,0 +1,12 @@
+{{define "title"}}Set up · {{.Brand.Name}}{{end}}
+{{define "main"}}{{template "auth-shell" .}}{{end}}
+{{define "auth-title"}}Set up TubeShelf{{end}}
+{{define "auth"}}
+<p>This account becomes the administrator.</p>
+<form method="post" action="/setup">
+  <label>Email <input type="email" name="email" required autofocus autocomplete="username"></label>
+  <label><span>Name<span class="optional">Optional</span></span> <input name="name" maxlength="80" autocomplete="name" aria-label="Name"></label>
+  <label>Password <input type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+  <button class="button primary wide">Create admin account</button>
+</form>
+{{end}}

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lint, typecheck, test, build
+    name: Vet, test, build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tag
@@ -28,28 +28,17 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Vet
+        run: go vet ./...
 
       - name: Test
-        run: npm test
+        run: go test -race ./...
+
+      - name: Check dependencies for known vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Build
-        run: npm run build
+        run: CGO_ENABLED=0 go build -trimpath -o /dev/null .
 
   build-and-push:
     needs: verify
@@ -61,13 +50,13 @@ jobs:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
-      - name: Get version from package.json
+      - name: Get version from VERSION
         id: version
         run: |
-          VERSION=$(jq -r '.version' package.json)
+          VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building from tag: ${{ github.ref_name }}"
-          echo "Package.json version: $VERSION"
+          echo "VERSION file: $VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0

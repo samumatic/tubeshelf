@@ -1,9 +1,0 @@
-#!/bin/sh
-# TubeShelf CLI wrapper
-# Usage: tubeshelf-cli <command> [args]
-
-# Set CLI mode to suppress migration logs
-export CLI_MODE=true
-
-# Execute the CLI command without npm/npx
-exec node /app/bin/cli.js "$@"

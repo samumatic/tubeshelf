@@ -1,0 +1,216 @@
+{{define "layout"}}{{/* The watch page folds the sidebar for a bigger video, without changing the saved choice. */}}{{$rail := or (eq .Set.sidebar "collapsed") (eq .Page "watch")}}<!doctype html>
+<html lang="en" data-theme="{{.Set.theme}}" class="preload {{if $rail}}rail {{end}}{{if eq .Set.theater "1"}}theater {{end}}{{if ne .Set.text_size "normal"}}text-{{.Set.text_size}} {{end}}sw-{{.Set.sidebar_width}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="{{if eq .Set.theme "dark"}}dark{{else if eq .Set.theme "light"}}light{{else}}dark light{{end}}">
+<title>{{block "title" .}}{{.Brand.Name}}{{end}}</title>
+<link rel="stylesheet" href="/static/app.css?v={{.AssetV}}">
+<link rel="stylesheet" href="{{.Brand.Theme}}">
+{{if .Brand.Logo}}<link rel="icon" href="{{.Brand.Logo}}">{{else}}<link rel="icon" href="/static/icon.svg" type="image/svg+xml">{{end}}
+<link rel="manifest" href="/static/manifest.json">
+<script type="module" src="/static/app.js?v={{.AssetV}}"></script>
+{{block "head" .}}{{end}}
+</head>
+<body class="view-{{.Set.view}} page-{{.Page}}">
+{{if .User}}
+<div class="shell">
+  {{if eq .Brand.Layout "backdrop"}}<img class="backdrop" src="{{.Brand.Background}}" alt="" fetchpriority="high">{{end}}
+  <a class="skip" href="#main">Skip to content</a>
+  <aside class="sidebar">
+    <div class="brand-row">
+      <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>
+      <button type="button" class="icon-button" data-palette aria-label="Search and jump (Cmd or Ctrl + K)" data-tip="Search" data-tip-key="⌘K">{{template "i-search"}}</button>
+    </div>
+    <nav aria-label="Main">
+      <h2 class="nav-heading">Watch</h2>
+      <a class="nav-item" data-tip="Feed" href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+      <a class="nav-item" data-tip="Watch later" href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Watch later</a>
+      <a class="nav-item" data-tip="History" href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+      <h2 class="nav-heading">Library</h2>
+      <a class="nav-item" data-tip="Channels" href="/channels" {{if eq .Page "channels"}}aria-current="page"{{end}}>{{template "i-channels"}}Channels</a>
+      <a class="nav-item" data-tip="Lists" href="/lists" {{if eq .Page "lists"}}aria-current="page"{{end}}>{{template "i-list"}}Lists</a>
+      {{range .NavLists}}<a class="nav-item nav-sub" href="/?list={{.ID}}" {{if and (eq $.Page "feed") (eq (print .ID) (print $.ListID))}}aria-current="page"{{end}}>{{.Name}}<small>{{.Channels}}</small></a>{{end}}
+      <a class="nav-item" data-tip="Import &amp; export" href="/channels/import" {{if eq .Page "import"}}aria-current="page"{{end}}>{{template "i-import"}}Import &amp; export</a>
+      {{if .User.IsAdmin}}<h2 class="nav-heading">Administration</h2>
+      <a class="nav-item" data-tip="Status" href="/admin" {{if eq .Page "admin"}}aria-current="page"{{end}}>{{template "i-pulse"}}Status{{if .AdminAlert}}<span class="nav-dot" title="{{.AdminAlert}} channels keep failing"><span class="sr">, {{.AdminAlert}} channels keep failing</span></span>{{end}}</a>
+      <a class="nav-item" data-tip="Users" href="/admin/users" {{if eq .Page "admin-users"}}aria-current="page"{{end}}>{{template "i-users"}}Users</a>
+      <a class="nav-item" data-tip="Sign-in" href="/admin/sign-in" {{if eq .Page "admin-signin"}}aria-current="page"{{end}}>{{template "i-key"}}Sign-in</a>
+      <a class="nav-item" data-tip="Instance" href="/admin/instance" {{if eq .Page "admin-instance"}}aria-current="page"{{end}}>{{template "i-server"}}Instance</a>
+      <a class="nav-item" data-tip="Branding" href="/admin/appearance" {{if eq .Page "admin-appearance"}}aria-current="page"{{end}}>{{template "i-theme"}}Branding</a>{{end}}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="foot-slot">
+        <p class="version" title="TubeShelf {{.Version}}">TubeShelf {{.Release}}</p>
+        <button type="button" class="rail-avatar" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" data-tip="{{or .User.Name .User.Email}}"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
+      </div>
+      <div class="account">
+        <button type="button" class="account-button" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span class="who">{{or .User.Name .User.Email}}</span></button>
+        {{$label := "Collapse sidebar"}}{{if $rail}}{{$label = "Expand sidebar"}}{{end}}
+        <form class="collapse-toggle" method="post" action="/account/preferences" data-sidebar><input type="hidden" name="sidebar" value="{{if $rail}}expanded{{else}}collapsed{{end}}"><button class="icon-button" aria-label="{{$label}}" data-tip="{{$label}}">{{template "i-sidebar"}}</button></form>
+      </div>
+    </div>
+    <div class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="208" aria-valuemax="400" aria-valuenow="{{.Set.sidebar_width}}" tabindex="0"></div>
+  </aside>
+  <div class="tip" id="tip" popover="manual" role="tooltip"></div>
+  <div class="content">
+    <header class="phone-bar">
+      <a class="brand" href="/">{{template "logo" .}}{{.Brand.Name}}</a>
+      <button type="button" class="me" popovertarget="account-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span></button>
+    </header>
+    <main id="main">
+      {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
+      {{if .Msg}}<p class="flash" role="status">{{.Msg}}{{with .Go}} <a href="{{.URL}}">{{.Label}}</a>{{end}}</p>{{end}}
+      {{template "main" .}}
+    </main>
+  </div>
+  <nav class="phone-nav" aria-label="Main">
+    <a href="/" {{if eq .Page "feed"}}aria-current="page"{{end}}>{{template "i-feed"}}Feed</a>
+    <a href="/later" {{if eq .Page "later"}}aria-current="page"{{end}}>{{template "i-clock"}}Later</a>
+    <a href="/history" {{if eq .Page "history"}}aria-current="page"{{end}}>{{template "i-history"}}History</a>
+    <a href="/library" {{if eq .Page "library" "channels" "lists" "import" "admin" "admin-users" "admin-signin" "admin-instance" "admin-appearance"}}aria-current="page"{{end}}>{{template "i-library"}}Library</a>
+  </nav>
+  <button type="button" class="phone-search" data-palette aria-label="Search and jump">{{template "i-search"}}</button>
+  <div class="popmenu account-menu" id="account-menu" popover role="menu" aria-label="Account">
+    <div class="menu-head"><span class="avatar" data-initial="{{initial (or .User.Name .User.Email)}}"></span><span><strong>{{or .User.Name .User.Email}}</strong>{{if .User.Name}}<small>{{.User.Email}}</small>{{end}}</span></div>
+    <hr>
+    <a role="menuitem" href="/account" {{if eq .Page "account"}}aria-current="page"{{end}}>{{template "i-user"}}My account</a>
+    <a role="menuitem" href="/account/preferences" {{if eq .Page "preferences"}}aria-current="page"{{end}}>{{template "i-settings"}}Preferences</a>
+    <a role="menuitem" href="/account/keys" {{if eq .Page "keys"}}aria-current="page"{{end}}>{{template "i-key"}}API keys</a>
+    {{if .User.IsAdmin}}<a role="menuitem" href="/admin" {{if hasPrefix .Page "admin"}}aria-current="page"{{end}}>{{template "i-server"}}Administration</a>{{end}}
+    <button type="button" role="menuitem" class="keys-item" data-show-keys>{{template "i-keyboard"}}Keyboard shortcuts<kbd>?</kbd></button>
+    <button type="button" role="menuitem" class="has-sub" popovertarget="theme-menu" popovertargetaction="show" aria-haspopup="menu" aria-expanded="false">{{template "i-theme"}}<span>Appearance<small>{{.Set.theme}}</small></span>{{template "i-chevron"}}</button>
+    <div class="popmenu theme-menu" id="theme-menu" popover role="menu" aria-label="Appearance">
+      <form method="post" action="/account/preferences">{{range list "light" "dark" "system"}}<button role="menuitemradio" name="theme" value="{{.}}" aria-checked="{{eq . $.Set.theme}}">{{.}}{{template "i-check"}}</button>{{end}}</form>
+    </div>
+    <hr>
+    <form method="post" action="/logout"><button role="menuitem">{{template "i-logout"}}Sign out</button></form>
+  </div>
+</div>
+<dialog class="palette" id="palette" aria-label="Command palette">
+  <input type="text" placeholder="Go to a page, list or channel, or search videos" aria-label="Search and jump" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list">
+  <ul role="listbox" id="palette-list" aria-label="Results">
+    <li class="group" role="presentation">Watch</li>
+    <li data-k="feed home"><a href="/">{{template "i-feed"}}Feed</a></li>
+    <li data-k="later saved"><a href="/later">{{template "i-clock"}}Watch later</a></li>
+    <li data-k="history watched"><a href="/history">{{template "i-history"}}History</a></li>
+    <li class="group" role="presentation">Library</li>
+    <li data-k="channels subscriptions subscribe unsubscribe"><a href="/channels">{{template "i-channels"}}Channels</a></li>
+    <li data-k="lists manage"><a href="/lists">{{template "i-list"}}Lists</a></li>
+    <li data-k="import export opml takeout"><a href="/channels/import">{{template "i-import"}}Import &amp; export</a></li>
+    <li class="group" role="presentation">Account</li>
+    <li data-k="account profile name email password delete"><a href="/account">{{template "i-user"}}My account</a></li>
+    <li data-k="preferences settings theme shorts sponsorblock player layout"><a href="/account/preferences">{{template "i-settings"}}Preferences</a></li>
+    <li data-k="api keys token"><a href="/account/keys">{{template "i-key"}}API keys</a></li>
+    {{if .User.IsAdmin}}<li class="group" role="presentation">Administration</li>
+    <li data-k="admin status fetcher refresh failing"><a href="/admin">{{template "i-pulse"}}Status</a></li>
+    <li data-k="admin users accounts"><a href="/admin/users">{{template "i-users"}}Users</a></li>
+    <li data-k="admin sign-in login oidc providers registration"><a href="/admin/sign-in">{{template "i-key"}}Sign-in</a></li>
+    <li data-k="admin instance refresh retention fetch"><a href="/admin/instance">{{template "i-server"}}Instance</a></li>
+    <li data-k="admin appearance branding logo background color radius name"><a href="/admin/appearance">{{template "i-theme"}}Branding</a></li>
+    <li data-k="admin refresh check fetch update all channels now"><a href="/admin" data-post="/admin/refresh">{{template "i-pulse"}}Check all channels now<small>Action</small></a></li>
+    <li data-k="admin add user invite account"><a href="/admin/users?add=1#add">{{template "i-users"}}Add a user<small>Action</small></a></li>{{end}}
+    {{if .NavLists}}<li class="group" role="presentation">Lists</li>{{end}}
+    {{range .NavLists}}<li data-k="{{.Name}} list"><a href="/?list={{.ID}}"><span class="dot"></span>{{.Name}}<small>List</small></a></li>{{end}}
+  </ul>
+  <footer><button type="button" class="button palette-close" data-palette-close>Close</button><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></footer>
+</dialog>
+<dialog class="keys-dialog" id="site-keys" aria-label="Keyboard shortcuts">
+  <h2>Keyboard shortcuts</h2>
+  <dl>
+    <dt><kbd>⌘</kbd><kbd>K</kbd></dt><dd>Search and jump anywhere</dd>
+    <dt><kbd>/</kbd></dt><dd>Search the feed</dd>
+    <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next or previous video in the feed</dd>
+    <dt><kbd>o</kbd> <kbd>enter</kbd></dt><dd>Open the selected video</dd>
+    <dt><kbd>l</kbd></dt><dd>Add to or remove from Watch later</dd>
+    <dt><kbd>w</kbd></dt><dd>Mark as watched or unwatched</dd>
+    <dt><kbd>?</kbd></dt><dd>This list (the video page has its own)</dd>
+  </dl>
+  <form method="dialog"><button class="button">Close</button></form>
+</dialog>
+{{else}}
+<a class="skip" href="#main">Skip to content</a>
+<img class="auth-bg" src="{{.Brand.Background}}" alt="">
+<main class="auth-page" id="main">
+  {{if .Err}}<p class="flash error" role="alert">{{.Err}}</p>{{end}}
+  {{template "main" .}}
+</main>
+{{end}}
+</body>
+</html>{{end}}
+
+{{define "i-search"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>{{end}}
+{{define "i-feed"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9.500 4.500 2.500-4.500 2.500z"/></svg>{{end}}
+{{define "i-history"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.500-5.800"/><path d="M4 4v4h4"/><path d="M12 8v4l2.500 2"/></svg>{{end}}
+{{define "i-channels"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.500"/><path d="M3 19c.600-3 3-4.500 6-4.500s5.400 1.500 6 4.500"/><path d="M16 6a3 3 0 0 1 0 6M18.500 15c1.500.700 2.300 2 2.500 4"/></svg>{{end}}
+{{define "i-settings"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>{{end}}
+{{define "i-logout"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 8l4 4-4 4M19 12H9"/></svg>{{end}}
+
+{{define "i-theater"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/></svg>{{end}}
+{{define "i-plus"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>{{end}}
+{{define "i-grid"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>{{end}}
+{{define "i-list"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>{{end}}
+{{define "i-import"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>{{end}}
+{{define "i-pulse"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>{{end}}
+{{define "i-users"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5"/></svg>{{end}}
+{{define "i-key"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2"/></svg>{{end}}
+{{define "i-server"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></svg>{{end}}
+{{define "i-library"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v16M9.5 4v16"/><path d="m14 5 3.8-1 3 15.5-3.8 1z"/></svg>{{end}}
+{{define "i-sidebar"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/><path class="chevron" d="M15.5 10l-2 2 2 2"/></svg>{{end}}
+{{define "i-user"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.5 1.7-2.2 3-2.2s2.5.7 3 2.2M15 10h3M15 13h3"/></svg>{{end}}
+{{define "i-theme"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>{{end}}
+{{define "i-chevron"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>{{end}}
+{{define "i-check"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-clock"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>{{end}}
+{{define "i-play"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-play" d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>{{end}}
+{{define "i-pause"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-pause" d="M8 5.5v13M16 5.5v13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-back"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor">10</text></svg>{{end}}
+{{define "i-forward"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor">10</text></svg>{{end}}
+{{define "i-volume"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-volume" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-muted"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-muted" d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-captions"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 10.3a2.3 2.3 0 1 0 0 3.4M17 10.3a2.3 2.3 0 1 0 0 3.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-keyboard"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-expand"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-expand" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-shrink"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-shrink" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+{{define "i-more"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>{{end}}
+{{define "i-refresh"}}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></svg>{{end}}
+{{define "i-external"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+
+{{/* card expects {V: Video, Set: user settings} */}}
+{{define "card"}}{{$v := .V}}
+<article class="card{{if $v.Watched}} watched{{end}}{{if $v.Later}} later{{end}}" data-id="{{$v.ID}}">
+  <a class="thumb" {{if eq .Set.open_on_youtube "1"}}href="https://www.youtube.com/watch?v={{$v.ID}}" target="_blank" rel="noopener"{{else}}href="/watch/{{$v.ID}}{{.Ctx}}"{{end}} tabindex="-1" aria-hidden="true">
+    <img src="/thumb/{{$v.ID}}.jpg" alt="" loading="lazy" width="320" height="180">
+    {{if eq $v.Kind "live"}}<span class="badge live">Live</span>
+    {{else if eq $v.Kind "upcoming"}}<span class="badge">Upcoming</span>
+    {{else if eq $v.Kind "short"}}<span class="badge">Short{{if $v.Duration}} · {{dur $v.Duration}}{{end}}</span>
+    {{else if $v.Duration}}<span class="badge">{{dur $v.Duration}}</span>{{end}}
+    {{if and (not $v.Watched) (pct $v.Progress $v.Duration)}}<progress value="{{pct $v.Progress $v.Duration}}" max="100"></progress>{{end}}
+  </a>
+  <div class="meta">
+    <a class="avatar" href="/?channel={{$v.ChannelID}}" tabindex="-1" aria-hidden="true" data-initial="{{initial $v.Channel}}">{{if $v.HasAvatar}}<img src="/avatar/{{$v.ChannelID}}" alt="" loading="lazy" width="36" height="36">{{end}}</a>
+    <div class="text">
+      <h3><a class="title" {{if eq .Set.open_on_youtube "1"}}href="https://www.youtube.com/watch?v={{$v.ID}}" target="_blank" rel="noopener"{{else}}href="/watch/{{$v.ID}}{{.Ctx}}"{{end}}>{{$v.Title}}</a></h3>
+      <p>{{if $v.ChannelID}}<a href="/?channel={{$v.ChannelID}}">{{$v.Channel}}</a>{{else}}{{$v.Channel}}{{end}} · <time datetime="{{iso $v.Published}}" title="{{date $v.Published}}">{{ago $v.Published}}</time>{{if $v.Members}} · Members only{{end}}</p>
+    </div>
+  </div>
+  {{/* Watched sits in the corner: a watched mark stays shown, and the unset Later beside it is invisible. */}}
+  <div class="actions">
+    <form method="post" action="/videos/{{$v.ID}}/later" data-toggle="later">
+      <input type="hidden" name="on" value="{{if $v.Later}}0{{else}}1{{end}}">
+      <button title="{{if $v.Later}}Remove from Later{{else}}Save for later{{end}}" aria-pressed="{{$v.Later}}">{{template "i-clock"}}<span class="sr">Later</span></button>
+    </form>
+    <form method="post" action="/videos/{{$v.ID}}/watched" data-toggle="watched">
+      <input type="hidden" name="on" value="{{if $v.Watched}}0{{else}}1{{end}}">
+      <button title="{{if $v.Watched}}Mark as not watched{{else}}Mark as watched{{end}}" aria-pressed="{{$v.Watched}}">{{template "i-check"}}<span class="sr">Watched</span></button>
+    </form>
+  </div>
+</article>{{end}}
+
+{{define "logo"}}<span class="logo{{if .Brand.Logo}} custom{{end}}">{{if .Brand.Logo}}<img src="{{.Brand.Logo}}" alt="">{{else}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h18v2H3zM4 9h3v7H4zm4.5-3.5h3V16h-3zM13.5 7.5l7 4.25-7 4.25z"/></svg>{{end}}</span>{{end}}
+{{define "auth-shell"}}
+<section class="auth">
+  {{template "logo" .}}
+  <h1>{{template "auth-title" .}}</h1>
+  {{template "auth" .}}
+</section>{{end}}

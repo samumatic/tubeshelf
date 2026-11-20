@@ -1,0 +1,16 @@
+{{define "title"}}Welcome · {{.Brand.Name}}{{end}}
+{{define "main"}}{{template "auth-shell" .}}{{end}}
+{{define "auth-title"}}{{if .Invited}}Welcome{{with .Invited.Name}}, {{.}}{{end}}{{else}}Invite link{{end}}{{end}}
+{{define "auth"}}
+{{with .Invited}}
+<p class="muted">Choose a password for <strong>{{.Email}}</strong>.</p>
+<form method="post" action="/welcome">
+  <input type="hidden" name="t" value="{{$.Token}}">
+  <input type="hidden" name="username" value="{{.Email}}" autocomplete="username">
+  <label>Password <input type="password" name="password" required minlength="8" maxlength="72" autofocus autocomplete="new-password"></label>
+  <button class="button primary wide">Start watching</button>
+</form>
+{{else}}
+<p><a class="button wide" href="/login">Go to sign in</a></p>
+{{end}}
+{{end}}

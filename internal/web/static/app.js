@@ -1,0 +1,739 @@
+// Progressive enhancement: every form here also works without this file.
+
+const still = matchMedia('(prefers-reduced-motion: reduce)');
+const ease = 'cubic-bezier(0.2, 0, 0, 1)';
+// Fade an element out, then drop it. The timer removes it even if the tab is hidden and the animation never ends.
+function leave(el) {
+  if (still.matches) return el.remove();
+  el.animate({ opacity: [1, 0], scale: [1, 0.96] }, { duration: 200, easing: ease, fill: 'forwards' });
+  setTimeout(() => el.remove(), 200);
+}
+
+// The first page after signing in plays the shell reveal; the sign-in pages leave the mark.
+try {
+  if (document.querySelector('.auth-page')) sessionStorage.setItem('reveal', '1');
+  else if (sessionStorage.getItem('reveal')) {
+    sessionStorage.removeItem('reveal');
+    document.documentElement.classList.add('app-reveal');
+  }
+} catch { /* storage blocked: no reveal */ }
+
+// Transitions stay off until the loaded page has been drawn once (see .preload in app.css).
+requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('preload')));
+
+// A flash message rides in the URL once: drop it, so a reload or a shared link does not repeat it.
+{
+  const u = new URL(location.href);
+  if (u.searchParams.has('msg') || u.searchParams.has('err')) {
+    for (const k of ['msg', 'err', 'fs', 'go', 'golabel', 'typed', 'failed', 'failedn']) u.searchParams.delete(k);
+    history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+  }
+}
+
+const post = (form, submitter) =>
+  fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form, submitter)), headers: { 'X-Requested-With': 'fetch' } });
+
+function offline() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.querySelector('.flash.offline')?.remove();
+  const p = document.createElement('p');
+  p.className = 'flash error offline';
+  p.setAttribute('role', 'alert');
+  p.textContent = 'No connection: nothing was changed. Try again when you are back online.';
+  main.prepend(p);
+  addEventListener('online', () => p.remove(), { once: true });
+}
+
+// Toggle buttons (watched, later, list membership) update in place.
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('form[data-toggle]');
+  if (!form) return;
+  e.preventDefault();
+  // One request at a time: a second click before the reply would send the same value and flip the button back.
+  if (form.dataset.busy) return;
+  form.dataset.busy = '1';
+  const on = form.elements.on;
+  const res = await post(form).catch(() => null);
+  delete form.dataset.busy;
+  // Offline: a reload would replace the page with the browser's error page and lose the scroll position.
+  if (!res) return offline();
+  if (!res.ok) return location.reload();
+  const active = on.value === '1';
+  on.value = active ? '0' : '1';
+  const button = form.querySelector('button');
+  button.setAttribute('aria-pressed', active);
+  if (!still.matches) button.querySelector('svg')?.animate({ scale: [1, 1.3, 1] }, { duration: 280, easing: ease });
+  const card = form.closest('.card');
+  if (card) card.classList.toggle(form.dataset.toggle, active);
+  const removed = card && !active && document.body.classList.contains('page-later') && form.dataset.toggle === 'later';
+  if (removed) leave(card);
+  const words = { later: ['Added to Watch later', 'Removed from Watch later'], watched: ['Marked as watched', 'Marked as not watched'] }[form.dataset.toggle];
+  if (words && !form.dataset.undoing) {
+    snack(words[active ? 0 : 1], () => {
+      if (removed) return post(form).then(() => location.reload());
+      form.dataset.undoing = '1';
+      form.requestSubmit();
+    });
+  }
+  delete form.dataset.undoing;
+});
+
+// A short message at the bottom of the screen, with an Undo button when undo is given.
+let snackTimer;
+function snack(text, undo) {
+  let el = document.getElementById('snack');
+  if (!el) {
+    el = Object.assign(document.createElement('div'), { id: 'snack', className: 'snack' });
+    el.setAttribute('role', 'status');
+    document.body.append(el);
+  }
+  el.replaceChildren(Object.assign(document.createElement('span'), { textContent: text }));
+  if (undo) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Undo' });
+    b.addEventListener('click', () => { el.hidden = true; undo(); });
+    el.append(b);
+  }
+  el.hidden = false;
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(() => { el.hidden = true; }, 5000);
+}
+
+// Actions that stay on the page (Refresh now): post in the background, say what happened.
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('form[data-inline]');
+  if (!form) return;
+  e.preventDefault();
+  form.closest('[popover]')?.hidePopover();
+  const res = await post(form).catch(() => null);
+  if (!res) return offline();
+  const body = await res.json().catch(() => ({}));
+  snack(body.message || body.error || (res.ok ? 'Done.' : 'That did not work. Try again.'));
+});
+
+// Row menus open under their ⋯ button and close when the page scrolls.
+document.addEventListener('beforetoggle', (e) => {
+  const menu = e.target;
+  if (!menu.classList?.contains('row-menu') || e.newState !== 'open') return;
+  const b = document.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`).getBoundingClientRect();
+  const below = innerHeight - b.bottom > 120;
+  menu.style.left = Math.max(8, b.right - 220) + 'px';
+  menu.style.top = below ? b.bottom + 4 + 'px' : 'auto';
+  menu.style.bottom = below ? 'auto' : innerHeight - b.top + 4 + 'px';
+}, true);
+addEventListener('scroll', () => document.querySelectorAll('.row-menu:popover-open').forEach((m) => m.hidePopover()), { passive: true });
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-confirm]');
+  if (el && !confirm(el.dataset.confirm)) e.preventDefault();
+});
+
+// Validation: a field is checked when you leave it, not while you type, and
+// the message says what to do. The browser's own bubbles are switched off.
+const fieldName = (el) =>
+  (el.getAttribute('aria-label') || el.closest('label')?.firstChild?.textContent || 'value').trim().replace(/\s+/g, ' ').toLowerCase();
+function problem(el) {
+  const v = el.validity;
+  if (v.valid) return '';
+  if (el.type === 'checkbox') return 'Tick this box to continue.';
+  if (el.type === 'file') return 'Choose a file first.';
+  if (v.valueMissing) return `Enter the ${fieldName(el)}.`;
+  if (v.typeMismatch && el.type === 'email') return 'Enter an email address like name@example.com.';
+  if (v.typeMismatch && el.type === 'url') return 'Enter a full address that starts with https://.';
+  if (v.tooShort) return `Use at least ${el.minLength} characters (${el.value.length} so far).`;
+  if (v.rangeUnderflow || v.rangeOverflow || v.stepMismatch || v.badInput) return `Enter a whole number from ${el.min} to ${el.max}.`;
+  return el.validationMessage;
+}
+function validate(el) {
+  if (!el.willValidate || el.type === 'hidden') return true;
+  const text = problem(el);
+  const id = el.dataset.errorId;
+  let note = id && document.getElementById(id);
+  if (!text) {
+    note?.remove();
+    el.removeAttribute('aria-invalid');
+    el.removeAttribute('aria-describedby');
+    return true;
+  }
+  if (!note) {
+    note = document.createElement('span');
+    note.className = 'field-error';
+    note.id = el.dataset.errorId = 'err-' + Math.random().toString(36).slice(2, 8);
+    const label = el.closest('label');
+    if (label && !label.classList.contains('check')) label.append(note);
+    else (label || el.closest('.row') || el).after(note);
+    el.setAttribute('aria-describedby', note.id);
+  }
+  note.textContent = text;
+  el.setAttribute('aria-invalid', 'true');
+  return false;
+}
+for (const form of document.querySelectorAll('form[method="post"]')) form.noValidate = true;
+document.addEventListener('focusout', (e) => {
+  if (e.target.matches?.('input, select') && e.target.form?.noValidate && (e.target.value || e.target.hasAttribute('aria-invalid'))) validate(e.target);
+});
+// While typing, only clear an error that is already showing.
+document.addEventListener('input', (e) => {
+  if (e.target.getAttribute?.('aria-invalid') === 'true') validate(e.target);
+});
+
+// A form that navigates shows it is working until the next page arrives.
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (e.defaultPrevented) return;
+  if (form.noValidate) {
+    const bad = [...form.elements].filter((el) => !validate(el));
+    if (bad.length) {
+      e.preventDefault();
+      bad[0].focus();
+      bad[0].classList.remove('shake');
+      void bad[0].offsetWidth;
+      bad[0].classList.add('shake');
+      return;
+    }
+  }
+  if (form.matches('[data-toggle], [role="search"]')) return;
+  form.classList.add('busy');
+  (e.submitter || form.querySelector('button'))?.setAttribute('aria-busy', 'true');
+});
+window.addEventListener('pageshow', () =>
+  document.querySelectorAll('form.busy').forEach((f) => {
+    f.classList.remove('busy');
+    f.querySelector('[aria-busy]')?.removeAttribute('aria-busy');
+  }));
+
+// Command palette (Cmd/Ctrl+K): pages and lists are in the markup, channels load on first open.
+const palette = document.getElementById('palette');
+let openPalette = () => {};
+if (palette) {
+  const input = palette.querySelector('input');
+  const list = palette.querySelector('ul');
+  let loaded = false;
+  const visible = () => [...list.children].filter((li) => !li.hidden && !li.classList.contains('group'));
+  const group = (label) => {
+    const li = document.createElement('li');
+    li.className = 'group';
+    li.role = 'presentation';
+    li.textContent = label;
+    return li;
+  };
+  const select = (li) => {
+    list.querySelector('[aria-selected="true"]')?.removeAttribute('aria-selected');
+    li?.setAttribute('aria-selected', 'true');
+    if (li?.id) input.setAttribute('aria-activedescendant', li.id); else input.removeAttribute('aria-activedescendant');
+    li?.scrollIntoView({ block: 'nearest' });
+  };
+  let seq = 0;
+  const item = (href, label, kind, keywords) => {
+    const li = document.createElement('li');
+    li.role = 'option';
+    li.id = 'pal-' + ++seq;
+    const a = document.createElement('a');
+    const small = document.createElement('small');
+    a.href = href;
+    if (kind === 'Channel') a.append(Object.assign(document.createElement('span'), { className: 'dot' }));
+    a.append(label);
+    small.textContent = kind;
+    a.append(small);
+    li.append(a);
+    li.dataset.k = keywords;
+    return li;
+  };
+  let videoTimer, videoReq = 0;
+  const filter = () => {
+    const raw = input.value.trim();
+    const q = raw.toLowerCase();
+    for (const el of list.querySelectorAll('[data-search-item], [data-video-item]')) el.remove();
+    for (const li of list.children) li.hidden = q !== '' && (li.classList.contains('group') || !(li.dataset.k + ' ' + li.textContent).toLowerCase().includes(q));
+    if (q) {
+      const li = item('/?q=' + encodeURIComponent(raw), `Search the feed for “${raw}”`, 'Search', '');
+      li.dataset.searchItem = '';
+      // With no page or channel matching, Enter searches (the phone's search button relies on this).
+      visible().length ? list.append(li) : list.prepend(li);
+    }
+    select(visible()[0]);
+    clearTimeout(videoTimer);
+    if (raw.length < 2) return;
+    const mine = ++videoReq;
+    videoTimer = setTimeout(async () => {
+      const vids = await fetch('/api/videos?q=' + encodeURIComponent(raw)).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      if (mine !== videoReq || !vids.length) return;
+      const g = group('Videos');
+      g.dataset.videoItem = '';
+      const anchor = list.querySelector('[data-search-item]');
+      const rows = vids.map((v) => item('/watch/' + v.id, v.title, v.channel, ''));
+      for (const r of rows) r.dataset.videoItem = '';
+      anchor ? anchor.after(g, ...rows) : list.append(g, ...rows);
+      if (!list.querySelector('[aria-selected="true"]')) select(visible()[0]);
+    }, 180);
+  };
+  const open = async () => {
+    input.value = '';
+    palette.showModal();
+    filter();
+    if (loaded) return;
+    loaded = true;
+    const channels = await fetch('/api/subscriptions').then((r) => r.json()).catch(() => []);
+    if (channels.length) list.append(group('Channels'));
+    for (const c of channels) list.append(item('/?channel=' + encodeURIComponent(c.channelId), c.title, 'Channel', 'channel'));
+    filter();
+  };
+  for (const li of list.children) if (!li.classList.contains('group')) { li.role = 'option'; li.id = 'pal-' + ++seq; }
+  // Actions run as a POST, then show the page they belong to.
+  list.addEventListener('click', async (e) => {
+    const a = e.target.closest('a[data-post]');
+    if (!a) return;
+    e.preventDefault();
+    const res = await fetch(a.dataset.post, { method: 'POST', headers: { 'X-Requested-With': 'fetch' } }).catch(() => null);
+    location.href = res?.url || a.href;
+  });
+  openPalette = open;
+  for (const b of document.querySelectorAll('[data-palette]')) b.addEventListener('click', open);
+  input.addEventListener('input', filter);
+  palette.addEventListener('click', (e) => { if (e.target === palette || e.target.closest('[data-palette-close]')) palette.close(); });
+  palette.addEventListener('keydown', (e) => {
+    const rows = visible();
+    const i = rows.indexOf(list.querySelector('[aria-selected="true"]'));
+    if (e.key === 'ArrowDown') select(rows[Math.min(i + 1, rows.length - 1)]);
+    else if (e.key === 'ArrowUp') select(rows[Math.max(i - 1, 0)]);
+    else if (e.key === 'Enter') rows[i]?.querySelector('a').click();
+    else return;
+    e.preventDefault();
+  });
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      palette.open ? palette.close() : open();
+    }
+  });
+}
+
+// Account menu: arrow keys, the Appearance flyout on hover, and theme changes without leaving the page.
+const accountMenu = document.getElementById('account-menu');
+if (accountMenu) {
+  const themeMenu = document.getElementById('theme-menu');
+  const sub = accountMenu.querySelector('.has-sub');
+  const items = (menu) => [...menu.querySelectorAll('[role^="menuitem"]')].filter((el) => el.closest('[popover]') === menu);
+  const show = (menu) => menu.matches(':popover-open') || menu.showPopover();
+  const hide = (menu) => menu.matches(':popover-open') && menu.hidePopover();
+  for (const menu of [accountMenu, themeMenu]) {
+    menu.addEventListener('toggle', (e) => {
+      const open = e.newState === 'open';
+      const owners = menu === accountMenu ? document.querySelectorAll('[popovertarget="account-menu"]') : [sub];
+      for (const b of owners) b.setAttribute('aria-expanded', open);
+      if (open && menu === accountMenu) items(menu)[0]?.focus();
+    });
+    menu.addEventListener('keydown', (e) => {
+      const list = items(menu);
+      const i = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') list.at((i + (e.key === 'ArrowDown' ? 1 : -1)) % list.length)?.focus();
+      else if ((e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') && document.activeElement === sub) { show(themeMenu); items(themeMenu)[0].focus(); }
+      else if (e.key === 'ArrowLeft' && menu === themeMenu) { hide(themeMenu); sub.focus(); }
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+  sub.addEventListener('pointerenter', () => show(themeMenu));
+  for (const item of items(accountMenu)) if (item !== sub) item.addEventListener('pointerenter', () => hide(themeMenu));
+  themeMenu.querySelector('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const b = e.submitter;
+    post(e.target, b).catch(() => {});
+    document.documentElement.dataset.theme = b.value;
+    document.querySelector('meta[name="color-scheme"]').content = b.value === 'system' ? 'dark light' : b.value;
+    for (const x of themeMenu.querySelectorAll('button')) x.setAttribute('aria-checked', x === b);
+    sub.querySelector('small').textContent = b.value;
+    hide(accountMenu);
+  });
+}
+
+// Sidebar collapse (from 1024px): switch at once, save in the background.
+const sidebarForm = document.querySelector('form[data-sidebar]');
+sidebarForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  post(sidebarForm).catch(() => {});
+  const input = sidebarForm.elements.sidebar;
+  const collapse = input.value === 'collapsed';
+  document.documentElement.classList.toggle('rail', collapse);
+  input.value = collapse ? 'expanded' : 'collapsed';
+  const label = collapse ? 'Expand sidebar' : 'Collapse sidebar';
+  const button = sidebarForm.querySelector('button');
+  button.setAttribute('aria-label', label);
+  button.dataset.tip = label;
+});
+
+// Tooltips, as in Pocket ID: inverse colors, right of the target, after a short hover or on keyboard focus;
+// once one is open, the next shows at once. Nav items and the avatar only need one in the rail.
+const tip = document.getElementById('tip');
+if (tip) {
+  const html = document.documentElement;
+  const tabletRail = matchMedia('(min-width: 640px) and (max-width: 1023px)');
+  const folded = () => tabletRail.matches || html.classList.contains('rail');
+  let timer = 0, current = null, closedAt = 0;
+  const hideTip = () => {
+    clearTimeout(timer);
+    if (!current) return;
+    current = null;
+    closedAt = performance.now();
+    tip.hidePopover();
+  };
+  const showTip = (el) => {
+    tip.replaceChildren(el.dataset.tip);
+    if (el.dataset.tipKey) tip.append(Object.assign(document.createElement('kbd'), { textContent: el.dataset.tipKey }));
+    // Sidebar tips sit to the right, as in Pocket ID; the player's control bar has them above.
+    const r = el.getBoundingClientRect();
+    const above = !!el.closest('.bar');
+    tip.classList.toggle('above', above);
+    tip.style.setProperty('left', `${above ? r.left + r.width / 2 : r.right + 6}px`);
+    tip.style.setProperty('top', `${above ? r.top - 6 : r.top + r.height / 2}px`);
+    tip.showPopover();
+    current = el;
+  };
+  const want = (el) => {
+    if (!el || el === current) return;
+    const warm = current || performance.now() - closedAt < 400;
+    hideTip();
+    if (el.matches('.nav-item, .rail-avatar') && !folded()) return;
+    if (el.getAttribute('aria-expanded') === 'true' || html.classList.contains('resizing')) return;
+    timer = setTimeout(() => showTip(el), warm ? 0 : 400);
+  };
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType === 'mouse') want(e.target.closest('[data-tip]'));
+  });
+  document.addEventListener('pointerout', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el && !el.contains(e.relatedTarget)) hideTip();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el?.matches(':focus-visible')) want(el);
+  });
+  document.addEventListener('focusout', hideTip);
+  document.addEventListener('pointerdown', hideTip);
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && hideTip());
+  addEventListener('scroll', hideTip, { passive: true, capture: true });
+}
+
+// Resizable sidebar (from 1024px), as in Pocket ID: drag the edge, arrow keys step 16px, Home/End jump to the
+// limits, a double-click resets. Letting go far left of the minimum folds it to the rail. Saved per user.
+const handle = document.querySelector('.sidebar-resize');
+if (handle && sidebarForm) {
+  const MIN = 208, MAX = 400, STEP = 16, DEFAULT = 256, FOLD = 140;
+  const html = document.documentElement;
+  const clamp = (px) => Math.min(MAX, Math.max(MIN, px));
+  const width = () => Number(handle.getAttribute('aria-valuenow')) || DEFAULT;
+  const live = (px) => html.style.setProperty('--sidebar-w', `${px}px`);
+  const save = (px) => {
+    px = clamp(Math.round(px / STEP) * STEP);
+    handle.setAttribute('aria-valuenow', px);
+    for (const c of [...html.classList]) if (c.startsWith('sw-')) html.classList.remove(c);
+    html.classList.add(`sw-${px}`);
+    html.style.removeProperty('--sidebar-w');
+    fetch('/account/preferences', { method: 'POST', body: new URLSearchParams({ sidebar_width: px }), headers: { 'X-Requested-With': 'fetch' } }).catch(() => {});
+  };
+  let drag = null;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, w: width() };
+    html.classList.add('resizing');
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (drag) live(clamp(drag.w + e.clientX - drag.x));
+  });
+  const end = (e, cancel) => {
+    if (!drag) return;
+    const w = drag.w + e.clientX - drag.x;
+    const start = drag.w;
+    drag = null;
+    html.classList.remove('resizing');
+    if (cancel || w < FOLD) html.style.removeProperty('--sidebar-w');
+    if (cancel) return;
+    if (w < FOLD) sidebarForm.requestSubmit();
+    else if (clamp(w) !== start) save(w);
+  };
+  handle.addEventListener('pointerup', (e) => end(e, false));
+  handle.addEventListener('pointercancel', (e) => end(e, true));
+  handle.addEventListener('dblclick', () => save(DEFAULT));
+  handle.addEventListener('keydown', (e) => {
+    const next = { ArrowLeft: width() - STEP, ArrowRight: width() + STEP, Home: MIN, End: MAX }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    save(next);
+  });
+}
+
+// Administration › Appearance: preview the color and corner radius before saving.
+const appearanceForm = document.querySelector('form[data-appearance]');
+if (appearanceForm) {
+  const root = document.documentElement.style;
+  const radii = { xs: 6, sm: 10, md: 12, lg: 16, xl: 20, '3xl': 24 };
+  const readable = (hex) => {
+    const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return (l + 0.05) / 0.05 > 1.05 / (l + 0.05) ? '#000000' : '#ffffff';
+  };
+  appearanceForm.querySelector('[data-square-check]')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    const warn = appearanceForm.querySelector('[data-square-warning]');
+    if (!file || !warn) return;
+    const img = new Image();
+    img.onload = () => { warn.hidden = Math.abs(img.naturalWidth - img.naturalHeight) <= 2; URL.revokeObjectURL(img.src); };
+    img.src = URL.createObjectURL(file);
+  });
+  appearanceForm.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.name === 'radius') for (const [k, px] of Object.entries(radii)) root.setProperty(`--radius-${k}`, `${px * t.value}px`);
+    if (t.name === 'primary_custom') appearanceForm.querySelector('input[name="primary"][value="custom"]').checked = true;
+    if (t.name !== 'primary' && t.name !== 'primary_custom') return;
+    const picked = appearanceForm.querySelector('input[name="primary"]:checked').value;
+    const color = picked === 'custom' ? appearanceForm.elements.primary_custom.value : picked;
+    const warn = appearanceForm.querySelector('[data-contrast-warning]');
+    if (warn) warn.hidden = !(color && readable(color) === '#000000' && parseInt(color.slice(1, 3), 16) + parseInt(color.slice(3, 5), 16) + parseInt(color.slice(5, 7), 16) > 600);
+    for (const k of ['--primary', '--primary-fg', '--primary-hover']) root.removeProperty(k);
+    if (color) {
+      root.setProperty('--primary', color);
+      root.setProperty('--primary-fg', readable(color));
+      root.setProperty('--primary-hover', `color-mix(in oklab, ${color} 85%, #000)`);
+    }
+  });
+}
+
+// Page transitions: the page being left names its content "content-old", so it fades out on its own while
+// the new page's "content" fades in (Pocket ID does the same). A page restored from the back/forward cache
+// drops the name again.
+addEventListener('pageswap', (e) => {
+  if (e.viewTransition) document.querySelector('main')?.style.setProperty('view-transition-name', 'content-old');
+});
+addEventListener('pagereveal', () => document.querySelector('main')?.style.removeProperty('view-transition-name'));
+
+// A long sidebar scrolls; keep the current page in view.
+const navCurrent = document.querySelector('.sidebar nav [aria-current]');
+if (navCurrent) {
+  const nav = navCurrent.closest('nav');
+  const below = navCurrent.getBoundingClientRect().bottom - nav.getBoundingClientRect().bottom;
+  if (below > 0) nav.scrollTop += below + 16;
+}
+
+// Infinite scroll: swap the "Load more" link for the next page when it nears the viewport.
+const feed = document.getElementById('feed');
+const pager = new IntersectionObserver(async ([entry]) => {
+  if (!entry.isIntersecting) return;
+  const link = entry.target;
+  pager.unobserve(link);
+  const res = await fetch(link.href + '&fragment=1', { headers: { 'X-Requested-With': 'fetch' } }).catch(() => null);
+  // A failed page is tried again a little later instead of ending the feed there.
+  if (!res || !res.ok) return setTimeout(() => link.isConnected && pager.observe(link), 3000);
+  link.insertAdjacentHTML('afterend', await res.text());
+  link.remove();
+  watchPager();
+}, { rootMargin: '1200px' });
+function watchPager() {
+  const link = document.getElementById('more');
+  if (link) pager.observe(link);
+}
+watchPager();
+
+// First fetch in progress: reload until videos arrive.
+const reload = document.querySelector('[data-reload]');
+if (reload) setTimeout(() => location.reload(), Number(reload.dataset.reload) * 1000);
+
+// Keyboard: j/k move, Enter opens, w watched, l later, / search.
+let current = null;
+function focusCard(card) {
+  if (!card) return;
+  current?.classList.remove('focus');
+  current = card;
+  card.classList.add('focus');
+  card.scrollIntoView({ block: 'nearest' });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('[popover], dialog')) return;
+  if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if (e.key === '/') {
+    e.preventDefault();
+    const field = document.querySelector('[data-search]');
+    field ? field.focus() : openPalette();
+    return;
+  }
+  if (e.key === '?' && !document.getElementById('player')) {
+    const d = document.getElementById('site-keys');
+    if (d) { e.preventDefault(); d.open ? d.close() : d.showModal(); }
+    return;
+  }
+  if (!feed || document.getElementById('player')) return;
+  // Enter on a focused link or button (Tab navigation) keeps its own meaning.
+  if (e.key === 'Enter' && e.target.closest?.('a, button, summary')) return;
+  const cards = [...feed.querySelectorAll('.card')];
+  const i = cards.indexOf(current);
+  switch (e.key) {
+    case 'j': focusCard(cards[Math.min(i + 1, cards.length - 1)]); break;
+    case 'k': focusCard(cards[Math.max(i - 1, 0)]); break;
+    case 'Enter': case 'o': current?.querySelector('a.title')?.click(); break;
+    case 'w': current?.querySelector('[data-toggle="watched"]')?.requestSubmit(); break;
+    case 'l': current?.querySelector('[data-toggle="later"]')?.requestSubmit(); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+
+// Videos open inside this page, as on YouTube and in TubeShelf 1.x: the watch page is fetched and swapped in,
+// so the click that opened it still counts as the go-ahead for sound. Firefox only gives that to the page
+// that was clicked; a freshly loaded watch page would have to start muted. Back puts the page left back as it
+// was (loaded pages, scroll position, focus), without fetching it again.
+let playerModule = null;
+let left = null;
+let shown = location.pathname + location.search;
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest?.('a[href]');
+  if (!a || a.origin !== location.origin || !a.pathname.startsWith('/watch/') || a.target || !document.querySelector('.shell')) return;
+  e.preventDefault();
+  openWatch(a.href);
+});
+let opening = 0;
+async function openWatch(url) {
+  // Only the video clicked last may be shown, whichever reply arrives last.
+  const mine = ++opening;
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
+    if (!res.ok || res.redirected) throw new Error(`watch page: ${res.status}`);
+    const next = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const main = next.querySelector('main#main');
+    const src = next.querySelector('script[src*="/static/player.js"]')?.getAttribute('src');
+    if (!main || !src || !next.querySelector('.shell')) throw new Error('watch page: unexpected markup');
+    playerModule ??= await import(src);
+    if (mine !== opening) return;
+    const from = shown;
+    const swap = () => {
+      // Keep the page being left (the very nodes, so its listeners and loaded pages survive) for Back.
+      if (!document.getElementById('player')) {
+        left = { url: from, nodes: [...document.querySelector('main#main').childNodes], y: scrollY, title: document.title,
+          html: document.documentElement.className, body: document.body.className, focus: document.activeElement?.closest('.card')?.querySelector('a.title'),
+          nav: [...document.querySelectorAll('.sidebar nav [aria-current]')], fold: sidebarForm?.innerHTML,
+          foldValue: sidebarForm?.elements.sidebar.value };
+      }
+      playerModule.unmount();
+      document.title = next.title;
+      document.documentElement.className = next.documentElement.className.replace(/\bpreload\b ?/, '');
+      document.body.className = next.body.className;
+      document.querySelector('main#main').replaceChildren(...main.childNodes);
+      for (const el of document.querySelectorAll('.sidebar nav [aria-current]')) el.removeAttribute('aria-current');
+      // The watch page folds the sidebar; the collapse button then offers to expand it.
+      const fold = next.querySelector('form[data-sidebar]');
+      if (fold && sidebarForm) {
+        sidebarForm.elements.sidebar.value = fold.elements.sidebar.value;
+        const b = sidebarForm.querySelector('button'), nb = fold.querySelector('button');
+        b.setAttribute('aria-label', nb.getAttribute('aria-label'));
+        b.dataset.tip = nb.dataset.tip;
+      }
+      scrollTo(0, 0);
+      playerModule.mount();
+      // Keyboard and screen reader users land on the video, not on whatever they clicked.
+      document.getElementById('player')?.focus({ preventScroll: true });
+    };
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    history.pushState(null, '', url);
+    shown = location.pathname + location.search;
+    if (document.startViewTransition && !still.matches) document.startViewTransition(swap);
+    else swap();
+  } catch {
+    if (mine === opening) location.href = url;
+  }
+}
+// A page kept for Back (bfcache) after signing out elsewhere must not show the old account.
+addEventListener('pageshow', async (e) => {
+  if (!e.persisted || !document.querySelector('.shell')) return;
+  const who = await fetch('/account', { method: 'HEAD', redirect: 'manual' }).catch(() => null);
+  if (who?.type === 'opaqueredirect') location.reload();
+});
+addEventListener('popstate', () => {
+  const here = location.pathname + location.search;
+  if (here === shown) return;
+  if (left && here === left.url) {
+    playerModule?.unmount();
+    document.querySelector('main#main').replaceChildren(...left.nodes);
+    document.title = left.title;
+    document.documentElement.className = left.html;
+    document.body.className = left.body;
+    for (const el of left.nav) el.setAttribute('aria-current', 'page');
+    if (sidebarForm && left.fold) { sidebarForm.innerHTML = left.fold; sidebarForm.elements.sidebar.value = left.foldValue; }
+    shown = here;
+    const { y, focus } = left;
+    left = null;
+    scrollTo(0, y);
+    requestAnimationFrame(() => { scrollTo(0, y); focus?.focus({ preventScroll: true }); });
+    return;
+  }
+  location.reload();
+});
+
+// Long descriptions and comments show a few lines; a Show more button appears only where text is cut.
+function clamps(root = document) {
+  for (const el of root.querySelectorAll('[data-clamp]:not([data-clamp-ready])')) {
+    el.dataset.clampReady = '';
+    const text = el.matches('p') ? el : el.querySelector('p');
+    if (!text || text.scrollHeight <= text.clientHeight + 2) continue;
+    let button = el.querySelector('[data-clamp-toggle]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'link clamp-more';
+      el.after(button);
+    }
+    button.hidden = false;
+    button.textContent = 'Show more';
+    button.addEventListener('click', () => {
+      const open = el.classList.toggle('open');
+      button.textContent = open ? 'Show less' : 'Show more';
+    });
+  }
+}
+clamps();
+new MutationObserver(() => clamps()).observe(document.body, { childList: true, subtree: true });
+
+// Filter a long table as you type (Channels, Users).
+document.addEventListener('input', (e) => {
+  const input = e.target.closest?.('[data-filter-rows]');
+  if (!input) return;
+  const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const row of document.querySelectorAll(`${input.dataset.filterRows} > [data-filter-text]`)) {
+    const text = row.dataset.filterText.toLowerCase();
+    row.hidden = !words.every((w) => text.includes(w));
+  }
+});
+
+// "Keyboard shortcuts" in the account menu: the video page's own list there, else the site list.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-show-keys]')) return;
+  document.getElementById('account-menu')?.hidePopover();
+  (document.getElementById('keys') || document.getElementById('site-keys'))?.showModal();
+});
+
+// Login provider presets fill the usual name, scopes and group claim.
+document.addEventListener('change', (e) => {
+  if (!e.target.matches('[data-preset]') || !e.target.value) return;
+  const f = e.target.form;
+  const [name, scopes, claim] = e.target.value.split('|');
+  f.elements.name.value = name;
+  f.elements.scopes.value = scopes;
+  f.elements.group_claim.value = claim;
+  if (name === 'Google') f.elements.issuer.value = 'https://accounts.google.com';
+});
+
+// Copy buttons: copy the nearest [data-copy-source] input.
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const src = b.parentElement.querySelector('[data-copy-source]');
+  if (!src) return;
+  src.select();
+  try { await navigator.clipboard.writeText(src.value); } catch { document.execCommand('copy'); }
+  const t = b.textContent; b.textContent = 'Copied'; setTimeout(() => { b.textContent = t; }, 1500);
+});
