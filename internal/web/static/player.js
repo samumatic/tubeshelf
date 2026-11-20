@@ -36,7 +36,12 @@ function setup(box) {
   let segments = [];
   // Segments skipped once already, or sought into: these play. Going back to one is how a skip is undone.
   const watchAnyway = new Set();
-  let lastSkip = null; // Enter goes back to its start, as in the SponsorBlock extension
+  // The last sponsor skipped; watching once Enter or Undo went back into it. Enter decides by this,
+  // not by the reported time alone, which lags behind a seek in the real player.
+  let lastSkip = null;
+  // The embed keeps reporting the old time for a moment after seekTo; until it reports near the target,
+  // those reports are ignored so the bar, the auto skip and Enter see where the video is going.
+  let seekGuard = null;
   let savedAt = now.t;
   let captions = box.dataset.captions === '1'; // remembered per user, like YouTube's own choice
   const touch = matchMedia('(hover: none)').matches;
@@ -86,8 +91,18 @@ function setup(box) {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => (toast.hidden = true), action ? 5000 : 1600);
   }
-  const undoSkip = () => { if (lastSkip) { seek(lastSkip[0]); say(touch ? 'Playing sponsor' : 'Playing sponsor · Enter to skip'); } };
-  const skipped = () => say(touch ? 'Skipped sponsor' : 'Skipped sponsor · Enter to undo', { label: 'Undo', run: undoSkip });
+  const undoSkip = () => {
+    if (!lastSkip) return;
+    lastSkip.watching = true;
+    seek(lastSkip.seg[0]);
+    say(touch ? 'Playing sponsor' : 'Playing sponsor · Enter to skip');
+  };
+  function skipSegment(seg) {
+    watchAnyway.add(seg);
+    lastSkip = { seg, watching: false };
+    seek(seg[1], true);
+    say(touch ? 'Skipped sponsor' : 'Skipped sponsor · Enter to undo', { label: 'Undo', run: undoSkip });
+  }
 
   const clock = (s) => {
     s = Math.max(0, Math.floor(s));
@@ -208,16 +223,14 @@ function setup(box) {
       speedButton.textContent = `${now.rate}×`;
       for (const b of speedMenu.querySelectorAll('[data-rate]')) b.setAttribute('aria-checked', Number(b.dataset.rate) === now.rate);
     }
-    if (typeof info.currentTime === 'number') {
+    const stale = typeof info.currentTime === 'number' && seekGuard
+      && performance.now() < seekGuard.until && Math.abs(info.currentTime - seekGuard.to) > 1.5;
+    if (typeof info.currentTime === 'number' && !stale) {
+      seekGuard = null;
       now.t = info.currentTime;
       now.at = performance.now();
       const hit = segments.find((s) => !watchAnyway.has(s) && now.t >= s[0] && now.t < s[1] - 0.5);
-      if (hit) {
-        watchAnyway.add(hit);
-        lastSkip = hit;
-        seek(hit[1], true);
-        skipped();
-      }
+      if (hit) skipSegment(hit);
       if (now.state === PLAYING && Math.abs(now.t - savedAt) >= 10) save();
     }
     if (typeof info.playerState === 'number' && info.playerState !== now.state) {
@@ -309,6 +322,7 @@ function setup(box) {
     if (!auto) for (const s of segments) if (to >= s[0] && to < s[1] - 0.5) watchAnyway.add(s);
     now.t = to;
     now.at = performance.now();
+    seekGuard = { to, until: now.at + 2500 };
     command('seekTo', to, true);
   }
   const toggle = () => (loaded ? command(now.state === PLAYING || now.state === BUFFERING ? 'pauseVideo' : 'playVideo') : load());
@@ -519,15 +533,16 @@ function setup(box) {
       case 'k': toggle(); break;
       case 'Enter': {
         if (e.target.closest('button, a, summary')) return; // Enter presses the focused control
-        // As in the SponsorBlock extension: inside a sponsor Enter skips it, after a skip Enter undoes it.
+        // As in the SponsorBlock extension: in the 10 s after a skip Enter goes back to the sponsor, while
+        // it plays Enter skips it again, and inside any other sponsor Enter skips that one. The player lands
+        // a seek on a frame it can show, which may be up to a second or two early, hence the margins.
         const t = position();
-        const inside = segments.find((s) => t >= s[0] && t < s[1] - 0.5);
-        if (inside) {
-          lastSkip = inside;
-          seek(inside[1], true);
-          skipped();
-        } else if (lastSkip) undoSkip();
-        else return;
+        const seg = lastSkip?.seg;
+        if (seg && !lastSkip.watching && t >= seg[1] - 2 && t < seg[1] + 10) { undoSkip(); break; }
+        let target = seg && lastSkip.watching && t >= seg[0] - 2 && t < seg[1] - 0.5 ? seg : null;
+        target ??= segments.find((s) => t >= s[0] && t < s[1] - 0.5);
+        if (!target) return;
+        skipSegment(target);
         break;
       }
       case 'j': seek(position() - 10); break;
